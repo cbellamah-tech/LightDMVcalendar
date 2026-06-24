@@ -317,7 +317,7 @@ export default function OpsCalendar() {
                             <div key={p.id} className="flex items-center gap-1">
                               <span style={{ background: "#94A3B8" }} className="w-1.5 h-1.5 rounded-full shrink-0" />
                               <span className="text-[10px] truncate leading-tight" style={{ color: "#64748B" }}>
-                                <span className="font-extrabold uppercase">Auto GBP &amp; FB Post: </span>{p.short}
+                                <span className="uppercase">Auto GBP &amp; FB Post: </span>{p.short}
                               </span>
                             </div>
                           ))}
