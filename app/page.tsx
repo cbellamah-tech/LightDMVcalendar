@@ -313,11 +313,12 @@ export default function OpsCalendar() {
                       ))}
                       {dayAuto.length > 0 && (
                         <>
-                          <span className="block text-[8px] font-extrabold uppercase leading-none whitespace-nowrap overflow-hidden" style={{ color: "#94A3B8" }}>Auto GBP &amp; FB Post:</span>
                           {dayAuto.slice(0, 2).map(p => (
                             <div key={p.id} className="flex items-center gap-1">
                               <span style={{ background: "#94A3B8" }} className="w-1.5 h-1.5 rounded-full shrink-0" />
-                              <span style={{ color: "#64748B" }} className="text-[10px] truncate leading-tight">{p.short}</span>
+                              <span className="text-[10px] truncate leading-tight" style={{ color: "#64748B" }}>
+                                <span className="font-extrabold uppercase">Auto GBP &amp; FB Post: </span>{p.short}
+                              </span>
                             </div>
                           ))}
                           {dayAuto.length > 2 && <span className="text-[10px] font-semibold" style={{ color: "#94A3B8" }}>+{dayAuto.length - 2} more auto-posts</span>}
