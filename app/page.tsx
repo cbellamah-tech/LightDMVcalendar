@@ -11,12 +11,13 @@ import autoPostData from "./data/autoposts.json";
 const NAVY = "#112E5B";
 const NAVY_DK = "#0B1F3D";
 const RED = "#F10800";
+const GREEN = "#1F9D55";
 const INK = "#1A2233";
 const PAPER = "#F5F7FA";
 const LINE = "#E2E8F0";
 
 const CATEGORIES: Record<string, string> = {
-  Social: "#0E7C7B", GBP: "#1F9D55", Ads: "#F10800", Content: "#7C3AED",
+  Social: "#0E7C7B", Ads: "#F10800", Content: "#7C3AED",
   Inventory: "#C8742B", Taxes: "#475569", Reviews: "#CA8A04", Ops: "#2563EB",
   Auto: "#94A3B8",
 };
@@ -44,7 +45,6 @@ const AUTO_BLOG_TASKS: Task[] = [
 
 const SEED: Task[] = [
   { id: uid(), title: "Film / post a reel or video", category: "Social", assignee: "Chris", freq: "weekly", daysOfWeek: [2,4], notes: "Install clips, roofline reveals, before/after." },
-  { id: uid(), title: "Add new photos to GBP", category: "GBP", assignee: "Liam", freq: "weekly", daysOfWeek: [5], notes: "Fresh install photos signal activity." },
   { id: uid(), title: "Review & optimize Google Ads", category: "Ads", assignee: "Chris", freq: "weekly", daysOfWeek: [1], notes: "Spend, search terms, negatives. Daily in season." },
   { id: uid(), title: "Check Meta / Facebook ads", category: "Ads", assignee: "Chris", freq: "weekly", daysOfWeek: [3], notes: "Pacing, creative fatigue, CPL." },
   { id: uid(), title: "Launch new ad creative", category: "Ads", assignee: "Chris", freq: "monthly", dayOfMonth: 1, notes: "Refresh the hook before it fatigues." },
@@ -104,7 +104,7 @@ const AUTO_POSTS: AutoPost[] = (((autoPostData as any).posts || []) as AutoPost[
 const autoPostsForDate = (date: Date) => AUTO_POSTS.filter(p => p.date === ymd(date));
 
 /* Seed tasks that are now handled by external automation — removed on load. */
-const RETIRED_TASK_TITLES = ["Google Business Profile post", "Social media post (IG / FB)"];
+const RETIRED_TASK_TITLES = ["Google Business Profile post", "Social media post (IG / FB)", "Add new photos to GBP"];
 
 /* ---------------- Data layer (shared DB) ---------------- */
 async function fetchBoard() {
@@ -289,7 +289,7 @@ export default function OpsCalendar() {
                 className="rounded-lg border p-1.5 text-left flex flex-col gap-1 hover:shadow-md transition min-h-[84px] sm:min-h-[104px]">
                 <div className="flex items-center justify-between">
                   <span style={{ color: isT ? RED : INK }} className="text-xs font-bold">{d.getDate()}</span>
-                  {allDone && <Check size={13} color={CATEGORIES.GBP} strokeWidth={3} />}
+                  {allDone && <Check size={13} color={GREEN} strokeWidth={3} />}
                 </div>
                 <div className="flex flex-col gap-0.5 overflow-hidden">
                   {regularTasks.slice(0, 3).map(t => (
@@ -410,7 +410,7 @@ function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: a
                 <span>{doneCount} of {tasks.length} done</span><span>{pct}%</span>
               </div>
               <div style={{ background: LINE }} className="h-2 rounded-full overflow-hidden">
-                <div style={{ background: pct === 100 ? CATEGORIES.GBP : RED, width: `${pct}%` }} className="h-full transition-all" />
+                <div style={{ background: pct === 100 ? GREEN : RED, width: `${pct}%` }} className="h-full transition-all" />
               </div>
             </div>
           )}
@@ -428,7 +428,7 @@ function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: a
                   <div key={t.id} style={{ borderColor: LINE, opacity: checked ? .6 : 1 }}
                     className="group flex items-start gap-3 border rounded-xl p-3">
                     <button onClick={() => toggleDone(t.id, date)}
-                      style={{ background: checked ? CATEGORIES.GBP : "white", borderColor: checked ? CATEGORIES.GBP : "#CBD5E1" }}
+                      style={{ background: checked ? GREEN : "white", borderColor: checked ? GREEN : "#CBD5E1" }}
                       className="mt-0.5 w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition">
                       {checked && <Check size={15} color="white" strokeWidth={3} />}
                     </button>
