@@ -85,17 +85,7 @@ type AutoPost = {
   category: string; short: string; caption: string; image: string;
 };
 const AUTO_POSTS: AutoPost[] = (((autoPostData as any).posts || []) as AutoPost[]);
-const AUTO_PLATFORMS: string[] = (autoPostData as any).platforms || ["GBP", "Meta"];
-const PLATFORM_COLOR: Record<string, string> = { GBP: "#1F9D55", Meta: "#2563EB" };
-const AUTOPOST_CAT_COLOR: Record<string, string> = {
-  Holiday: "#1F9D55", Permanent: NAVY, Bistro: "#C8742B",
-};
-const catColor = (c: string) => CATEGORIES[c] || AUTOPOST_CAT_COLOR[c] || "#64748B";
-const parseISODate = (s: string) => {
-  const [y, mo, d] = s.split("-").map(Number);
-  return new Date(y || 1970, (mo || 1) - 1, d || 1);
-};
-const AUTO_POST_DATES = new Set(AUTO_POSTS.map(p => p.date));
+const autoPostsForDate = (date: Date) => AUTO_POSTS.filter(p => p.date === ymd(date));
 
 /* Seed tasks that are now handled by external automation — removed on load. */
 const RETIRED_TASK_TITLES = ["Google Business Profile post", "Social media post (IG / FB)"];
@@ -119,7 +109,6 @@ export default function OpsCalendar() {
   const [done, setDone] = useState<Record<string, boolean>>({});
   const [cursor, setCursor] = useState(new Date());
   const [filter, setFilter] = useState("All");
-  const [view, setView] = useState<"tasks" | "autoposts">("tasks");
   const [dayPanel, setDayPanel] = useState<Date | null>(null);
   const [editing, setEditing] = useState<Task | "new" | null>(null);
   const [ready, setReady] = useState(false);
@@ -225,39 +214,24 @@ export default function OpsCalendar() {
           </div>
         </div>
 
-        {/* View toggle */}
         <div style={{ background: NAVY_DK }} className="flex rounded-lg p-1">
-          {([["tasks","Tasks"],["autoposts","Auto-Posts"]] as const).map(([v, label]) => (
-            <button key={v} onClick={() => setView(v)}
-              style={{ background: view===v ? "white":"transparent", color: view===v ? NAVY : "#9FB3D1" }}
-              className="px-3 py-1.5 rounded-md text-sm font-semibold transition">{label}</button>
+          {["All","Chris","Liam"].map(p => (
+            <button key={p} onClick={() => setFilter(p)}
+              style={{ background: filter===p ? "white":"transparent", color: filter===p ? NAVY : "#9FB3D1" }}
+              className="px-3 py-1.5 rounded-md text-sm font-semibold transition">{p}</button>
           ))}
         </div>
 
-        {view === "tasks" && (
-          <>
-            <div style={{ background: NAVY_DK }} className="flex rounded-lg p-1">
-              {["All","Chris","Liam"].map(p => (
-                <button key={p} onClick={() => setFilter(p)}
-                  style={{ background: filter===p ? "white":"transparent", color: filter===p ? NAVY : "#9FB3D1" }}
-                  className="px-3 py-1.5 rounded-md text-sm font-semibold transition">{p}</button>
-              ))}
-            </div>
-
-            <button onClick={() => setDayPanel(new Date())}
-              className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white border border-white/25 hover:bg-white/10">
-              Today
-            </button>
-            <button onClick={() => setEditing("new")} style={{ background: "white", color: NAVY }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold">
-              <Plus size={16} /> Add task
-            </button>
-          </>
-        )}
+        <button onClick={() => setDayPanel(new Date())}
+          className="px-3 py-1.5 rounded-lg text-sm font-semibold text-white border border-white/25 hover:bg-white/10">
+          Today
+        </button>
+        <button onClick={() => setEditing("new")} style={{ background: "white", color: NAVY }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold">
+          <Plus size={16} /> Add task
+        </button>
       </div>
 
-      {view === "tasks" && (
-      <>
       {/* Month controls */}
       <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center gap-3">
         <button onClick={() => shiftMonth(-1)} style={{ borderColor: LINE }}
@@ -287,7 +261,7 @@ export default function OpsCalendar() {
             const isT = sameDay(d, today);
             const dayTasks = tasksForDate(d);
             const allDone = dayTasks.length > 0 && dayTasks.every(t => isDone(t.id, d));
-            const hasAuto = AUTO_POST_DATES.has(ymd(d));
+            const dayAuto = autoPostsForDate(d);
             return (
               <button key={i} onClick={() => setDayPanel(d)}
                 style={{
@@ -298,23 +272,30 @@ export default function OpsCalendar() {
                 className="rounded-lg border p-1.5 text-left flex flex-col gap-1 hover:shadow-md transition min-h-[84px] sm:min-h-[104px]">
                 <div className="flex items-center justify-between">
                   <span style={{ color: isT ? RED : INK }} className="text-xs font-bold">{d.getDate()}</span>
-                  <span className="flex items-center gap-1">
-                    {hasAuto && (
-                      <span title="Auto-post scheduled" style={{ background: PLATFORM_COLOR.Meta }}
-                        className="w-1.5 h-1.5 rounded-full inline-block" />
-                    )}
-                    {allDone && <Check size={13} color={CATEGORIES.GBP} strokeWidth={3} />}
-                  </span>
+                  {allDone && <Check size={13} color={CATEGORIES.GBP} strokeWidth={3} />}
                 </div>
                 <div className="flex flex-col gap-0.5 overflow-hidden">
-                  {dayTasks.slice(0, 4).map(t => (
+                  {dayTasks.slice(0, 3).map(t => (
                     <div key={t.id} className="flex items-center gap-1">
                       <span style={{ background: CATEGORIES[t.category] }} className="w-1.5 h-1.5 rounded-full shrink-0" />
                       <span style={{ textDecoration: isDone(t.id, d) ? "line-through" : "none", color: isDone(t.id,d) ? "#94A3B8" : "#475569" }}
                         className="text-[10px] truncate leading-tight">{t.title}</span>
                     </div>
                   ))}
-                  {dayTasks.length > 4 && <span className="text-[10px] text-slate-400 font-semibold">+{dayTasks.length - 4} more</span>}
+                  {dayTasks.length > 3 && <span className="text-[10px] text-slate-400 font-semibold">+{dayTasks.length - 3} more</span>}
+
+                  {dayAuto.length > 0 && (
+                    <div style={{ background: "#F1F5F9", borderColor: LINE }}
+                      className="mt-0.5 rounded-md border px-1 py-0.5 flex flex-col gap-0.5">
+                      {dayAuto.slice(0, 2).map(p => (
+                        <div key={p.id} className="flex items-center gap-1">
+                          <span style={{ background: "#94A3B8" }} className="w-1.5 h-1.5 rounded-full shrink-0" />
+                          <span style={{ color: "#64748B" }} className="text-[10px] truncate leading-tight">{p.short}</span>
+                        </div>
+                      ))}
+                      {dayAuto.length > 2 && <span className="text-[10px] font-semibold" style={{ color: "#94A3B8" }}>+{dayAuto.length - 2} more auto-posts</span>}
+                    </div>
+                  )}
                 </div>
               </button>
             );
@@ -331,13 +312,9 @@ export default function OpsCalendar() {
           </span>
         ))}
         <span className="flex items-center gap-1.5 text-xs text-slate-600 ml-1">
-          <span style={{ background: PLATFORM_COLOR.Meta }} className="w-2.5 h-2.5 rounded-full inline-block" />Auto-post scheduled
+          <span style={{ background: "#94A3B8" }} className="w-2.5 h-2.5 rounded-full inline-block" />Auto-posts
         </span>
       </div>
-      </>
-      )}
-
-      {view === "autoposts" && <AutoPostsView />}
 
       {/* Day panel */}
       {dayPanel && (
@@ -374,106 +351,12 @@ function SyncBadge({ state }: { state: "idle"|"saving"|"error" }) {
   return <span className="flex items-center gap-1 text-xs text-slate-400"><Cloud size={13}/> Synced</span>;
 }
 
-/* ---------------- Auto-Posts view ---------------- */
-function AutoPostsView() {
-  const [platform, setPlatform] = useState<string>("All");
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  const filtered = useMemo(() => {
-    const list = platform === "All" ? AUTO_POSTS : AUTO_POSTS.filter(p => p.platform === platform);
-    return [...list].sort((a, b) => a.date.localeCompare(b.date));
-  }, [platform]);
-
-  const groups = useMemo(() => {
-    const map = new Map<string, { label: string; posts: AutoPost[] }>();
-    for (const p of filtered) {
-      const d = parseISODate(p.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-      if (!map.has(key)) map.set(key, { label, posts: [] });
-      map.get(key)!.posts.push(p);
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
-  }, [filtered]);
-
-  const pills = ["All", ...AUTO_PLATFORMS];
-
-  return (
-    <div className="px-4 sm:px-6 pt-5 pb-12">
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <div className="font-extrabold text-2xl mr-auto" style={{ color: NAVY }}>Scheduled Auto-Posts</div>
-        <div style={{ background: "white", borderColor: LINE }} className="flex rounded-lg p-1 border">
-          {pills.map(p => (
-            <button key={p} onClick={() => setPlatform(p)}
-              style={{ background: platform === p ? NAVY : "transparent", color: platform === p ? "white" : "#64748B" }}
-              className="px-3 py-1.5 rounded-md text-sm font-semibold transition">{p}</button>
-          ))}
-        </div>
-        <span className="text-xs font-semibold text-slate-500">{filtered.length} post{filtered.length === 1 ? "" : "s"}</span>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div style={{ borderColor: LINE }} className="border-2 border-dashed rounded-xl py-16 text-center">
-          <div className="text-slate-600 font-semibold">
-            No {platform === "All" ? "" : platform + " "}posts scheduled yet.
-          </div>
-          <div className="text-slate-400 text-sm mt-1">
-            Add them to autoposts.json when you set up {platform === "All" ? "automation" : platform + " automation"}.
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {groups.map(g => (
-            <div key={g.label}>
-              <div className="text-sm font-bold uppercase tracking-wide text-slate-400 mb-2">{g.label}</div>
-              <div className="space-y-2">
-                {g.posts.map(p => {
-                  const d = parseISODate(p.date);
-                  const open = expanded === p.id;
-                  const cc = catColor(p.category);
-                  return (
-                    <div key={p.id} style={{ borderColor: LINE }} className="border rounded-xl bg-white overflow-hidden">
-                      <button onClick={() => setExpanded(open ? null : p.id)}
-                        className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 transition">
-                        <span style={{ background: PLATFORM_COLOR[p.platform] || "#64748B" }}
-                          className="text-[10px] font-bold text-white px-2 py-1 rounded-md shrink-0 w-12 text-center">
-                          {p.platform}
-                        </span>
-                        <div className="shrink-0 w-24 sm:w-28">
-                          <div className="text-sm font-bold" style={{ color: INK }}>
-                            {d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-                          </div>
-                          <div className="text-xs text-slate-400">{p.time}</div>
-                        </div>
-                        <span style={{ background: cc + "22", color: cc }}
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">{p.category}</span>
-                        <span className="text-sm text-slate-600 truncate flex-1 min-w-0">{p.short}</span>
-                        <ChevronRight size={16} className="text-slate-300 shrink-0 transition-transform"
-                          style={{ transform: open ? "rotate(90deg)" : "none" }} />
-                      </button>
-                      {open && (
-                        <div style={{ borderColor: LINE }} className="border-t px-3 py-3 bg-slate-50">
-                          <div className="text-sm text-slate-700 whitespace-pre-wrap">{p.caption}</div>
-                          {p.image && <div className="text-xs text-slate-400 mt-2 font-mono">{p.image}</div>}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------------- Day panel (slide-over) ---------------- */
 function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: any) {
   const isToday = sameDay(date, today);
   const doneCount = tasks.filter((t: Task) => isDone(t.id, date)).length;
   const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const dayAuto = autoPostsForDate(date);
   return (
     <div className="fixed inset-0 z-40 flex justify-end" style={{ background: "rgba(11,31,61,.45)" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} className="bg-white w-full max-w-md h-full overflow-y-auto shadow-2xl flex flex-col">
@@ -502,12 +385,12 @@ function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: a
             </div>
           )}
 
-          {tasks.length === 0 ? (
+          {tasks.length === 0 && dayAuto.length === 0 ? (
             <div style={{ borderColor: LINE }} className="border-2 border-dashed rounded-xl py-12 text-center">
               <div className="text-slate-600 font-semibold">Nothing scheduled.</div>
               <div className="text-slate-400 text-sm mt-1">Add a recurring task with the button up top.</div>
             </div>
-          ) : (
+          ) : tasks.length === 0 ? null : (
             <div className="space-y-2">
               {tasks.map((t: Task) => {
                 const checked = isDone(t.id, date);
@@ -537,6 +420,27 @@ function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: a
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {dayAuto.length > 0 && (
+            <div style={{ background: "#F1F5F9", borderColor: LINE }} className="mt-4 border rounded-xl p-3">
+              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: "#94A3B8" }}>
+                Auto-posts ({dayAuto.length})
+              </div>
+              <div className="space-y-2">
+                {dayAuto.map((p: AutoPost) => (
+                  <div key={p.id} style={{ borderColor: LINE }} className="bg-white border rounded-lg p-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span style={{ background: "#94A3B8" }} className="text-[10px] font-bold text-white px-2 py-0.5 rounded-md">{p.platform}</span>
+                      <span className="text-xs font-semibold" style={{ color: "#64748B" }}>{p.time}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#E2E8F0", color: "#64748B" }}>{p.category}</span>
+                    </div>
+                    <div className="text-sm font-semibold" style={{ color: "#475569" }}>{p.short}</div>
+                    <div className="text-xs mt-1 whitespace-pre-wrap" style={{ color: "#94A3B8" }}>{p.caption}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
