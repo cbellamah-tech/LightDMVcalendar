@@ -276,6 +276,8 @@ export default function OpsCalendar() {
             const isT = sameDay(d, today);
             const dayTasks = tasksForDate(d);
             const allDone = dayTasks.length > 0 && dayTasks.every(t => isDone(t.id, d));
+            const regularTasks = dayTasks.filter(t => t.category !== "Auto");
+            const autoTasks = dayTasks.filter(t => t.category === "Auto");
             const dayAuto = autoPostsForDate(d);
             return (
               <button key={i} onClick={() => setDayPanel(d)}
@@ -290,26 +292,37 @@ export default function OpsCalendar() {
                   {allDone && <Check size={13} color={CATEGORIES.GBP} strokeWidth={3} />}
                 </div>
                 <div className="flex flex-col gap-0.5 overflow-hidden">
-                  {dayTasks.slice(0, 3).map(t => (
+                  {regularTasks.slice(0, 3).map(t => (
                     <div key={t.id} className="flex items-center gap-1">
                       <span style={{ background: CATEGORIES[t.category] }} className="w-1.5 h-1.5 rounded-full shrink-0" />
                       <span style={{ textDecoration: isDone(t.id, d) ? "line-through" : "none", color: isDone(t.id,d) ? "#94A3B8" : "#475569" }}
                         className="text-[10px] truncate leading-tight">{t.title}</span>
                     </div>
                   ))}
-                  {dayTasks.length > 3 && <span className="text-[10px] text-slate-400 font-semibold">+{dayTasks.length - 3} more</span>}
+                  {regularTasks.length > 3 && <span className="text-[10px] text-slate-400 font-semibold">+{regularTasks.length - 3} more</span>}
 
-                  {dayAuto.length > 0 && (
+                  {(autoTasks.length > 0 || dayAuto.length > 0) && (
                     <div style={{ background: "#F1F5F9", borderColor: LINE }}
                       className="mt-0.5 rounded-md border px-1 py-0.5 flex flex-col gap-0.5">
-                      <span className="text-[9px] font-bold uppercase tracking-wide leading-tight" style={{ color: "#94A3B8" }}>Auto Post FB &amp; GBP:</span>
-                      {dayAuto.slice(0, 2).map(p => (
-                        <div key={p.id} className="flex items-center gap-1">
+                      {autoTasks.map(t => (
+                        <div key={t.id} className="flex items-center gap-1">
                           <span style={{ background: "#94A3B8" }} className="w-1.5 h-1.5 rounded-full shrink-0" />
-                          <span style={{ color: "#64748B" }} className="text-[10px] truncate leading-tight">{p.short}</span>
+                          <span style={{ textDecoration: isDone(t.id, d) ? "line-through" : "none", color: "#64748B" }}
+                            className="text-[10px] truncate leading-tight">{t.title}</span>
                         </div>
                       ))}
-                      {dayAuto.length > 2 && <span className="text-[10px] font-semibold" style={{ color: "#94A3B8" }}>+{dayAuto.length - 2} more auto-posts</span>}
+                      {dayAuto.length > 0 && (
+                        <>
+                          <span className="text-[9px] font-bold uppercase tracking-wide leading-tight" style={{ color: "#94A3B8" }}>Auto Post FB &amp; GBP:</span>
+                          {dayAuto.slice(0, 2).map(p => (
+                            <div key={p.id} className="flex items-center gap-1">
+                              <span style={{ background: "#94A3B8" }} className="w-1.5 h-1.5 rounded-full shrink-0" />
+                              <span style={{ color: "#64748B" }} className="text-[10px] truncate leading-tight">{p.short}</span>
+                            </div>
+                          ))}
+                          {dayAuto.length > 2 && <span className="text-[10px] font-semibold" style={{ color: "#94A3B8" }}>+{dayAuto.length - 2} more auto-posts</span>}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
