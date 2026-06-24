@@ -18,21 +18,29 @@ const LINE = "#E2E8F0";
 const CATEGORIES: Record<string, string> = {
   Social: "#0E7C7B", GBP: "#1F9D55", Ads: "#F10800", Content: "#7C3AED",
   Inventory: "#C8742B", Taxes: "#475569", Reviews: "#CA8A04", Ops: "#2563EB",
+  Auto: "#94A3B8",
 };
 const CATEGORY_NAMES = Object.keys(CATEGORIES);
 const PEOPLE = ["Chris", "Liam", "Both"];
 const PERSON_COLOR: Record<string, string> = { Chris: NAVY, Liam: "#0E7C7B", Both: "#64748B" };
-const FREQS = ["daily", "weekly", "monthly", "quarterly", "yearly"];
+const FREQS = ["daily", "weekly", "monthly", "quarterly", "yearly", "once"];
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const QUARTER_MONTHS = [0, 3, 6, 9];
 
 type Task = {
   id: string; title: string; category: string; assignee: string;
-  freq: string; daysOfWeek?: number[]; dayOfMonth?: number; month?: number; notes?: string;
+  freq: string; daysOfWeek?: number[]; dayOfMonth?: number; month?: number; date?: string; notes?: string;
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+/* Auto-blog tasks (gray "Auto" category). Stable ids so the one-time load
+   injection below is idempotent and matches across the shared board. */
+const AUTO_BLOG_TASKS: Task[] = [
+  { id: "auto-blog-weekly", title: "Auto blog post publishes (review live)", category: "Auto", assignee: "Both", freq: "weekly", daysOfWeek: [1], notes: "Weekly SEO blog auto-publishes to lightdmv.com/blog. No action needed unless reviewing." },
+  { id: "auto-blog-refill-2026-12-14", title: "Refill blog topic queue (blogQueue.ts)", category: "Auto", assignee: "Both", freq: "once", date: "2026-12-14", notes: "Auto-blog topic queue is running low. Add more topics to src/data/blogQueue.ts in the lightdmv-site repo so weekly posts continue." },
+];
 
 const SEED: Task[] = [
   { id: uid(), title: "Film / post a reel or video", category: "Social", assignee: "Chris", freq: "weekly", daysOfWeek: [2,4], notes: "Install clips, roofline reveals, before/after." },
@@ -48,6 +56,7 @@ const SEED: Task[] = [
   { id: uid(), title: "Quarterly estimated taxes", category: "Taxes", assignee: "Chris", freq: "quarterly", dayOfMonth: 15, notes: "IRS dates: ~Apr 15, Jun 15, Sep 15, Jan 15 — verify." },
   { id: uid(), title: "Annual return — books to CPA", category: "Taxes", assignee: "Chris", freq: "yearly", month: 2, dayOfMonth: 1, notes: "Send everything to Bienestar (S-Corp)." },
   { id: uid(), title: "Update KPI dashboard", category: "Ops", assignee: "Chris", freq: "monthly", dayOfMonth: 1, notes: "Jobber + GHL exports → revenue, close rate, ROAS." },
+  ...AUTO_BLOG_TASKS,
 ];
 
 /* ---------------- Date helpers ---------------- */
@@ -65,6 +74,7 @@ function taskDueOn(task: Task, date: Date) {
     case "monthly": return dom === clampDom(y, mon, task.dayOfMonth || 1);
     case "quarterly": return QUARTER_MONTHS.includes(mon) && dom === clampDom(y, mon, task.dayOfMonth || 1);
     case "yearly": return mon === (task.month ?? 0) && dom === clampDom(y, mon, task.dayOfMonth || 1);
+    case "once": return task.date === ymd(date);
     default: return false;
   }
 }
@@ -75,6 +85,12 @@ function recurrenceLabel(t: Task) {
     case "monthly": return `Monthly · day ${t.dayOfMonth}`;
     case "quarterly": return `Quarterly · Jan/Apr/Jul/Oct day ${t.dayOfMonth}`;
     case "yearly": return `Yearly · ${MONTHS[t.month ?? 0]} ${t.dayOfMonth}`;
+    case "once": {
+      if (!t.date) return "One-time";
+      const [y, mo, dd] = t.date.split("-").map(Number);
+      const d = new Date(y, (mo || 1) - 1, dd || 1);
+      return "One-time · " + d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
     default: return t.freq;
   }
 }
@@ -125,14 +141,13 @@ export default function OpsCalendar() {
         else {
           const loaded: Task[] = data.tasks;
           // One-time cleanup: drop tasks now handled by external automation.
-          const needsCleanup = loaded.some((t: Task) => RETIRED_TASK_TITLES.includes(t.title));
-          if (needsCleanup) {
-            const cleaned = loaded.filter((t: Task) => !RETIRED_TASK_TITLES.includes(t.title));
-            setTasks(cleaned);
-            await saveBoard(cleaned, data.done || {});
-          } else {
-            setTasks(loaded);
-          }
+          const cleaned = loaded.filter((t: Task) => !RETIRED_TASK_TITLES.includes(t.title));
+          // One-time injection: ensure the gray auto-blog tasks exist on the saved board.
+          const missing = AUTO_BLOG_TASKS.filter(a => !cleaned.some((t: Task) => t.title === a.title));
+          const next = missing.length ? [...cleaned, ...missing] : cleaned;
+          const changed = cleaned.length !== loaded.length || missing.length > 0;
+          setTasks(next);
+          if (changed) await saveBoard(next, data.done || {});
         }
         setDone(data.done || {});
       } catch {
@@ -459,6 +474,7 @@ function TaskModal({ initial, onClose, onSave, onDelete }: any) {
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initial?.daysOfWeek || [1]);
   const [dayOfMonth, setDayOfMonth] = useState(initial?.dayOfMonth || 1);
   const [month, setMonth] = useState(initial?.month ?? 0);
+  const [date, setDate] = useState(initial?.date || ymd(new Date()));
   const [notes, setNotes] = useState(initial?.notes || "");
 
   const toggleDow = (i: number) => setDaysOfWeek(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i].sort());
@@ -469,6 +485,7 @@ function TaskModal({ initial, onClose, onSave, onDelete }: any) {
     if (freq === "weekly") t.daysOfWeek = daysOfWeek.length ? daysOfWeek : [1];
     if (freq === "monthly" || freq === "quarterly") t.dayOfMonth = Number(dayOfMonth) || 1;
     if (freq === "yearly") { t.month = Number(month); t.dayOfMonth = Number(dayOfMonth) || 1; }
+    if (freq === "once") t.date = date;
     onSave(t);
   };
 
@@ -537,6 +554,12 @@ function TaskModal({ initial, onClose, onSave, onDelete }: any) {
                   style={{ borderColor: LINE }} className="w-full border rounded-lg px-3 py-2 text-[15px] outline-none" />
               </Field>
             </div>
+          )}
+          {freq === "once" && (
+            <Field label="Date">
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                style={{ borderColor: LINE }} className="w-full border rounded-lg px-3 py-2 text-[15px] outline-none" />
+            </Field>
           )}
           <Field label="Notes (optional)">
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything useful to remember"
