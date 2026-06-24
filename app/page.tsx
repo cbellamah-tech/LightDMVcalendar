@@ -287,6 +287,7 @@ export default function OpsCalendar() {
                   {dayAuto.length > 0 && (
                     <div style={{ background: "#F1F5F9", borderColor: LINE }}
                       className="mt-0.5 rounded-md border px-1 py-0.5 flex flex-col gap-0.5">
+                      <span className="text-[9px] font-bold uppercase tracking-wide leading-tight" style={{ color: "#94A3B8" }}>Auto Post FB &amp; GBP:</span>
                       {dayAuto.slice(0, 2).map(p => (
                         <div key={p.id} className="flex items-center gap-1">
                           <span style={{ background: "#94A3B8" }} className="w-1.5 h-1.5 rounded-full shrink-0" />
