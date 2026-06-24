@@ -426,7 +426,7 @@ function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: a
           {dayAuto.length > 0 && (
             <div style={{ background: "#F1F5F9", borderColor: LINE }} className="mt-4 border rounded-xl p-3">
               <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: "#94A3B8" }}>
-                Auto-posts ({dayAuto.length})
+                Auto GBP &amp; FB Post:
               </div>
               <div className="space-y-2">
                 {dayAuto.map((p: AutoPost) => (
