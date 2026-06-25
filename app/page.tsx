@@ -65,6 +65,7 @@ const ymd = (d: Date) =>
 const sameDay = (a: Date, b: Date) => ymd(a) === ymd(b);
 const daysInMonth = (y: number, m: number) => new Date(y, m+1, 0).getDate();
 const clampDom = (y: number, m: number, dom: number) => Math.min(dom, daysInMonth(y, m));
+const startOfWeek = (d: Date) => { const s = new Date(d); s.setHours(0,0,0,0); s.setDate(s.getDate() - s.getDay()); return s; };
 
 function taskDueOn(task: Task, date: Date) {
   const dow = date.getDay(), dom = date.getDate(), mon = date.getMonth(), y = date.getFullYear();
@@ -124,6 +125,7 @@ export default function OpsCalendar() {
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
   const [cursor, setCursor] = useState(new Date());
+  const [view, setView] = useState<"week" | "month">("week");
   const [filter, setFilter] = useState("All");
   const [dayPanel, setDayPanel] = useState<Date | null>(null);
   const [editing, setEditing] = useState<Task | "new" | null>(null);
@@ -203,6 +205,11 @@ export default function OpsCalendar() {
     });
   }, [cursor]);
 
+  const weekDays = useMemo(() => {
+    const s = startOfWeek(cursor);
+    return Array.from({ length: 7 }, (_, i) => { const d = new Date(s); d.setDate(s.getDate() + i); return d; });
+  }, [cursor]);
+
   if (!ready || tasks === null) {
     return (
       <div className="flex items-center justify-center gap-2 py-32 text-slate-500" style={{ minHeight: "100vh" }}>
@@ -214,6 +221,16 @@ export default function OpsCalendar() {
   const today = new Date();
   const m = cursor.getMonth();
   const shiftMonth = (n: number) => { const d = new Date(cursor); d.setMonth(d.getMonth()+n); setCursor(d); };
+  const shiftWeek = (n: number) => { const d = new Date(cursor); d.setDate(d.getDate()+7*n); setCursor(d); };
+  const goPrev = () => (view === "month" ? shiftMonth(-1) : shiftWeek(-1));
+  const goNext = () => (view === "month" ? shiftMonth(1) : shiftWeek(1));
+  const weekRangeLabel = (() => {
+    const s = weekDays[0], e = weekDays[6];
+    const sM = MONTHS[s.getMonth()], eM = MONTHS[e.getMonth()];
+    return s.getMonth() === e.getMonth()
+      ? `${sM} ${s.getDate()} – ${e.getDate()}, ${e.getFullYear()}`
+      : `${sM} ${s.getDate()} – ${eM} ${e.getDate()}, ${e.getFullYear()}`;
+  })();
 
   return (
     <div className="min-h-screen" style={{ background: PAPER, color: INK }}>
@@ -247,28 +264,102 @@ export default function OpsCalendar() {
         </button>
       </div>
 
-      {/* Month controls */}
-      <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center gap-3">
-        <button onClick={() => shiftMonth(-1)} style={{ borderColor: LINE }}
-          className="w-9 h-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50">
-          <ChevronLeft size={18} />
-        </button>
-        <div className="font-extrabold text-2xl mr-auto" style={{ color: NAVY }}>
-          {cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+      {/* View toggle + nav controls */}
+      <div className="px-4 sm:px-6 pt-4 pb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex items-center gap-2">
+          <button onClick={goPrev} style={{ borderColor: LINE }} aria-label="Previous"
+            className="w-9 h-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 active:bg-slate-100">
+            <ChevronLeft size={18} />
+          </button>
+          <button onClick={goNext} style={{ borderColor: LINE }} aria-label="Next"
+            className="w-9 h-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 active:bg-slate-100">
+            <ChevronRight size={18} />
+          </button>
         </div>
-        <SyncBadge state={sync} />
+        <div className="font-extrabold text-lg sm:text-2xl mr-auto" style={{ color: NAVY }}>
+          {view === "month"
+            ? cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })
+            : weekRangeLabel}
+        </div>
+
+        <div style={{ background: "#E2E8F0" }} className="flex rounded-lg p-1">
+          {(["week","month"] as const).map(v => (
+            <button key={v} onClick={() => setView(v)}
+              style={{ background: view===v ? "white":"transparent", color: view===v ? NAVY : "#64748B" }}
+              className="px-3 py-1.5 rounded-md text-sm font-semibold capitalize transition">{v}</button>
+          ))}
+        </div>
         <button onClick={() => setCursor(new Date())} style={{ color: NAVY, borderColor: LINE }}
-          className="text-sm font-semibold border rounded-lg px-3 py-2 bg-white hover:bg-slate-50">This month</button>
-        <button onClick={() => shiftMonth(1)} style={{ borderColor: LINE }}
-          className="w-9 h-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50">
-          <ChevronRight size={18} />
+          className="text-sm font-semibold border rounded-lg px-3 py-2 bg-white hover:bg-slate-50 whitespace-nowrap">
+          {view === "month" ? "This month" : "This week"}
         </button>
+        <SyncBadge state={sync} />
       </div>
 
-      {/* Calendar */}
+      {/* Week view (mobile-first list) */}
+      {view === "week" && (
+        <div className="px-4 sm:px-6 pb-4 flex flex-col gap-2">
+          {weekDays.map((d, i) => {
+            const isT = sameDay(d, today);
+            const dayTasks = tasksForDate(d);
+            const regularTasks = dayTasks.filter(t => t.category !== "Auto");
+            const autoTasks = dayTasks.filter(t => t.category === "Auto");
+            const dayAuto = autoPostsForDate(d);
+            const allDone = dayTasks.length > 0 && dayTasks.every(t => isDone(t.id, d));
+            const empty = dayTasks.length === 0 && dayAuto.length === 0;
+            return (
+              <button key={i} onClick={() => setDayPanel(d)}
+                style={{ background: "white", borderColor: isT ? RED : LINE, borderWidth: isT ? 2 : 1 }}
+                className="w-full rounded-xl border p-3 text-left flex gap-3 items-start hover:shadow-md transition">
+                <div className="flex flex-col items-center justify-center w-11 shrink-0 pt-0.5">
+                  <span className="text-[11px] font-bold uppercase leading-none" style={{ color: isT ? RED : "#94A3B8" }}>{DOW[d.getDay()]}</span>
+                  <span className="text-2xl font-extrabold leading-tight" style={{ color: isT ? RED : NAVY }}>{d.getDate()}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  {empty ? (
+                    <div className="text-sm text-slate-400 py-3">Nothing scheduled</div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {regularTasks.map(t => (
+                        <div key={t.id} className="flex items-center gap-2">
+                          <span style={{ background: CATEGORIES[t.category] }} className="w-2 h-2 rounded-full shrink-0" />
+                          <span style={{ textDecoration: isDone(t.id, d) ? "line-through" : "none", color: isDone(t.id,d) ? "#94A3B8" : "#334155" }}
+                            className="text-sm leading-snug">{t.title}</span>
+                        </div>
+                      ))}
+                      {(autoTasks.length > 0 || dayAuto.length > 0) && (
+                        <div style={{ background: "#F1F5F9", borderColor: LINE }} className="mt-0.5 rounded-lg border px-2 py-1.5 flex flex-col gap-1">
+                          {autoTasks.map(t => (
+                            <div key={t.id} className="flex items-center gap-2">
+                              <span style={{ background: "#94A3B8" }} className="w-2 h-2 rounded-full shrink-0" />
+                              <span style={{ textDecoration: isDone(t.id, d) ? "line-through" : "none", color: "#64748B" }} className="text-xs leading-snug">{t.title}</span>
+                            </div>
+                          ))}
+                          {dayAuto.map(p => (
+                            <div key={p.id} className="flex items-center gap-2">
+                              <span style={{ background: "#94A3B8" }} className="w-2 h-2 rounded-full shrink-0" />
+                              <span className="text-xs leading-snug truncate" style={{ color: "#64748B" }}>
+                                <span className="uppercase">Auto GBP &amp; FB Post: </span>{p.short}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {allDone && <Check size={18} color={GREEN} strokeWidth={3} className="shrink-0 mt-1" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Month view */}
+      {view === "month" && (
       <div className="px-4 sm:px-6 pb-4">
         <div className="grid grid-cols-7 gap-1 mb-1">
-          {DOW.map(d => <div key={d} className="text-center text-xs font-bold text-slate-400 py-1">{d}</div>)}
+          {DOW.map(d => <div key={d} className="text-center text-[10px] sm:text-xs font-bold text-slate-400 py-1">{d}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-1">
           {grid.map((d, i) => {
@@ -332,6 +423,7 @@ export default function OpsCalendar() {
           })}
         </div>
       </div>
+      )}
 
       {/* Legend */}
       <div className="px-4 sm:px-6 pb-6 flex flex-wrap gap-x-4 gap-y-2 items-center">
