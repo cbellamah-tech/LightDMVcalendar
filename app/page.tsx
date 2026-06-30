@@ -24,23 +24,25 @@ const CATEGORIES: Record<string, string> = {
 const CATEGORY_NAMES = Object.keys(CATEGORIES);
 const PEOPLE = ["Chris", "Liam", "Both"];
 const PERSON_COLOR: Record<string, string> = { Chris: NAVY, Liam: "#0E7C7B", Both: "#64748B" };
-const FREQS = ["daily", "weekly", "monthly", "quarterly", "yearly", "once"];
+const FREQS = ["daily", "weekly", "monthly", "monthly-last", "quarterly", "yearly", "once"];
+const FREQ_LABELS: Record<string, string> = { "monthly-last": "Last weekday" };
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const QUARTER_MONTHS = [0, 3, 6, 9];
 
 type Task = {
   id: string; title: string; category: string; assignee: string;
-  freq: string; daysOfWeek?: number[]; dayOfMonth?: number; month?: number; date?: string; notes?: string;
+  freq: string; daysOfWeek?: number[]; dayOfMonth?: number; month?: number; date?: string; endDate?: string; weekday?: number; notes?: string;
 };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-/* Auto-blog tasks (gray "Auto" category). Stable ids so the one-time load
+/* Automated (gray "Auto" category) tasks. Stable ids so the one-time load
    injection below is idempotent and matches across the shared board. */
-const AUTO_BLOG_TASKS: Task[] = [
+const AUTO_TASKS: Task[] = [
   { id: "auto-blog-weekly", title: "Auto blog post publishes (review live)", category: "Auto", assignee: "Both", freq: "weekly", daysOfWeek: [1], notes: "Weekly SEO blog auto-publishes to lightdmv.com/blog. No action needed unless reviewing." },
   { id: "auto-blog-refill-2026-12-14", title: "Refill blog topic queue (blogQueue.ts)", category: "Auto", assignee: "Both", freq: "once", date: "2026-12-14", notes: "Auto-blog topic queue is running low. Add more topics to src/data/blogQueue.ts in the lightdmv-site repo so weekly posts continue." },
+  { id: "auto-cold-email-2026", title: "Automated cold emails (50/day)", category: "Auto", assignee: "Both", freq: "range", date: "2026-07-13", endDate: "2026-08-31", notes: "Automated outbound: ~50 cold emails sent per day. Runs Jul 13 – Aug 31, 2026 (50 days). No action needed — monitor replies." },
 ];
 
 const SEED: Task[] = [
@@ -51,12 +53,12 @@ const SEED: Task[] = [
   { id: uid(), title: "Publish blog post", category: "Content", assignee: "Both", freq: "monthly", dayOfMonth: 10, notes: "Local angle, target a city/neighborhood." },
   { id: uid(), title: "Send review-request texts", category: "Reviews", assignee: "Liam", freq: "weekly", daysOfWeek: [5], notes: "Recent jobs. Keep velocity +2–3/mo." },
   { id: uid(), title: "Order product from China", category: "Inventory", assignee: "Chris", freq: "quarterly", dayOfMonth: 5, notes: "Long lead time — plan a season ahead." },
-  { id: uid(), title: "File sales tax (VA / MD / DC)", category: "Taxes", assignee: "Liam", freq: "monthly", dayOfMonth: 20, notes: "VA seasonal filer Oct–Dec. CRN FR0003375239." },
-  { id: uid(), title: "QuickBooks reconciliation", category: "Taxes", assignee: "Liam", freq: "monthly", dayOfMonth: 5, notes: "Reconcile bank/cards w/ Bienestar." },
+  { id: uid(), title: "File sales tax (VA / MD / DC)", category: "Taxes", assignee: "Liam", freq: "monthly-last", weekday: 4, notes: "VA seasonal filer Oct–Dec. CRN FR0003375239." },
+  { id: uid(), title: "QuickBooks reconciliation", category: "Taxes", assignee: "Liam", freq: "monthly-last", weekday: 4, notes: "Reconcile bank/cards w/ Bienestar." },
   { id: uid(), title: "Quarterly estimated taxes", category: "Taxes", assignee: "Chris", freq: "quarterly", dayOfMonth: 15, notes: "IRS dates: ~Apr 15, Jun 15, Sep 15, Jan 15 — verify." },
   { id: uid(), title: "Annual return — books to CPA", category: "Taxes", assignee: "Chris", freq: "yearly", month: 2, dayOfMonth: 1, notes: "Send everything to Bienestar (S-Corp)." },
   { id: uid(), title: "Update KPI dashboard", category: "Ops", assignee: "Chris", freq: "monthly", dayOfMonth: 1, notes: "Jobber + GHL exports → revenue, close rate, ROAS." },
-  ...AUTO_BLOG_TASKS,
+  ...AUTO_TASKS,
 ];
 
 /* ---------------- Date helpers ---------------- */
@@ -73,9 +75,11 @@ function taskDueOn(task: Task, date: Date) {
     case "daily": return true;
     case "weekly": return (task.daysOfWeek || []).includes(dow);
     case "monthly": return dom === clampDom(y, mon, task.dayOfMonth || 1);
+    case "monthly-last": return dow === (task.weekday ?? 4) && dom + 7 > daysInMonth(y, mon);
     case "quarterly": return QUARTER_MONTHS.includes(mon) && dom === clampDom(y, mon, task.dayOfMonth || 1);
     case "yearly": return mon === (task.month ?? 0) && dom === clampDom(y, mon, task.dayOfMonth || 1);
     case "once": return task.date === ymd(date);
+    case "range": { const k = ymd(date); return !!task.date && !!task.endDate && k >= task.date && k <= task.endDate; }
     default: return false;
   }
 }
@@ -84,6 +88,7 @@ function recurrenceLabel(t: Task) {
     case "daily": return "Every day";
     case "weekly": return "Weekly · " + (t.daysOfWeek || []).map(d => DOW[d]).join(", ");
     case "monthly": return `Monthly · day ${t.dayOfMonth}`;
+    case "monthly-last": return `Monthly · last ${DOW[t.weekday ?? 4]}`;
     case "quarterly": return `Quarterly · Jan/Apr/Jul/Oct day ${t.dayOfMonth}`;
     case "yearly": return `Yearly · ${MONTHS[t.month ?? 0]} ${t.dayOfMonth}`;
     case "once": {
@@ -91,6 +96,14 @@ function recurrenceLabel(t: Task) {
       const [y, mo, dd] = t.date.split("-").map(Number);
       const d = new Date(y, (mo || 1) - 1, dd || 1);
       return "One-time · " + d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+    case "range": {
+      const fmt = (s?: string) => {
+        if (!s) return "";
+        const [y, mo, dd] = s.split("-").map(Number);
+        return new Date(y, (mo || 1) - 1, dd || 1).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      };
+      return `Daily · ${fmt(t.date)} – ${fmt(t.endDate)}`;
     }
     default: return t.freq;
   }
@@ -106,6 +119,9 @@ const autoPostsForDate = (date: Date) => AUTO_POSTS.filter(p => p.date === ymd(d
 
 /* Seed tasks that are now handled by external automation — removed on load. */
 const RETIRED_TASK_TITLES = ["Google Business Profile post", "Social media post (IG / FB)", "Add new photos to GBP"];
+
+/* Tasks moved to the last Thursday of each month — migrated on load. */
+const LAST_THURSDAY_TITLES = ["QuickBooks reconciliation", "File sales tax (VA / MD / DC)"];
 
 /* ---------------- Data layer (shared DB) ---------------- */
 async function fetchBoard() {
@@ -144,10 +160,19 @@ export default function OpsCalendar() {
           const loaded: Task[] = data.tasks;
           // One-time cleanup: drop tasks now handled by external automation.
           const cleaned = loaded.filter((t: Task) => !RETIRED_TASK_TITLES.includes(t.title));
-          // One-time injection: ensure the gray auto-blog tasks exist on the saved board.
-          const missing = AUTO_BLOG_TASKS.filter(a => !cleaned.some((t: Task) => t.title === a.title));
-          const next = missing.length ? [...cleaned, ...missing] : cleaned;
-          const changed = cleaned.length !== loaded.length || missing.length > 0;
+          // One-time injection: ensure the gray automated tasks exist on the saved board.
+          const missing = AUTO_TASKS.filter(a => !cleaned.some((t: Task) => t.title === a.title));
+          const merged = missing.length ? [...cleaned, ...missing] : cleaned;
+          // One-time migration: move QuickBooks + Sales tax to the last Thursday of each month.
+          let migratedAny = false;
+          const next = merged.map((t: Task) => {
+            if (LAST_THURSDAY_TITLES.includes(t.title) && (t.freq !== "monthly-last" || t.weekday !== 4)) {
+              migratedAny = true;
+              return { ...t, freq: "monthly-last", weekday: 4 };
+            }
+            return t;
+          });
+          const changed = cleaned.length !== loaded.length || missing.length > 0 || migratedAny;
           setTasks(next);
           if (changed) await saveBoard(next, data.done || {});
         }
@@ -580,6 +605,7 @@ function TaskModal({ initial, onClose, onSave, onDelete }: any) {
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initial?.daysOfWeek || [1]);
   const [dayOfMonth, setDayOfMonth] = useState(initial?.dayOfMonth || 1);
   const [month, setMonth] = useState(initial?.month ?? 0);
+  const [weekday, setWeekday] = useState<number>(initial?.weekday ?? 4);
   const [date, setDate] = useState(initial?.date || ymd(new Date()));
   const [notes, setNotes] = useState(initial?.notes || "");
 
@@ -590,6 +616,7 @@ function TaskModal({ initial, onClose, onSave, onDelete }: any) {
     const t: Task = { id: initial?.id, title: title.trim(), category, assignee, freq, notes: notes.trim() };
     if (freq === "weekly") t.daysOfWeek = daysOfWeek.length ? daysOfWeek : [1];
     if (freq === "monthly" || freq === "quarterly") t.dayOfMonth = Number(dayOfMonth) || 1;
+    if (freq === "monthly-last") t.weekday = weekday;
     if (freq === "yearly") { t.month = Number(month); t.dayOfMonth = Number(dayOfMonth) || 1; }
     if (freq === "once") t.date = date;
     onSave(t);
@@ -626,7 +653,7 @@ function TaskModal({ initial, onClose, onSave, onDelete }: any) {
               {FREQS.map(f => (
                 <button key={f} onClick={() => setFreq(f)}
                   style={{ background: freq === f ? NAVY : "white", color: freq === f ? "white" : INK, borderColor: LINE }}
-                  className="border rounded-lg px-3 py-1.5 text-sm font-semibold capitalize">{f}</button>
+                  className="border rounded-lg px-3 py-1.5 text-sm font-semibold capitalize">{FREQ_LABELS[f] ?? f}</button>
               ))}
             </div>
           </Field>
@@ -645,6 +672,17 @@ function TaskModal({ initial, onClose, onSave, onDelete }: any) {
             <Field label={freq === "quarterly" ? "Day (Jan/Apr/Jul/Oct)" : "Day of month"}>
               <input type="number" min={1} max={31} value={dayOfMonth} onChange={e => setDayOfMonth(e.target.value as any)}
                 style={{ borderColor: LINE }} className="w-24 border rounded-lg px-3 py-2 text-[15px] outline-none" />
+            </Field>
+          )}
+          {freq === "monthly-last" && (
+            <Field label="Last … of each month">
+              <div className="flex gap-1.5 flex-wrap">
+                {DOW.map((d, i) => (
+                  <button key={i} onClick={() => setWeekday(i)}
+                    style={{ background: weekday === i ? RED : "white", color: weekday === i ? "white" : INK, borderColor: LINE }}
+                    className="border rounded-lg w-11 h-9 text-xs font-bold">{d}</button>
+                ))}
+              </div>
             </Field>
           )}
           {freq === "yearly" && (
