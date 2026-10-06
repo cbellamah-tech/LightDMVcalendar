@@ -12,15 +12,11 @@ Crew and owner app for Light DMV, built on the original ops calendar. Installabl
 
 ## Setup on Vercel
 
-Environment variables (see `.env.example`):
+1. Storage tab: connect **Supabase** to the project (Production and Preview, no custom prefix). The app creates its own table (`ldmv_kv`) and photo bucket (`ldmv-photos`) on first use; nothing to run by hand.
+2. Environment variable `OWNER_SETUP_CODE`: a code only Chris and Liam know. The first time an owner signs in they pick a PIN and enter this code.
+3. Jobber (later): create an app at developer.getjobber.com, callback URL `https://<your site>/api/jobber/callback`, add `JOBBER_CLIENT_ID` and `JOBBER_CLIENT_SECRET`, then press **Connect Jobber** in the app.
 
-1. `AUTH_SECRET`: any long random string.
-2. `OWNER_SETUP_CODE`: a code only Chris and Liam know. The first time an owner signs in they pick a PIN and enter this code.
-3. Storage tab > Create > **Blob** and connect it (sets `BLOB_READ_WRITE_TOKEN`) so photos are kept.
-4. Upstash Redis is already connected for the calendar; the app uses the same database.
-5. Jobber: create an app at developer.getjobber.com, callback URL `https://<your site>/api/jobber/callback`, then add `JOBBER_CLIENT_ID` and `JOBBER_CLIENT_SECRET` and press **Connect Jobber** in the app.
-
-Redeploy after adding variables. Without Redis/Blob (local `npm run dev`) data and photos live in memory.
+Optional: `AUTH_SECRET` (otherwise the sign-in key is derived from the Supabase secret). Upstash Redis and Vercel Blob still work as fallbacks. With nothing connected (local `npm run dev`) data and photos live in memory.
 
 ## Yard sign stops
 
