@@ -3,8 +3,10 @@ import { Redis } from "@upstash/redis";
 /* Tiny key-value layer. Uses the same Upstash Redis the calendar already uses;
    falls back to process memory so the app runs locally before Redis is connected. */
 
+// Vercel's Upstash integration may name these UPSTASH_REDIS_REST_* or KV_REST_API_*; Redis.fromEnv() reads both.
 const hasRedis =
-  !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN;
+  (!!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN) ||
+  (!!process.env.KV_REST_API_URL && !!process.env.KV_REST_API_TOKEN);
 const redis = hasRedis ? Redis.fromEnv() : null;
 
 const g = globalThis as unknown as { __ldmvMem?: Map<string, unknown> };

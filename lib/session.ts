@@ -10,7 +10,7 @@ function secret() {
   const s = process.env.AUTH_SECRET?.trim();
   if (s) return s;
   // No AUTH_SECRET: derive one from the Upstash token, which is already a secret only this app has.
-  const t = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const t = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)?.trim();
   if (t) return `ldmv-session:${t}`;
   // Previews share the production database, so a Vercel deploy never uses the dev key.
   if (process.env.VERCEL) throw new Error("Set AUTH_SECRET (or connect Upstash Redis) in Vercel");
@@ -18,7 +18,7 @@ function secret() {
 }
 
 export const hasSessionSecret = () =>
-  !!process.env.AUTH_SECRET?.trim() || !!process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || !process.env.VERCEL;
+  !!process.env.AUTH_SECRET?.trim() || !!(process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)?.trim() || !process.env.VERCEL;
 
 const enc = new TextEncoder();
 const b64url = (buf: ArrayBuffer | Uint8Array) =>
