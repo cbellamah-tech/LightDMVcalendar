@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { NAVY } from "@/components/ui";
 
 type Person = { id: string; name: string; hasPin: boolean; owner: boolean };
+type Health = { env: string; setupCode: boolean; authSecret: boolean; database: boolean; photos: boolean };
 
 export default function Login() {
   const [people, setPeople] = useState<Person[]>([]);
@@ -13,9 +14,11 @@ export default function Login() {
   const [setupCode, setSetupCode] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [health, setHealth] = useState<Health | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/users").then((r) => r.json()).then(setPeople).catch(() => setErr("Couldn't load the team list."));
+    fetch("/api/auth/health").then((r) => r.json()).then(setHealth).catch(() => {});
   }, []);
   const who = people.find((p) => p.id === userId);
   const firstOwner = who && !who.hasPin && who.owner;
@@ -67,6 +70,14 @@ export default function Login() {
           </label>
         )}
         {err && <p className="text-sm text-red-600">{err}</p>}
+        {firstOwner && health && (
+          <div className="text-xs text-slate-500 border-t pt-2 space-y-0.5">
+            <div className="font-semibold">This {health.env} deployment can see:</div>
+            {([["setupCode", "OWNER_SETUP_CODE"], ["authSecret", "AUTH_SECRET"], ["database", "Upstash Redis (saves PINs and data)"], ["photos", "Blob store (photos)"]] as const).map(([k, label]) => (
+              <div key={k} className={health[k] ? "text-green-700" : "text-red-600"}>{health[k] ? "✓" : "✗"} {label}</div>
+            ))}
+          </div>
+        )}
         <button disabled={busy} className="w-full rounded-lg py-3 font-bold text-white flex justify-center gap-2" style={{ background: NAVY }}>
           {busy && <Loader2 className="animate-spin" size={20} />} Sign in
         </button>

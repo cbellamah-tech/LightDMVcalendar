@@ -22,9 +22,12 @@ export async function POST(req: Request) {
 
   if (!user.pinHash) {
     // First sign-in. Owners set their own PIN with the setup code from Vercel; everyone else gets a PIN from an owner.
-    const code = process.env.OWNER_SETUP_CODE;
+    const code = process.env.OWNER_SETUP_CODE?.trim();
     if (user.role !== "owner") return NextResponse.json({ error: "Ask Chris or Liam to set your PIN on the People page." }, { status: 403 });
-    if (!code || setupCode !== code) return NextResponse.json({ error: "Enter the owner setup code to create your PIN.", needSetup: true }, { status: 403 });
+    if (!code) return NextResponse.json({ error: `This ${process.env.VERCEL_ENV || "local"} deployment can't see OWNER_SETUP_CODE. In Vercel, make sure it's checked for this environment, then redeploy.`, needSetup: true }, { status: 403 });
+    if (typeof setupCode !== "string" || !setupCode.trim()) return NextResponse.json({ error: "Enter the owner setup code to create your PIN.", needSetup: true }, { status: 403 });
+    if (setupCode.trim() !== code) return NextResponse.json({ error: "That setup code doesn't match the one in Vercel (it's case-sensitive).", needSetup: true }, { status: 403 });
+    if (!process.env.AUTH_SECRET?.trim() && process.env.VERCEL) return NextResponse.json({ error: "Setup code is right, but AUTH_SECRET isn't set for this environment in Vercel. Add it and redeploy." }, { status: 500 });
     user.pinHash = hashPin(pin);
     await saveUsers(users);
   } else if (!checkPin(pin, user.pinHash)) {
