@@ -9,17 +9,18 @@ const MAX_AGE_S = 60 * 60 * 24 * 60; // 60 days, crews stay signed in on their p
 function secret() {
   const s = process.env.AUTH_SECRET?.trim();
   if (s) return s;
-  // No AUTH_SECRET: derive one from the Upstash token, which is already a secret only this app has.
-  const t = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)?.trim();
+  // No AUTH_SECRET: derive one from a database secret this app already has.
+  const t = (process.env.SUPABASE_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.POSTGRES_PASSWORD ||
+    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || process.env.OWNER_SETUP_CODE)?.trim();
   if (t) return `ldmv-session:${t}`;
   // Previews share the production database, so a Vercel deploy never uses the dev key.
   if (process.env.VERCEL) throw new Error("Set AUTH_SECRET (or connect Upstash Redis) in Vercel");
   return "dev-only-secret-change-me";
 }
 
-export const hasSessionSecret = () =>
-  !!process.env.AUTH_SECRET?.trim() || !!(process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)?.trim() || !process.env.VERCEL;
-
+export const hasSessionSecret = () => {
+  try { secret(); return true; } catch { return false; }
+};
 const enc = new TextEncoder();
 const b64url = (buf: ArrayBuffer | Uint8Array) =>
   btoa(String.fromCharCode(...new Uint8Array(buf as ArrayBuffer)))

@@ -36,7 +36,7 @@ async function login(req: Request) {
     if (!code) return NextResponse.json({ error: `This ${process.env.VERCEL_ENV || "local"} deployment can't see OWNER_SETUP_CODE. In Vercel, make sure it's checked for this environment, then redeploy.`, needSetup: true }, { status: 403 });
     if (typeof setupCode !== "string" || !setupCode.trim()) return NextResponse.json({ error: "Enter the owner setup code to create your PIN.", needSetup: true }, { status: 403 });
     if (setupCode.trim() !== code) return NextResponse.json({ error: "That setup code doesn't match the one in Vercel (it's case-sensitive).", needSetup: true }, { status: 403 });
-    if (!hasSessionSecret()) return NextResponse.json({ error: "Setup code is right, but this deployment has no database connected (Upstash Redis). Connect it for this environment in Vercel and redeploy." }, { status: 500 });
+    if (!hasSessionSecret()) return NextResponse.json({ error: "Setup code is right, but this deployment has no database connected yet. Connect Supabase to the project in Vercel (Storage tab)." }, { status: 500 });
     user.pinHash = hashPin(pin);
     await saveUsers(users);
   } else if (!checkPin(pin, user.pinHash)) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { usingRedis } from "@/lib/store";
+import { storeKind, usingRedis } from "@/lib/store";
+import { photoStore } from "@/lib/photos";
 import { hasSessionSecret } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export async function GET() {
     setupCode: !!process.env.OWNER_SETUP_CODE?.trim(),
     authSecret: hasSessionSecret(),
     database: usingRedis,
-    photos: !!process.env.BLOB_READ_WRITE_TOKEN,
+    photos: photoStore() !== "memory",
+    store: storeKind,
   });
 }
