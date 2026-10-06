@@ -4,25 +4,23 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Loader2, MapPin, Navigation, Play, Square, X } from "lucide-react";
-import PhotoButton from "@/components/PhotoButton";
+import AddSignButton from "../AddSignButton";
+import VisitSheet from "../VisitSheet";
+import { arrived, useGps } from "../useGps";
 import { ago, api, NAVY } from "@/components/ui";
 import { distanceM, fmtDist, mapsLink } from "@/lib/geo";
 import { SignsData, Stop, STATUS_COLOR, STATUS_LABEL, Visit } from "../types";
 
 const SignMap = dynamic(() => import("@/components/SignMap"), { ssr: false });
 
-type Pos = { lat: number; lng: number; accuracyM: number; at: number };
-const PING_MS = 30_000;
 
 export default function RoutePage({ params }: { params: { id: string } }) {
   const [data, setData] = useState<SignsData | null>(null);
   const [err, setErr] = useState("");
   const [runStart, setRunStart] = useState<number | null>(null);
-  const [pos, setPos] = useState<Pos | null>(null);
-  const [gpsErr, setGpsErr] = useState("");
+  const [added, setAdded] = useState("");
   const [sheet, setSheet] = useState<{ stop: Stop; auto: boolean } | null>(null);
   const dismissed = useRef<Set<string>>(new Set());
-  const lastPing = useRef(0);
   const sheetRef = useRef(sheet);
   sheetRef.current = sheet;
   const runKey = `ldmv-run-${params.id}`;
@@ -49,51 +47,24 @@ export default function RoutePage({ params }: { params: { id: string } }) {
   const doneCount = route ? route.stops.filter(doneInRun).length : 0;
   const running = !!runStart;
 
-  // GPS watch while a route is running.
-  useEffect(() => {
-    if (!running || !route) return;
-    if (!("geolocation" in navigator)) { setGpsErr("This phone's browser doesn't share location."); return; }
-    const id = navigator.geolocation.watchPosition(
-      (p) => {
-        const here = { lat: p.coords.latitude, lng: p.coords.longitude, accuracyM: p.coords.accuracy, at: Date.now() };
-        setPos(here);
-        setGpsErr("");
-        if (Date.now() - lastPing.current > PING_MS) {
-          lastPing.current = Date.now();
-          api("/api/signs/ping", { method: "POST", json: { ...here, routeId: route.id } }).catch(() => {});
-        }
-        if (sheetRef.current || here.accuracyM > 100) return;
-        // Arrival: the closest stop not yet done on this run, inside its radius (allowing some GPS wobble).
-        const candidates = route.stops.filter((s) => !doneInRunRef.current(s) && !dismissed.current.has(s.id));
-        let best: { s: Stop; d: number } | null = null;
-        for (const s of candidates) {
-          const d = distanceM(here, s);
-          if (!best || d < best.d) best = { s, d };
-        }
-        if (best && best.d <= best.s.radiusM + Math.min(here.accuracyM, 40)) {
-          navigator.vibrate?.([200, 100, 200]);
-          setSheet({ stop: best.s, auto: true });
-        }
-      },
-      (e) => setGpsErr(e.code === 1 ? "Location is blocked. Allow location for this site in your phone settings." : "Waiting for GPS..."),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, [running, route?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  const { pos, err: gpsErr } = useGps(running && !!route, route?.id);
   const doneInRunRef = useRef(doneInRun);
   doneInRunRef.current = doneInRun;
 
-  // Keep the screen awake while driving the route.
+  // Arrival: the closest stop not yet done on this run, inside its radius.
   useEffect(() => {
-    if (!running) return;
-    let lock: any = null;
-    const get = () => (navigator as any).wakeLock?.request("screen").then((l: any) => (lock = l)).catch(() => {});
-    get();
-    const onVis = () => document.visibilityState === "visible" && get();
-    document.addEventListener("visibilitychange", onVis);
-    return () => { document.removeEventListener("visibilitychange", onVis); lock?.release?.(); };
-  }, [running]);
+    if (!pos || !route || sheetRef.current) return;
+    let best: { s: Stop; d: number } | null = null;
+    for (const s of route.stops) {
+      if (doneInRunRef.current(s) || dismissed.current.has(s.id)) continue;
+      const d = distanceM(pos, s);
+      if (!best || d < best.d) best = { s, d };
+    }
+    if (best && arrived(best.d, best.s.radiusM, pos.accuracyM)) {
+      navigator.vibrate?.([200, 100, 200]);
+      setSheet({ stop: best.s, auto: true });
+    }
+  }, [pos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function start() {
     const t = Date.now();
@@ -104,7 +75,6 @@ export default function RoutePage({ params }: { params: { id: string } }) {
   function finish() {
     try { localStorage.removeItem(runKey); } catch {}
     setRunStart(null);
-    setPos(null);
   }
 
   const points = useMemo(() => (route?.stops || []).map((s) => {
@@ -159,6 +129,8 @@ export default function RoutePage({ params }: { params: { id: string } }) {
           ) : (
             <div className="font-bold text-green-700 flex items-center gap-2"><Check /> Every stop on this route is logged. Tap Finish.</div>
           )}
+          <AddSignButton pos={pos} routeId={route.id} onAdded={(m) => { setAdded(m); load(); }} />
+          {added && <p className="text-sm text-green-700">{added}</p>}
           {gpsErr && distNext != null && <div className="text-xs text-amber-700">{gpsErr}</div>}
           <p className="text-xs text-slate-400">Keep this screen open while driving. Phones stop sharing location when the app is closed.</p>
         </div>
@@ -195,69 +167,6 @@ export default function RoutePage({ params }: { params: { id: string } }) {
           onClose={() => { dismissed.current.add(sheet.stop.id); setSheet(null); }}
           onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); }} />
       )}
-    </div>
-  );
-}
-
-function VisitSheet({ stop, auto, pos, last, onClose, onSaved }: {
-  stop: Stop; auto: boolean; pos: Pos | null; last?: Visit; onClose: () => void; onSaved: () => void;
-}) {
-  const [status, setStatus] = useState<Visit["status"]>(last && last.status !== "skipped" ? "still_there" : "placed");
-  const [photo, setPhoto] = useState<string>("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const needPhoto = stop.photoRequired && status !== "skipped";
-  const dist = pos ? distanceM(pos, stop) : null;
-
-  async function save() {
-    setBusy(true); setErr("");
-    try {
-      await api("/api/signs/visit", { method: "POST", json: { stopId: stop.id, status, photoUrl: photo || undefined, note, ...(pos || {}) } });
-      onSaved();
-    } catch (e: any) { setErr(e.message); setBusy(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[2000] bg-black/50 flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 space-y-3 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
-        <div className="flex justify-between items-start gap-2">
-          <div>
-            {auto && <div className="text-xs font-bold uppercase text-green-700">You've arrived</div>}
-            <div className="text-lg font-bold">#{stop.order} {stop.name}</div>
-            <div className="text-sm text-slate-500">{stop.type}{stop.near ? ` · near ${stop.near}` : ""}{dist != null ? ` · ${fmtDist(dist)} from you` : ""}</div>
-          </div>
-          <button onClick={onClose} aria-label="Close"><X /></button>
-        </div>
-        {stop.notes && <div className="text-sm bg-amber-50 text-amber-900 rounded-lg p-2">{stop.notes}</div>}
-        <div className="grid grid-cols-2 gap-2">
-          {(["placed", "still_there", "replaced", "skipped"] as const).map((k) => (
-            <button key={k} onClick={() => setStatus(k)}
-              className={`rounded-lg px-2 py-2 text-sm font-semibold border-2 ${status === k ? "text-white" : "bg-white"}`}
-              style={{ borderColor: STATUS_COLOR[k], background: status === k ? STATUS_COLOR[k] : undefined }}>
-              {STATUS_LABEL[k]}
-            </button>
-          ))}
-        </div>
-        {photo ? (
-          <div className="relative">
-            <img src={photo} alt="Sign" className="w-full max-h-64 object-cover rounded-lg" />
-            <button onClick={() => setPhoto("")} className="absolute top-2 right-2 bg-white/90 rounded-full p-1" aria-label="Remove photo"><X size={16} /></button>
-          </div>
-        ) : (
-          <PhotoButton folder={`signs/${stop.id}`} multiple={false} label={needPhoto ? "Take sign photo (required)" : "Take sign photo"} className="w-full py-3"
-            onUploaded={(urls) => setPhoto(urls[0])} />
-        )}
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
-          placeholder={status === "skipped" ? "Why couldn't you place it?" : "Note (optional)"}
-          className="w-full border border-slate-300 rounded-lg p-2 text-sm" />
-        {err && <p className="text-sm text-red-600">{err}</p>}
-        <button disabled={busy || (needPhoto && !photo) || (status === "skipped" && !note.trim())} onClick={save}
-          className="w-full rounded-lg py-3 font-bold text-white disabled:opacity-40 flex justify-center gap-2" style={{ background: "#1F9D55" }}>
-          {busy && <Loader2 className="animate-spin" size={20} />} Save stop
-        </button>
-      </div>
     </div>
   );
 }

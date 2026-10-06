@@ -1,4 +1,5 @@
 import { parseCsv } from "./csv";
+import { distanceM } from "./geo";
 import { kvGet, kvSet, kvUpdate } from "./store";
 // Draft stops from the "Plan 14 yard sign routes" thread, bundled so a fresh deploy has routes.
 import bundledCsv from "../data/yard-signs/yard_sign_stops.csv";
@@ -20,6 +21,8 @@ export type Stop = {
   photoRequired: boolean;
   radiusM: number;       // GPS arrival radius that triggers the photo prompt
   notes?: string;
+  addedBy?: string;      // name of the crew member who added this spot in the field
+  addedAt?: number;
 };
 
 export type Route = {
@@ -111,6 +114,10 @@ export async function importRoutes(csv: string, source: string, by?: string): Pr
   for (const r of incoming) {
     const prev = old.find((o) => o.id === r.id);
     if (prev) { r.assignedCrew = prev.assignedCrew; r.assignedUser = prev.assignedUser; }
+    // Spots crews added in the field aren't in the CSV; keep them unless the CSV now has that stop id.
+    const ids = new Set(r.stops.map((st) => st.id));
+    let order = Math.max(0, ...r.stops.map((st) => st.order));
+    for (const st of prev?.stops ?? []) if (st.addedAt && !ids.has(st.id)) r.stops.push({ ...st, order: ++order });
   }
   await kvSet(ROUTES, incoming);
   const meta: ImportMeta = { importedAt: Date.now(), source, routes: incoming.length, stops: incoming.reduce((n, r) => n + r.stops.length, 0), by };
@@ -156,3 +163,38 @@ export async function setLive(p: LivePos) {
 export const routeVisibleTo = (r: Route, s: { uid: string; role: string; crew?: string }) =>
   s.role === "owner" || s.role === "manager" || r.assignedUser === s.uid || (!!s.crew && r.assignedCrew === s.crew) ||
   (!r.assignedUser && !r.assignedCrew);
+
+/** A spot a crew added where they're standing. Joins the given route, or the route with the nearest stop.
+ *  If a stop is already within 30 m, that stop is returned instead of making a duplicate. */
+export async function addStop(at: { lat: number; lng: number }, by: string, visible: (r: Route) => boolean, routeId?: string, name?: string) {
+  let result: Stop | undefined, created = false;
+  await kvUpdate<Route[]>(ROUTES, [], (routes) => {
+    const mine = routes.filter(visible);
+    let near: { s: Stop; d: number } | undefined;
+    for (const r of mine) for (const st of r.stops) {
+      const d = distanceM(at, st);
+      if (!near || d < near.d) near = { s: st, d };
+    }
+    if (near && near.d <= 30) { result = near.s; return; }
+    const route = mine.find((r) => r.id === routeId) || mine.find((r) => r.id === near?.s.routeId) || mine[0];
+    if (!route) return;
+    const order = Math.max(0, ...route.stops.map((st) => st.order)) + 1;
+    result = {
+      id: `${route.id}-N${Date.now().toString(36)}`,
+      routeId: route.id,
+      order,
+      name: name || `New spot added by ${by}`,
+      lat: at.lat, lng: at.lng,
+      type: "added in the field",
+      state: route.state,
+      photoRequired: true,
+      radiusM: 75,
+      addedBy: by,
+      addedAt: Date.now(),
+    };
+    route.stops.push(result);
+    created = true;
+  });
+  if (!result) throw new Error("There's no route you can add a sign to.");
+  return { stop: result, created };
+}

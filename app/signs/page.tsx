@@ -3,9 +3,13 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Loader2, Upload } from "lucide-react";
+import { ChevronRight, Loader2, LocateFixed, Navigation, Upload } from "lucide-react";
+import { distanceM, fmtDist, mapsLink } from "@/lib/geo";
+import AddSignButton from "./AddSignButton";
+import VisitSheet from "./VisitSheet";
+import { arrived, useGps } from "./useGps";
 import { ago, api, NAVY } from "@/components/ui";
-import { CREW_LABEL, SignsData, STATUS_COLOR, STATUS_LABEL } from "./types";
+import { CREW_LABEL, SignsData, Stop, STATUS_COLOR, STATUS_LABEL } from "./types";
 
 const SignMap = dynamic(() => import("@/components/SignMap"), { ssr: false });
 
@@ -15,6 +19,42 @@ export default function SignsPage() {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [gpsOn, setGpsOn] = useState(false);
+  const { pos, err: gpsErr } = useGps(gpsOn);
+  const [sheet, setSheet] = useState<{ stop: Stop; auto: boolean } | null>(null);
+  const [added, setAdded] = useState("");
+  const dismissed = useRef<Set<string>>(new Set());
+  const sheetRef = useRef(sheet);
+  sheetRef.current = sheet;
+
+  // GPS mode is remembered on this phone, so crews only turn it on once.
+  useEffect(() => { try { if (localStorage.getItem("ldmv-gps") === "on") setGpsOn(true); } catch {} }, []);
+  function toggleGps(on: boolean) {
+    setGpsOn(on);
+    try { on ? localStorage.setItem("ldmv-gps", "on") : localStorage.removeItem("ldmv-gps"); } catch {}
+  }
+
+  // Nearest planned spot on any route this person can see.
+  const nearest = useMemo(() => {
+    if (!pos || !data) return null;
+    let best: { stop: Stop; routeName: string; d: number } | null = null;
+    for (const r of data.routes) for (const st of r.stops) {
+      const d = distanceM(pos, st);
+      if (!best || d < best.d) best = { stop: st, routeName: r.name, d };
+    }
+    return best;
+  }, [pos, data]);
+
+  // Arriving at a spot opens the photo prompt, unless it was logged in the last 12 hours.
+  useEffect(() => {
+    if (!nearest || !pos || !data || sheetRef.current || dismissed.current.has(nearest.stop.id)) return;
+    const last = data.lastVisit[nearest.stop.id];
+    if (last && Date.now() - last.at < 12 * 3600_000) return;
+    if (arrived(nearest.d, nearest.stop.radiusM, pos.accuracyM)) {
+      navigator.vibrate?.([200, 100, 200]);
+      setSheet({ stop: nearest.stop, auto: true });
+    }
+  }, [nearest, pos, data]);
 
   const load = useCallback(() => api<SignsData>("/api/signs").then(setData).catch((e) => setErr(e.message)), []);
   useEffect(() => {
@@ -37,8 +77,9 @@ export default function SignsPage() {
       id: `live-${p.uid}`, lat: p.lat, lng: p.lng, color: "#2563EB", big: true,
       label: `${p.name} (${ago(p.at)})`,
     }));
-    return [...stops, ...crews];
-  }, [data]);
+    const me = pos ? [{ id: "me", lat: pos.lat, lng: pos.lng, color: "#2563EB", big: true, label: "You" }] : [];
+    return [...stops, ...crews.filter((c) => c.id !== `live-${data.me.uid}`), ...me];
+  }, [data, pos]);
 
   async function assign(routeId: string, value: string) {
     const [kind, id] = value.split(":");
@@ -73,6 +114,37 @@ export default function SignsPage() {
           ))}
           {data.office && <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-600" />Crew live location</span>}
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border-2 p-4 space-y-3" style={{ borderColor: gpsOn ? "#1F9D55" : "#E2E8F0" }}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 font-bold"><LocateFixed size={18} className={gpsOn ? "text-green-700" : "text-slate-400"} /> GPS {gpsOn ? "on" : "off"}</div>
+          <button onClick={() => toggleGps(!gpsOn)} className="rounded-lg px-4 py-2 font-semibold text-sm text-white" style={{ background: gpsOn ? "#64748B" : "#1F9D55" }}>
+            {gpsOn ? "Turn off" : "Turn on GPS"}
+          </button>
+        </div>
+        {!gpsOn ? (
+          <p className="text-sm text-slate-500">Turn on GPS and keep this page open while driving. When you pull up to any sign spot, it asks for a picture on its own.</p>
+        ) : (
+          <>
+            {gpsErr && <p className="text-sm text-amber-700">{gpsErr}</p>}
+            {nearest && (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-slate-400 font-bold uppercase">Nearest sign spot · {fmtDist(nearest.d)}</div>
+                  <div className="font-semibold truncate">{nearest.stop.name}</div>
+                  <div className="text-xs text-slate-500 truncate">{nearest.routeName}</div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <a href={mapsLink(nearest.stop.lat, nearest.stop.lng)} target="_blank" rel="noreferrer" className="rounded-lg p-2 border border-slate-300" aria-label="Navigate"><Navigation size={18} /></a>
+                  <button onClick={() => setSheet({ stop: nearest.stop, auto: false })} className="rounded-lg px-3 py-2 border border-slate-300 text-sm font-semibold">I'm here</button>
+                </div>
+              </div>
+            )}
+            <AddSignButton pos={pos} className="w-full" onAdded={(m) => { setAdded(m); load(); }} />
+            {added && <p className="text-sm text-green-700">{added}</p>}
+          </>
+        )}
       </div>
 
       <SignMap points={points} height={380} fitKey={data.routes.map((r) => r.id).join(",")} />
@@ -111,12 +183,19 @@ export default function SignsPage() {
         })}
       </div>
 
+      {sheet && (
+        <VisitSheet stop={sheet.stop} auto={sheet.auto} pos={pos} last={data.lastVisit[sheet.stop.id]}
+          routeName={data.routes.find((r) => r.id === sheet.stop.routeId)?.name}
+          onClose={() => { dismissed.current.add(sheet.stop.id); setSheet(null); }}
+          onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); }} />
+      )}
+
       {data.office && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
           <h2 className="font-bold">Update the stop list</h2>
           <p className="text-sm text-slate-500">
             Upload a CSV with columns route_id, route_name, stop_order, stop_id, name, lat, lng, type, near, near_m, homes_nearby,
-            state, photo_required, arrival_radius_m, notes. Importing again is safe: crew assignments and sign photos stay, matched by stop id.
+            state, photo_required, arrival_radius_m, notes. Importing again is safe: crew assignments, sign photos and spots crews added in the field all stay.
           </p>
           <div className="flex gap-2 flex-wrap">
             <button disabled={busy} onClick={() => fileRef.current?.click()} className="rounded-lg px-3 py-2 text-white font-semibold text-sm flex items-center gap-2" style={{ background: NAVY }}>
