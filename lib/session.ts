@@ -1,3 +1,5 @@
+import { envAny } from "./env";
+
 /* Signed session cookie. Uses Web Crypto so it works in middleware (edge) and route handlers. */
 
 export type Role = "owner" | "manager" | "lead" | "crew";
@@ -10,8 +12,8 @@ function secret() {
   const s = process.env.AUTH_SECRET?.trim();
   if (s) return s;
   // No AUTH_SECRET: derive one from a database secret this app already has.
-  const t = (process.env.SUPABASE_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.POSTGRES_PASSWORD ||
-    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || process.env.OWNER_SETUP_CODE)?.trim();
+  const t = envAny("SUPABASE_JWT_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "POSTGRES_PASSWORD",
+    "UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN", "OWNER_SETUP_CODE");
   if (t) return `ldmv-session:${t}`;
   // Previews share the production database, so a Vercel deploy never uses the dev key.
   if (process.env.VERCEL) throw new Error("Set AUTH_SECRET (or connect Upstash Redis) in Vercel");

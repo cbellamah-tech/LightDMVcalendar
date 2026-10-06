@@ -1,13 +1,14 @@
 import { put } from "@vercel/blob";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { envAny } from "./env";
 
 /* Photo storage, first one available:
    1. Supabase Storage (bucket "ldmv-photos", created automatically) when Supabase is connected.
    2. Vercel Blob when BLOB_READ_WRITE_TOKEN is set.
    3. Memory, so local testing works. */
 
-const SB_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = envAny("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
+const SB_KEY = envAny("SUPABASE_SERVICE_ROLE_KEY");
 const BUCKET = "ldmv-photos";
 let sb: SupabaseClient | null = null;
 let bucketReady: Promise<void> | null = null;

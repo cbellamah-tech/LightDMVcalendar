@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import postgres from "postgres";
+import { envAny } from "./env";
 
 /* Tiny key-value layer shared by the whole app (and the calendar board).
    1. Supabase / Postgres when Vercel's Supabase integration is connected (POSTGRES_URL).
@@ -7,7 +8,7 @@ import postgres from "postgres";
    2. Upstash Redis if that's connected instead.
    3. Process memory, so the app still runs locally with nothing connected. */
 
-const pgUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+const pgUrl = envAny("POSTGRES_URL", "DATABASE_URL", "SUPABASE_DB_URL");
 
 // Vercel's Upstash integration may name these UPSTASH_REDIS_REST_* or KV_REST_API_*; Redis.fromEnv() reads both.
 const hasRedis =
