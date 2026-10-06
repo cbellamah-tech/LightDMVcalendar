@@ -32,7 +32,7 @@ export default function Login() {
     });
     const j = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) return setErr(j.error || "Sign-in failed");
+    if (!res.ok) return setErr(j.error || `Sign-in failed (error ${res.status}). This deployment may be an older version; open the newest preview.`);
     const next = new URLSearchParams(window.location.search).get("next");
     window.location.href = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
   }
@@ -70,10 +70,10 @@ export default function Login() {
           </label>
         )}
         {err && <p className="text-sm text-red-600">{err}</p>}
-        {firstOwner && health && (
+        {health && (firstOwner || Object.entries(health).some(([k, v]) => k !== "env" && k !== "photos" && !v)) && (
           <div className="text-xs text-slate-500 border-t pt-2 space-y-0.5">
             <div className="font-semibold">This {health.env} deployment can see:</div>
-            {([["setupCode", "OWNER_SETUP_CODE"], ["authSecret", "AUTH_SECRET"], ["database", "Upstash Redis (saves PINs and data)"], ["photos", "Blob store (photos)"]] as const).map(([k, label]) => (
+            {([["setupCode", "OWNER_SETUP_CODE"], ["authSecret", "Sign-in key (AUTH_SECRET or Upstash)"], ["database", "Upstash Redis (saves PINs and data)"], ["photos", "Blob store (photos)"]] as const).map(([k, label]) => (
               <div key={k} className={health[k] ? "text-green-700" : "text-red-600"}>{health[k] ? "✓" : "✗"} {label}</div>
             ))}
           </div>

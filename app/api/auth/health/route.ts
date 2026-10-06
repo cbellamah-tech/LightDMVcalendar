@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { usingRedis } from "@/lib/store";
+import { hasSessionSecret } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ export async function GET() {
   return NextResponse.json({
     env: process.env.VERCEL_ENV || "local",
     setupCode: !!process.env.OWNER_SETUP_CODE?.trim(),
-    authSecret: !!process.env.AUTH_SECRET?.trim(),
+    authSecret: hasSessionSecret(),
     database: usingRedis,
     photos: !!process.env.BLOB_READ_WRITE_TOKEN,
   });

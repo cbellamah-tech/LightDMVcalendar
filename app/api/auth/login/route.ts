@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkPin, hashPin, listUsers, saveUsers, validPin } from "@/lib/users";
 import { kvGet, kvSet } from "@/lib/store";
-import { COOKIE, cookieOptions, signSession } from "@/lib/session";
+import { COOKIE, cookieOptions, hasSessionSecret, signSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,15 @@ const MAX_FAILS = 5;
 const LOCK_MS = 10 * 60 * 1000;
 
 export async function POST(req: Request) {
+  try {
+    return await login(req);
+  } catch (e: any) {
+    console.error("login failed", e);
+    return NextResponse.json({ error: `Sign-in error: ${e?.message || "unknown"}` }, { status: 500 });
+  }
+}
+
+async function login(req: Request) {
   const { userId, pin, setupCode } = await req.json().catch(() => ({}));
   const users = await listUsers();
   const user = users.find((u) => u.id === userId && u.active);
@@ -27,7 +36,7 @@ export async function POST(req: Request) {
     if (!code) return NextResponse.json({ error: `This ${process.env.VERCEL_ENV || "local"} deployment can't see OWNER_SETUP_CODE. In Vercel, make sure it's checked for this environment, then redeploy.`, needSetup: true }, { status: 403 });
     if (typeof setupCode !== "string" || !setupCode.trim()) return NextResponse.json({ error: "Enter the owner setup code to create your PIN.", needSetup: true }, { status: 403 });
     if (setupCode.trim() !== code) return NextResponse.json({ error: "That setup code doesn't match the one in Vercel (it's case-sensitive).", needSetup: true }, { status: 403 });
-    if (!process.env.AUTH_SECRET?.trim() && process.env.VERCEL) return NextResponse.json({ error: "Setup code is right, but AUTH_SECRET isn't set for this environment in Vercel. Add it and redeploy." }, { status: 500 });
+    if (!hasSessionSecret()) return NextResponse.json({ error: "Setup code is right, but this deployment has no database connected (Upstash Redis). Connect it for this environment in Vercel and redeploy." }, { status: 500 });
     user.pinHash = hashPin(pin);
     await saveUsers(users);
   } else if (!checkPin(pin, user.pinHash)) {
