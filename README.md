@@ -1,4 +1,40 @@
-# LightDMV Ops Calendar
+# Light DMV App
+
+Crew and owner app for Light DMV, built on the original ops calendar. Installable on phones (open the site, then Share > Add to Home Screen).
+
+| Tab | Who | What |
+| --- | --- | --- |
+| Yard signs | everyone | 14 routes / 168 stops. Start a route, the phone tracks GPS, and inside a stop's arrival radius it pops up "You've arrived" and asks for a sign photo. Owners see every stop's status and crews' live location. |
+| Jobs | everyone | Jobber visits for your crew with the install or takedown SOP checklist. Required boxes block "Mark job done"; photo boxes need a photo. Updates every 5 seconds so the whole crew sees each other's checks. |
+| Calendar | owners | The original recurring task board (moved to `/calendar`). |
+| People | owners, Maria | Add workers, set PINs, put people on Crew 1 / Crew 2, match them to their Jobber name. |
+| Jobber | owners, Maria | Connect Jobber and sync. |
+
+## Setup on Vercel
+
+Environment variables (see `.env.example`):
+
+1. `AUTH_SECRET`: any long random string.
+2. `OWNER_SETUP_CODE`: a code only Chris and Liam know. The first time an owner signs in they pick a PIN and enter this code.
+3. Storage tab > Create > **Blob** and connect it (sets `BLOB_READ_WRITE_TOKEN`) so photos are kept.
+4. Upstash Redis is already connected for the calendar; the app uses the same database.
+5. Jobber: create an app at developer.getjobber.com, callback URL `https://<your site>/api/jobber/callback`, then add `JOBBER_CLIENT_ID` and `JOBBER_CLIENT_SECRET` and press **Connect Jobber** in the app.
+
+Redeploy after adding variables. Without Redis/Blob (local `npm run dev`) data and photos live in memory.
+
+## Yard sign stops
+
+The drafted stops are bundled at `data/yard-signs/yard_sign_stops.csv` and load automatically on first use. To change them, upload a new CSV on the Yard signs page (same columns). Re-importing keeps crew assignments and sign history, matched by `route_id` and `stop_id`. Each stop carries `arrival_radius_m` (GPS geofence for the photo prompt) and `photo_required`.
+
+Phones only share location while the app is open on screen, so crews keep the route page open while driving (the app keeps the screen awake).
+
+## SOP checklists
+
+Defined in `lib/sops.ts`. Items marked REQUIRED and items that ask for a picture are required; picture items need a photo. Install vs takedown is read from the Jobber visit title (takedown/removal) and otherwise by month.
+
+---
+
+## Original: LightDMV Ops Calendar
 
 A shared recurring-task calendar for Chris & Liam. Month view, click any day to see/check that day's tasks. Tasks and checkmarks are stored in a shared Upstash Redis database, so both of you see the same board from any device. No login.
 

@@ -1,0 +1,169 @@
+route_id,route_name,stop_order,stop_id,name,lat,lng,type,near,near_m,homes_nearby,state,photo_required,arrival_radius_m,notes
+R01,"Bethesda, Chevy Chase & NW DC",1,R01-S01,Shoreham Dr NW & Calvert St NW,38.923484,-77.0526,intersection,,,6487,MD/DC,True,75,
+R01,"Bethesda, Chevy Chase & NW DC",2,R01-S02,Connecticut Ave NW & Van Ness St NW,38.943154,-77.062921,shopping center,Giant Food,147,4370,MD/DC,True,75,"Use the corner at the main entrance, not the private lot."
+R01,"Bethesda, Chevy Chase & NW DC",3,R01-S03,Nebraska Ave NW & Van Ness St NW,38.943164,-77.08142,school,National Presbyterian School,148,6877,MD/DC,True,75,"Place in the public strip at the corner, not on school grounds."
+R01,"Bethesda, Chevy Chase & NW DC",4,R01-S04,Clara Barton Pkwy NW & Chain Bridge,38.93033,-77.111766,intersection,,,2834,MD/DC,True,75,
+R01,"Bethesda, Chevy Chase & NW DC",5,R01-S05,Wisconsin Ave & Western Ave NW,38.96074,-77.08571,shopping center,Trader Joe's,83,6371,MD/DC,True,75,"Use the corner at the main entrance, not the private lot."
+R01,"Bethesda, Chevy Chase & NW DC",6,R01-S06,River Rd & Brookside Dr,38.966481,-77.105933,shopping center,Whole Foods Market,140,4903,MD/DC,True,75,"Use the corner at the main entrance, not the private lot."
+R01,"Bethesda, Chevy Chase & NW DC",7,R01-S07,Bradley Blvd & Arlington Rd,38.978076,-77.098737,shopping center,Safeway,50,4268,MD/DC,True,75,"Use the corner at the main entrance, not the private lot."
+R01,"Bethesda, Chevy Chase & NW DC",8,R01-S08,Montgomery Ave & East-West Hwy,38.986159,-77.086213,school,Bethesda Chevy Chase High School,190,4516,MD/DC,True,75,"Place in the public strip at the corner, not on school grounds."
+R01,"Bethesda, Chevy Chase & NW DC",9,R01-S09,Military Rd NW & 27th St NW,38.961013,-77.056201,school,St Johns College High School,176,3801,MD/DC,True,75,"Place in the public strip at the corner, not on school grounds."
+R01,"Bethesda, Chevy Chase & NW DC",10,R01-S10,Piney Branch Pkwy NW & Arkansas Ave NW,38.940504,-77.035124,intersection,Powell Elementary School,326,10777,MD/DC,True,75,
+R01,"Bethesda, Chevy Chase & NW DC",11,R01-S11,Missouri Ave NW & Georgia Ave NW,38.961262,-77.02801,intersection,Brightwood Elementary School,181,9641,MD/DC,True,75,
+R01,"Bethesda, Chevy Chase & NW DC",12,R01-S12,Georgia Ave NW & Kalmia Rd NW,38.983829,-77.026596,shopping center,Target,79,5556,MD/DC,True,75,"Use the corner at the main entrance, not the private lot."
+R02,Potomac,1,R02-S01,River Rd & Burdette Rd,38.990106,-77.152702,intersection,The Primary Day School,336,1643,MD,True,75,
+R02,Potomac,2,R02-S02,Greentree Rd & Burdette Rd,39.00786,-77.138313,intersection,,,3523,MD,True,75,
+R02,Potomac,3,R02-S03,Rockledge Dr & Rock Spring Dr,39.026976,-77.132409,school,Walter Johnson High School,270,3214,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R02,Potomac,4,R02-S04,Westlake Dr & Tuckerman Ln,39.037127,-77.148261,intersection,,,2109,MD,True,75,
+R02,Potomac,5,R02-S05,Potomac Ave & Park Potomac Ave,39.057728,-77.157882,shopping center,Park Potomac,219,2971,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R02,Potomac,6,R02-S06,Montrose Rd & Falls Rd,39.0563,-77.179424,intersection,,,4029,MD,True,75,
+R02,Potomac,7,R02-S07,Falls Rd & Glen Rd,39.046085,-77.191467,intersection,,,2596,MD,True,75,
+R02,Potomac,8,R02-S08,Tuckerman Ln & Gainsborough Rd,39.040981,-77.172741,school,Winston Churchill High School,275,3686,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R02,Potomac,9,R02-S09,Westlake Dr & Democracy Blvd,39.022513,-77.150144,intersection,,,1626,MD,True,75,
+R02,Potomac,10,R02-S10,Seven Locks Rd & Bradley Blvd,39.01197,-77.160095,school,Seven Locks Elementary School,130,1712,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R02,Potomac,11,R02-S11,Persimmon Tree Rd & Eggert Dr,38.982364,-77.173103,school,Carderock Springs Elementary School,125,1457,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R02,Potomac,12,R02-S12,River Rd & Falls Rd,39.018043,-77.208946,shopping center,Safeway,151,723,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R03,Rockville & North Potomac,1,R03-S01,Potomac Ave & Park Potomac Ave,39.061613,-77.157849,shopping center,Harris Teeter,63,3346,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R03,Rockville & North Potomac,2,R03-S02,Rockville Pike & First St,39.077088,-77.139563,shopping center,Giant,100,4178,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R03,Rockville & North Potomac,3,R03-S03,Nelson St & Martins Ln,39.093418,-77.161399,school,Rock Terrace School,95,2783,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R03,Rockville & North Potomac,4,R03-S04,Redland Blvd & Grand Champion Dr,39.113962,-77.168918,shopping center,Safeway,266,2300,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R03,Rockville & North Potomac,5,R03-S05,South Frederick Ave & Frederick Rd,39.125995,-77.182882,shopping center,Aldi,129,2308,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R03,Rockville & North Potomac,6,R03-S06,Sam Eig Hwy & Fields Rd,39.116253,-77.208164,shopping center,Harris Teeter,150,3573,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R03,Rockville & North Potomac,7,R03-S07,Darnestown Rd & Muddy Branch Rd,39.102568,-77.220734,intersection,,,4606,MD,True,75,
+R03,Rockville & North Potomac,8,R03-S08,Shady Grove Rd & Traville Gateway Dr,39.091128,-77.204436,shopping center,Giant Food,109,1919,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R03,Rockville & North Potomac,9,R03-S09,West Montgomery Ave & Shady Grove Rd,39.103306,-77.190601,intersection,JSSA,244,1785,MD,True,75,
+R03,Rockville & North Potomac,10,R03-S10,Greenplace Ter & Gerard St,39.078899,-77.176986,school,Fallsmead Elementary School,90,3571,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R03,Rockville & North Potomac,11,R03-S11,Falls Rd & Falls Chapel Way,39.062876,-77.176518,intersection,Ritchie Park Elementary School,205,3640,MD,True,75,
+R03,Rockville & North Potomac,12,R03-S12,Travilah Rd & Dufief Mill Rd,39.081527,-77.249748,school,Travilah Elementary School,137,2016,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R04,"Gaithersburg, Germantown & Clarksburg",1,R04-S01,Darnestown Rd & Tschiffely Square Rd,39.115835,-77.246386,school,Rachel Carson Elementary School,143,3978,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R04,"Gaithersburg, Germantown & Clarksburg",2,R04-S02,West Diamond Ave & Quince Orchard Rd,39.142534,-77.220931,shopping center,Aldi,229,1304,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R04,"Gaithersburg, Germantown & Clarksburg",3,R04-S03,West Diamond Ave & Service Rd A,39.141008,-77.201015,shopping center,Giant Food,234,1823,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R04,"Gaithersburg, Germantown & Clarksburg",4,R04-S04,Montgomery Village Ave & Midcounty Hwy,39.160073,-77.202343,intersection,Gaithersburg Library,346,3198,MD,True,75,
+R04,"Gaithersburg, Germantown & Clarksburg",5,R04-S05,Wightman Rd & Snouffer School Rd,39.187723,-77.186781,shopping center,Safeway,168,2368,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R04,"Gaithersburg, Germantown & Clarksburg",6,R04-S06,Watkins Mill Rd & Club House Rd,39.174109,-77.208297,school,Montgomery Village Middle School,88,3149,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R04,"Gaithersburg, Germantown & Clarksburg",7,R04-S07,Middlebrook Rd & Frederick Rd,39.181191,-77.238292,shopping center,Giant Food,185,1791,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R04,"Gaithersburg, Germantown & Clarksburg",8,R04-S08,Great Seneca Hwy & Clopper Rd,39.159012,-77.275497,shopping center,Giant Food,293,1815,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R04,"Gaithersburg, Germantown & Clarksburg",9,R04-S09,Steeple Rd & Hopkins Rd,39.169292,-77.289291,school,Dr. Ronald E. McNair Elementary School,122,3171,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R04,"Gaithersburg, Germantown & Clarksburg",10,R04-S10,Middlebrook Rd & Germantown Rd,39.178922,-77.267327,shopping center,Safeway,201,1112,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R04,"Gaithersburg, Germantown & Clarksburg",11,R04-S11,Ridge Rd & Frederick Rd,39.204574,-77.245913,shopping center,Giant Food,169,2385,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R04,"Gaithersburg, Germantown & Clarksburg",12,R04-S12,Frederick Rd & Little Seneca Pkwy,39.223103,-77.26056,intersection,Rocky Hill Middle School,253,3510,MD,True,75,
+R05,"Olney, Sandy Spring & Ashton",1,R05-S01,Bel Pre Rd & Homecrest Rd,39.091308,-77.062805,intersection,,,3503,MD,True,75,
+R05,"Olney, Sandy Spring & Ashton",2,R05-S02,Georgia Ave & Bel Pre Rd,39.093129,-77.079452,intersection,,,3169,MD,True,75,
+R05,"Olney, Sandy Spring & Ashton",3,R05-S03,Norbeck Rd & Muncaster Mill Rd,39.10895,-77.080003,shopping center,Norbeck Center,260,3024,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R05,"Olney, Sandy Spring & Ashton",4,R05-S04,Norbeck Rd & Wintergate Dr,39.112424,-77.059132,intersection,,,1981,MD,True,75,
+R05,"Olney, Sandy Spring & Ashton",5,R05-S05,Georgia Ave & Emory Ln,39.126139,-77.072483,intersection,,,1917,MD,True,75,
+R05,"Olney, Sandy Spring & Ashton",6,R05-S06,Cherry Valley Dr & Cashell Rd,39.136245,-77.08628,school,Cashell Elementary School,124,1951,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R05,"Olney, Sandy Spring & Ashton",7,R05-S07,Georgia Ave & Cherry Valley Dr,39.139114,-77.068482,intersection,,,1802,MD,True,75,
+R05,"Olney, Sandy Spring & Ashton",8,R05-S08,Olney Sandy Spring Rd & Georgia Ave,39.153329,-77.06693,shopping center,Shoppers Food & Pharmacy,186,3412,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R05,"Olney, Sandy Spring & Ashton",9,R05-S09,Olney Sandy Spring Rd & Old Baltimore Rd,39.146457,-77.050622,intersection,,,2049,MD,True,75,
+R05,"Olney, Sandy Spring & Ashton",10,R05-S10,Olney Sandy Spring Rd & Brooke Rd,39.149581,-77.02671,school,Echelon Academy Beauty,20,523,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R05,"Olney, Sandy Spring & Ashton",11,R05-S11,Norwood Rd & Bryants Nursery Rd,39.114078,-77.014602,school,James Hubert Blake High School Alumni,280,898,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R05,"Olney, Sandy Spring & Ashton",12,R05-S12,Layhill Rd & Longmead Crossing Dr,39.095594,-77.044589,intersection,,,3048,MD,True,75,
+R06,"Silver Spring, Kensington & Wheaton",1,R06-S01,Georgia Ave & Silver Spring Ave,38.991622,-77.02655,school,The Nora School,151,5662,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R06,"Silver Spring, Kensington & Wheaton",2,R06-S02,Georgia Ave & 16th St,39.007716,-77.039826,shopping center,Aldi,298,4972,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R06,"Silver Spring, Kensington & Wheaton",3,R06-S03,Connecticut Ave & Beach Dr,39.008024,-77.080306,intersection,Oneness Family Montessori High School Of Washington,291,3325,MD,True,75,
+R06,"Silver Spring, Kensington & Wheaton",4,R06-S04,Connecticut Ave & Knowles Ave,39.027489,-77.076682,shopping center,Safeway,124,5252,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R06,"Silver Spring, Kensington & Wheaton",5,R06-S05,Strathmore Ave & Flanders Ave,39.034859,-77.096053,school,Holy Cross Catholic Elementary School,153,4623,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R06,"Silver Spring, Kensington & Wheaton",6,R06-S06,Randolph Rd & Dalewood Dr,39.059043,-77.069183,school,Wheaton High School,158,7749,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R06,"Silver Spring, Kensington & Wheaton",7,R06-S07,Georgia Ave & Layhill Rd,39.060228,-77.051048,shopping center,Glenmont Shopping Center,170,5484,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R06,"Silver Spring, Kensington & Wheaton",8,R06-S08,University Blvd West & Georgia Ave,39.041446,-77.051667,school,Albert Einstein High School,190,6457,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R06,"Silver Spring, Kensington & Wheaton",9,R06-S09,University Blvd West & Arcola Ave,39.0355,-77.025955,school,Northwood High School,210,6103,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R06,"Silver Spring, Kensington & Wheaton",10,R06-S10,University Blvd West & Colesville Rd,39.020296,-77.012637,shopping center,Woodmoor Shopping Center,83,6048,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R06,"Silver Spring, Kensington & Wheaton",11,R06-S11,Piney Branch Rd & Arliss St,38.998489,-77.00107,shopping center,Giant Food,171,6257,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R06,"Silver Spring, Kensington & Wheaton",12,R06-S12,New Hampshire Ave & Lockwood Dr,39.039742,-76.990729,shopping center,Giant Food,203,3466,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R07,"Bowie, Mitchellville & Upper Marlboro",1,R07-S01,Landover Rd & Medical Center Dr,38.903591,-76.833675,intersection,Largo Town Center,297,3120,MD,True,75,
+R07,"Bowie, Mitchellville & Upper Marlboro",2,R07-S02,West Kettering Dr & Etna Dr,38.88455,-76.818661,school,Largo High School,214,3449,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R07,"Bowie, Mitchellville & Upper Marlboro",3,R07-S03,Central Ave & Watkins Park Dr,38.900168,-76.792394,shopping center,Watkins Park Plaza,230,2667,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R07,"Bowie, Mitchellville & Upper Marlboro",4,R07-S04,Oak Grove Rd & Leeland Rd,38.875184,-76.759675,school,Queen Anne School,136,1498,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R07,"Bowie, Mitchellville & Upper Marlboro",5,R07-S05,North West Crain Hwy & Collington Rd,38.942512,-76.718132,shopping center,Lowe's Home Improvement,327,1829,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R07,"Bowie, Mitchellville & Upper Marlboro",6,R07-S06,Collington Rd & Northview Dr,38.947495,-76.737313,shopping center,Safeway,163,3555,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R07,"Bowie, Mitchellville & Upper Marlboro",7,R07-S07,Annapolis Rd & Belair Dr,38.977498,-76.741504,school,Bowie High School,191,3923,MD,True,75,"Place in the public strip at the corner, not on school grounds."
+R07,"Bowie, Mitchellville & Upper Marlboro",8,R07-S08,Laurel Bowie Rd & Old Chapel Rd,38.986258,-76.757591,shopping center,Whitehall Shopping Center,124,3104,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R07,"Bowie, Mitchellville & Upper Marlboro",9,R07-S09,Laurel Bowie Rd & Collington Rd,38.970945,-76.75546,intersection,,,3192,MD,True,75,
+R07,"Bowie, Mitchellville & Upper Marlboro",10,R07-S10,Annapolis Rd & High Bridge Rd,38.972178,-76.773604,shopping center,Lidl,120,2626,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R07,"Bowie, Mitchellville & Upper Marlboro",11,R07-S11,Annapolis Rd & Fairwood Pkwy,38.96515,-76.793119,shopping center,Safeway,331,2244,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R07,"Bowie, Mitchellville & Upper Marlboro",12,R07-S12,Martin Luther King Jr. Hwy & Annapolis Rd,38.955828,-76.823173,shopping center,Shoppers,213,2427,MD,True,75,"Use the corner at the main entrance, not the private lot."
+R08,McLean & Great Falls,1,R08-S01,Old Dominion Dr & Chain Bridge Rd,38.934035,-77.177356,shopping center,Giant Food,293,3778,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R08,McLean & Great Falls,2,R08-S02,Old Dominion Dr & Balls Hill Rd,38.941506,-77.194086,intersection,,,2327,VA,True,75,
+R08,McLean & Great Falls,3,R08-S03,Dolley Madison Blvd & Scotts Crossing Rd,38.924858,-77.208232,shopping center,Wegmans,183,2978,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R08,McLean & Great Falls,4,R08-S04,Leesburg Pike & Towers Crescent Dr,38.913362,-77.222832,shopping center,The Shops at Fairfax Square,115,1563,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R08,McLean & Great Falls,5,R08-S05,Leesburg Pike & Westpark Dr,38.924025,-77.236508,shopping center,Lidl,209,1050,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R08,McLean & Great Falls,6,R08-S06,Spring Hill Rd & Lewinsville Rd,38.93861,-77.231252,intersection,Spring Hill Elementary School,267,802,VA,True,75,
+R08,McLean & Great Falls,7,R08-S07,Old Dominion Dr & Swinks Mill Rd,38.946666,-77.211727,intersection,,,1051,VA,True,75,
+R08,McLean & Great Falls,8,R08-S08,Georgetown Pike & Balls Hill Rd,38.954077,-77.191978,school,Cooper Middle School,156,1308,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R08,McLean & Great Falls,9,R08-S09,Georgetown Pike & Spring Hill Rd,38.962322,-77.22705,intersection,,,312,VA,True,75,
+R08,McLean & Great Falls,10,R08-S10,Leesburg Pike & Beulah Rd,38.958041,-77.274622,intersection,,,1449,VA,True,75,
+R08,McLean & Great Falls,11,R08-S11,Trap Rd & Towlston Rd,38.944186,-77.265739,intersection,Colvin Run Elementary School,275,1216,VA,True,75,
+R08,McLean & Great Falls,12,R08-S12,Trap Rd & Beulah Rd,38.930388,-77.271539,intersection,,,1582,VA,True,75,
+R09,"Vienna, Oakton & Fairfax",1,R09-S01,Gallows Rd & Prosperity Ave,38.880642,-77.227651,shopping center,Harris Teeter,145,2367,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R09,"Vienna, Oakton & Fairfax",2,R09-S02,Park St SE & Cedar Ln,38.888246,-77.242189,shopping center,Cedar Park Shopping Center,106,3312,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R09,"Vienna, Oakton & Fairfax",3,R09-S03,Maple Ave East & Chain Bridge Rd,38.90975,-77.254941,intersection,,,2812,VA,True,75,
+R09,"Vienna, Oakton & Fairfax",4,R09-S04,Maple Ave West & Lawyers Rd,38.899764,-77.267479,shopping center,Maple Avenue Shopping Center,62,3746,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R09,"Vienna, Oakton & Fairfax",5,R09-S05,Nutley St & Virginia Center Blvd,38.882933,-77.267921,school,Marshall Road Elementary School,155,3441,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R09,"Vienna, Oakton & Fairfax",6,R09-S06,Pickett Rd & Fairfax Blvd,38.864992,-77.270199,shopping center,Giant Food,93,2205,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R09,"Vienna, Oakton & Fairfax",7,R09-S07,Chain Bridge Rd & Blake Ln,38.879166,-77.303583,school,Oakton Elementary School,121,2368,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R09,"Vienna, Oakton & Fairfax",8,R09-S08,Fairfax Blvd & University Dr,38.859505,-77.303811,shopping center,Point 50,84,3635,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R09,"Vienna, Oakton & Fairfax",9,R09-S09,Main St & Fairfax Blvd,38.852801,-77.323904,shopping center,Aldi,90,3076,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R09,"Vienna, Oakton & Fairfax",10,R09-S10,Main St & Blenheim Blvd,38.84568,-77.303997,shopping center,Victorian Square,90,3735,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R09,"Vienna, Oakton & Fairfax",11,R09-S11,Main St & Whitacre Rd,38.841968,-77.27856,school,Carter G. Woodson High School,273,2544,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R09,"Vienna, Oakton & Fairfax",12,R09-S12,Little River Turnpike & Guinea Rd,38.838424,-77.251383,intersection,Pozez Jewish Community Center of Northern Virginia,83,2992,VA,True,75,
+R10,Arlington & Falls Church,1,R10-S01,Wilson Blvd & North Pierce St,38.894395,-77.076724,shopping center,Safeway,145,3230,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R10,Arlington & Falls Church,2,R10-S02,Spout Run Pkwy & North Kirkwood Rd,38.895904,-77.096087,shopping center,Sprouts Farmers Market,84,4809,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R10,Arlington & Falls Church,3,R10-S03,North Glebe Rd & 7th St North,38.879203,-77.112497,shopping center,Target,102,6276,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R10,Arlington & Falls Church,4,R10-S04,Columbia Pike & South Walter Reed Dr,38.86257,-77.087011,school,Metta Montessori School,36,5527,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R10,Arlington & Falls Church,5,R10-S05,Columbia Pike & South Four Mile Run Dr,38.856374,-77.10981,shopping center,Columbia Pike Plaza,268,5319,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R10,Arlington & Falls Church,6,R10-S06,Leesburg Pike & Carlin Springs Rd,38.848332,-77.124337,shopping center,Somali Mall,153,3116,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R10,Arlington & Falls Church,7,R10-S07,Leesburg Pike & Glen Carlyn Rd,38.856119,-77.139871,school,Corpus Christi School,119,3442,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R10,Arlington & Falls Church,8,R10-S08,Leesburg Pike & Arlington Blvd Service Rd,38.872031,-77.1559,intersection,Eden Center,299,4542,VA,True,75,
+R10,Arlington & Falls Church,9,R10-S09,North Washington St & East Broad St,38.882197,-77.171046,shopping center,Whole Foods Market,30,5286,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R10,Arlington & Falls Church,10,R10-S10,North Sycamore St & Langston Blvd,38.890468,-77.156351,intersection,Tuckahoe Elementary School,346,6171,VA,True,75,
+R10,Arlington & Falls Church,11,R10-S11,North Glebe Rd & 26th St North,38.902603,-77.127621,school,Discovery Elementary,175,6267,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R10,Arlington & Falls Church,12,R10-S12,North Glebe Rd & Williamsburg Blvd,38.916,-77.136565,intersection,Jamestown Elementary School,264,4616,VA,True,75,
+R11,Alexandria & Mount Vernon,1,R11-S01,North Washington St & George Washington Memorial Pkwy,38.815568,-77.044713,shopping center,Harris Teeter,319,7514,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,2,R11-S02,Duke St & South Peyton St,38.804079,-77.057258,school,Chance For Change Academy,66,8343,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R11,Alexandria & Mount Vernon,3,R11-S03,Duke St & Yale Dr,38.807603,-77.08279,shopping center,Alexandria Commons,63,3713,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,4,R11-S04,Duke St & North Jordan St,38.811965,-77.109617,shopping center,Aldi,82,3846,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,5,R11-S05,South Van Dorn St & Franconia Rd,38.784143,-77.136213,school,Thomas Edison High School,248,2493,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R11,Alexandria & Mount Vernon,6,R11-S06,Manchester Blvd & Kingstowne Blvd,38.768454,-77.141255,shopping center,Aldi,133,3199,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,7,R11-S07,Telegraph Rd & Hayfield Rd,38.751967,-77.13973,shopping center,Giant Food,207,3444,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,8,R11-S08,Richmond Hwy & Fordson Rd,38.749511,-77.083152,shopping center,Mount Vernon Plaza,104,2576,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,9,R11-S09,Richmond Hwy & Memorial St,38.76971,-77.081964,shopping center,Giant Food,199,2993,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,10,R11-S10,Richmond Hwy & North Kings Hwy,38.782518,-77.077028,shopping center,Aldi,235,3204,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,11,R11-S11,Fort Hunt Rd & Belle View Blvd,38.775068,-77.062597,shopping center,Safeway,196,3097,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R11,Alexandria & Mount Vernon,12,R11-S12,Fort Hunt Rd & Waynewood Blvd,38.726508,-77.058394,school,Carl Sandburg Middle School Hockey Club,91,3220,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R12,"Burke, Springfield & Fairfax Station",1,R12-S01,Backlick Rd & Amherst Ave,38.791066,-77.187078,school,Lynbrook Elementary School,129,3436,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R12,"Burke, Springfield & Fairfax Station",2,R12-S02,Old Keene Mill Rd & Commerce St,38.778311,-77.191468,shopping center,Whole Foods Market,235,2981,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",3,R12-S03,Rolling Rd & Old Keene Mill Rd,38.779176,-77.233147,shopping center,Whole Foods Market,181,3424,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",4,R12-S04,Sydenstricker Rd & Huntsman Blvd,38.766326,-77.253849,school,Orange Hunt Elementary School,165,3185,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R12,"Burke, Springfield & Fairfax Station",5,R12-S05,Fairfax County Pkwy & Huntsman Blvd,38.751505,-77.266882,shopping center,Giant Food,206,3369,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",6,R12-S06,Old Keene Mill Rd & Lee Chapel Rd,38.776783,-77.275689,shopping center,Safeway,180,3399,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",7,R12-S07,Roberts Rd & Roberts Pkwy,38.800487,-77.302806,shopping center,Target,260,3160,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",8,R12-S08,Roberts Rd & Commonwealth Blvd,38.813843,-77.302085,school,Robinson Secondary School,269,3156,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R12,"Burke, Springfield & Fairfax Station",9,R12-S09,Braddock Rd & Twinbrook Rd,38.817389,-77.27396,shopping center,Safeway,140,3501,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",10,R12-S10,Burke Lake Rd & Burke Rd,38.797454,-77.271739,shopping center,H Mart,219,3338,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",11,R12-S11,Rolling Rd & Burke Lake Rd,38.807919,-77.254882,shopping center,Kings Park Shopping Center,206,4212,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R12,"Burke, Springfield & Fairfax Station",12,R12-S12,Braddock Rd & Queensberry Ave,38.811152,-77.224627,shopping center,Lotte Plaza Market,178,2643,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",1,R13-S01,Reston Pkwy & New Dominion Pkwy,38.960117,-77.354268,shopping center,Whole Foods Market,197,1486,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",2,R13-S02,Elden St & Post Dr,38.967696,-77.375171,shopping center,Safeway,158,2027,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",3,R13-S03,Elden St & Herndon Pkwy,38.962899,-77.399135,shopping center,H Mart,124,2851,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",4,R13-S04,Centreville Rd & Sunrise Valley Dr,38.952342,-77.409102,shopping center,Giant Food,251,2036,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",5,R13-S05,Fox Mill Rd & Monroe St,38.945206,-77.393276,school,McNair Upper Elementary School,91,2697,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R13,"Reston, Herndon & Chantilly",6,R13-S06,Steeplechase Dr & Colts Neck Rd,38.931783,-77.362757,school,Fairfax County Public Schools,110,2128,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R13,"Reston, Herndon & Chantilly",7,R13-S07,Centreville Rd & McLearen Rd,38.923748,-77.417026,shopping center,Food Lion,314,2243,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",8,R13-S08,Fairfax County Pkwy & Franklin Farm Rd,38.906982,-77.405652,shopping center,Giant Food,200,3686,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",9,R13-S09,Route 50 & Metrotech Dr,38.892565,-77.426894,shopping center,Aldi,176,2271,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",10,R13-S10,Route 50 & Majestic Ln,38.879888,-77.394802,shopping center,Greenbriar Shopping Center,185,2928,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R13,"Reston, Herndon & Chantilly",11,R13-S11,West Ox Rd & Ox Trail,38.888843,-77.377516,school,Navy Elementary School,131,2087,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R13,"Reston, Herndon & Chantilly",12,R13-S12,Route 50 & Dorforth Dr,38.872852,-77.375953,shopping center,Harris Teeter,166,2098,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",1,R14-S01,Loudoun County Pkwy & Russell Branch Pkwy,39.050027,-77.451013,shopping center,Trader Joe's,146,1614,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",2,R14-S02,Ashburn Rd & Hay Rd,39.043555,-77.487449,school,Hillside Elementary School,31,2838,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R14,"Ashburn, Brambleton & Leesburg",3,R14-S03,Farmwell Rd & Ashburn Farm Pkwy,39.027667,-77.487166,shopping center,Ashburn Farm Village Center,174,2256,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",4,R14-S04,Loudoun County Pkwy & Mooreview Pkwy,38.992336,-77.500861,intersection,,,2030,VA,True,75,
+R14,"Ashburn, Brambleton & Leesburg",5,R14-S05,Mooreview Pkwy & Wynridge Dr,39.006881,-77.502894,shopping center,Harris Teeter,186,2211,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",6,R14-S06,Claiborne Pkwy & Broadlands Blvd,39.026455,-77.511366,shopping center,Lidl,132,2660,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",7,R14-S07,Claiborne Pkwy & Hay Rd,39.046064,-77.507729,school,Trailside Middle School,75,3008,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R14,"Ashburn, Brambleton & Leesburg",8,R14-S08,Battlefield Pkwy SE & Russell Branch Pkwy,39.095318,-77.53443,shopping center,Aldi,188,1315,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",9,R14-S09,Leesburg Bypass & Edwards Ferry Rd NE,39.113604,-77.537708,shopping center,Target,334,1922,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",10,R14-S10,Leesburg Bypass & Battlefield Pkwy NE,39.125936,-77.542892,shopping center,Exeter Shopping Center,253,2412,VA,True,75,"Use the corner at the main entrance, not the private lot."
+R14,"Ashburn, Brambleton & Leesburg",11,R14-S11,East Market St & Catoctin Cir SE,39.110566,-77.555412,school,The Historic Douglass High School,109,2995,VA,True,75,"Place in the public strip at the corner, not on school grounds."
+R14,"Ashburn, Brambleton & Leesburg",12,R14-S12,South King St & Davis Ave SW,39.104366,-77.569915,shopping center,Food Lion,132,3038,VA,True,75,"Use the corner at the main entrance, not the private lot."
