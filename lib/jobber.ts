@@ -165,3 +165,59 @@ export async function syncIfStale() {
   if (s.lastSyncAt && Date.now() - s.lastSyncAt < 5 * 60_000) return;
   await syncJobber().catch(() => {});
 }
+
+// Quotes with line items, one page per call so a long history never hits the function time limit.
+const QUOTES_QUERY = `
+query LdmvQuotes($cursor: String) {
+  quotes(first: 15, after: $cursor) {
+    nodes {
+      id
+      quoteNumber
+      quoteStatus
+      title
+      createdAt
+      updatedAt
+      client { name }
+      property { address { street city province postalCode } }
+      amounts { subtotal total }
+      lineItems(first: 60) { nodes { name description quantity unitPrice totalPrice } }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
+
+type QuoteNode = {
+  id: string; quoteNumber?: string | number; quoteStatus?: string; title?: string; createdAt?: string; updatedAt?: string;
+  client?: { name?: string };
+  property?: { address?: { street?: string; city?: string; province?: string; postalCode?: string } };
+  amounts?: { subtotal?: number; total?: number };
+  lineItems?: { nodes: { name?: string; description?: string; quantity?: number; unitPrice?: number; totalPrice?: number }[] };
+};
+
+export type QuoteRow = Record<string, string | number>;
+
+export async function quotesPage(cursor: string | null): Promise<{ rows: QuoteRow[]; quotes: number; next: string | null }> {
+  const d: { quotes: { nodes: QuoteNode[]; pageInfo: { hasNextPage: boolean; endCursor: string } } } =
+    await gql(QUOTES_QUERY, { cursor });
+  const rows: QuoteRow[] = [];
+  for (const q of d.quotes.nodes) {
+    const a = q.property?.address;
+    const base = {
+      quote_number: q.quoteNumber ?? "",
+      status: q.quoteStatus ?? "",
+      title: q.title ?? "",
+      client: q.client?.name ?? "",
+      property_address: [a?.street, a?.city, a?.province, a?.postalCode].filter(Boolean).join(", "),
+      created_at: q.createdAt ?? "",
+      updated_at: q.updatedAt ?? "",
+      quote_subtotal: q.amounts?.subtotal ?? "",
+      quote_total: q.amounts?.total ?? "",
+    };
+    const items = q.lineItems?.nodes ?? [];
+    if (!items.length) rows.push({ ...base, line_name: "", line_description: "", quantity: "", unit_price: "", line_total: "" });
+    for (const li of items)
+      rows.push({ ...base, line_name: li.name ?? "", line_description: li.description ?? "", quantity: li.quantity ?? "",
+        unit_price: li.unitPrice ?? "", line_total: li.totalPrice ?? "" });
+  }
+  return { rows, quotes: d.quotes.nodes.length, next: d.quotes.pageInfo.hasNextPage ? d.quotes.pageInfo.endCursor : null };
+}

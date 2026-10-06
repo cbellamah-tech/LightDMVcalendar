@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, Download, Loader2, RefreshCw } from "lucide-react";
 import { ago, api, NAVY } from "@/components/ui";
 
 type Status = { configured: boolean; connected: boolean; redirectUri: string; lastSyncAt?: number; lastError?: string; lastCount?: number; connectedAt?: number };
@@ -27,6 +27,36 @@ export default function JobberSettings() {
     finally { setBusy(false); load(); }
   }
 
+  async function exportQuotes() {
+    setBusy(true); setMsg("Downloading quotes from Jobber...");
+    try {
+      const rows: Record<string, string | number>[] = [];
+      let cursor: string | null = null, quotes = 0;
+      do {
+        let page: { rows: typeof rows; quotes: number; next: string | null } | null = null;
+        for (let tries = 0; !page; tries++) {
+          try { page = await api(`/api/jobber/quotes${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`); }
+          catch (e: any) {
+            // Jobber rate-limits big pulls; wait and retry the same page.
+            if (tries < 6 && /throttl|429/i.test(e.message)) await new Promise((r) => setTimeout(r, 5000));
+            else throw e;
+          }
+        }
+        rows.push(...page.rows); quotes += page.quotes; cursor = page.next;
+        setMsg(`Downloading quotes from Jobber... ${quotes} so far`);
+      } while (cursor);
+      const cols = rows.length ? Object.keys(rows[0]) : ["quote_number"];
+      const cell = (v: unknown) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+      const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = "jobber_quotes_line_items.csv";
+      a.click();
+      setMsg(`Downloaded ${quotes} quotes (${rows.length} line items).`);
+    } catch (e: any) { setMsg(e.message); }
+    finally { setBusy(false); }
+  }
+
   if (!s) return <div className="p-6 text-slate-500 flex gap-2"><Loader2 className="animate-spin" /> Loading...</div>;
 
   return (
@@ -43,6 +73,9 @@ export default function JobberSettings() {
             <button onClick={sync} disabled={busy} className="rounded-lg px-4 py-2 text-white font-semibold flex items-center gap-2" style={{ background: NAVY }}>
               {busy ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />} Sync now
             </button>
+            <button onClick={exportQuotes} disabled={busy} className="rounded-lg px-4 py-2 font-semibold flex items-center gap-2 border border-slate-300">
+              <Download size={16} /> Download all quotes (CSV)
+            </button>
           </>
         ) : s.configured ? (
           <>
@@ -55,7 +88,7 @@ export default function JobberSettings() {
             <ol className="list-decimal pl-5 space-y-1">
               <li>Go to developer.getjobber.com, sign in with your Jobber admin account, and create an app (name it Light DMV App).</li>
               <li>Set its OAuth callback URL to <code className="bg-slate-100 px-1 rounded break-all">{s.redirectUri}</code></li>
-              <li>Give it read access to Jobs, Clients and Users (scheduling and assigned team members).</li>
+              <li>Give it read access to Clients, Requests, Quotes, Jobs, Scheduled Items and Users.</li>
               <li>In Vercel, open this project, then Settings, then Environment Variables, and add <code>JOBBER_CLIENT_ID</code> and <code>JOBBER_CLIENT_SECRET</code> from the app page. Redeploy.</li>
               <li>Come back here and press Connect Jobber.</li>
             </ol>
