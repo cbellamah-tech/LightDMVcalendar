@@ -8,13 +8,13 @@ Crew and owner app for Light DMV, built on the original ops calendar. Installabl
 | Jobs | everyone | Jobber visits for your crew with the install or takedown SOP checklist. Required boxes block "Mark job done"; photo boxes need a photo. Updates every 5 seconds so the whole crew sees each other's checks. |
 | Calendar | owners | The original recurring task board (moved to `/calendar`). |
 | People | owners, Maria | Add workers, set PINs, put people on Crew 1 / Crew 2, match them to their Jobber name. |
-| Jobber | owners, Maria | Connect Jobber and sync. |
+| Jobber | owners, Maria | Connect Jobber, sync, and download every quote with line items as CSV. |
 
 ## Setup on Vercel
 
 1. Storage tab: connect **Supabase** to the project (Production and Preview, no custom prefix). The app creates its own table (`ldmv_kv`) and photo bucket (`ldmv-photos`) on first use; nothing to run by hand.
 2. Environment variable `OWNER_SETUP_CODE`: a code only Chris and Liam know. The first time an owner signs in they pick a PIN and enter this code.
-3. Jobber (later): create an app at developer.getjobber.com, callback URL `https://<your site>/api/jobber/callback`, add `JOBBER_CLIENT_ID` and `JOBBER_CLIENT_SECRET`, then press **Connect Jobber** in the app.
+3. Jobber: create an app at developer.getjobber.com with read-only Clients, Requests, Quotes, Jobs, Scheduled Items and Users scopes, refresh token rotation on, no webhooks, and callback URL `https://<your site>/api/jobber/callback`. Add `JOBBER_CLIENT_ID` and `JOBBER_CLIENT_SECRET` (Production and Preview), then press **Connect Jobber** on the Jobber tab. The same tab has **Download all quotes (CSV)**.
 
 Optional: `AUTH_SECRET` (otherwise the sign-in key is derived from the Supabase secret). Upstash Redis and Vercel Blob still work as fallbacks. With nothing connected (local `npm run dev`) data and photos live in memory.
 
