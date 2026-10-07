@@ -14,7 +14,6 @@ export type JobDetail = {
   createdAt?: string;
   instructions?: string;
   quoteNumber?: string;
-  quoteMessage?: string;
   lines: DetailLine[];
   notes: DetailNote[];
   clientName?: string;
@@ -78,7 +77,7 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
   const notes: DetailNote[] = [
     ...rows(quote.notes).map((n: any) => ({ from: "quote" as const, message: n.message || "", at: n.createdAt, files: filesOf(n) })),
     ...rows(j.notes).map((n: any) => ({ from: "job" as const, message: n.message || "", at: n.createdAt, files: filesOf(n) })),
-  ].filter((n) => n.message.trim() || n.files.length);
+  ].map((n) => (isContract(n.message) ? { ...n, message: "" } : n)).filter((n) => n.message.trim() || n.files.length);
   const text = [j.instructions, quote.message, ...notes.map((n) => n.message), ...lines.map((l) => `${l.name} ${l.description || ""}`)].join("\n");
   const bins = [...new Set([...text.matchAll(BIN_RE)].map((m) => m[1]))];
   const client = j.client || {};
@@ -92,12 +91,16 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
     ? `Jobber has ${earlier.length} earlier job${earlier.length > 1 ? "s" : ""} for this client (first ${new Date(Math.min(...earlier.map((x) => Date.parse(x.createdAt!)))).getFullYear()})`
     : bins.length ? `Notes mention bin ${bins.join(", ")}` : undefined;
   return {
-    createdAt: j.createdAt, instructions: j.instructions || undefined,
-    quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined, quoteMessage: quote.message || undefined,
+    // The quote's customer message (our service agreement) is for the customer, not the crew, so it is never sent.
+    createdAt: j.createdAt, instructions: j.instructions && !isContract(j.instructions) ? j.instructions : undefined,
+    quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined,
     lines, notes, clientName: client.name, clientTags: rows(client.tags).map((t: any) => t.label).filter(Boolean),
     otherJobs, repeat, repeatWhy, bins,
   };
 }
+
+/** Our seasonal lighting agreement / terms pasted into a note: customer paperwork, not crew notes. */
+const isContract = (t?: string) => !!t && /service agreement|terms and conditions|scope of services/i.test(t);
 
 export async function fetchJobDetail(jobberJobId: string): Promise<JobDetail> {
   let d: JobDetail;
@@ -115,6 +118,7 @@ export async function fetchJobDetail(jobberJobId: string): Promise<JobDetail> {
 
 export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolean } = {}): Promise<JobDetail | null> {
   const d = await kvGet<JobDetail>(key(jobberJobId));
+  if (d) { delete (d as any).quoteMessage; if (isContract(d.instructions)) d.instructions = undefined; d.notes = d.notes.filter((n) => !isContract(n.message)); } // saved before the agreement was left out
   if (d && !opts.refresh && Date.now() - d.fetchedAt < MAX_AGE) return d;
   return opts.refresh || !d ? fetchJobDetail(jobberJobId) : d;
 }
