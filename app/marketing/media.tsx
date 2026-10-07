@@ -17,8 +17,8 @@ type Account = { platform: string; name: string; expired?: boolean };
 
 const has = (accounts: Account[], p: string) => accounts.some((a) => a.platform.toLowerCase().includes(p) && !a.expired);
 
-export function MediaBoard({ media, platforms, accounts, ghlOn, today, reload }: {
-  media: Media[]; platforms: { id: Platform; label: string }[]; accounts: Account[]; ghlOn: boolean; today: string; reload: () => void;
+export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner, today, reload }: {
+  media: Media[]; platforms: { id: Platform; label: string }[]; accounts: Account[]; ghlOn: boolean; autopost: boolean; owner: boolean; today: string; reload: () => void;
 }) {
   const [pick, setPick] = useState<string | null>(null);
   const m = media.find((x) => x.id === pick) ?? media[0];
@@ -48,6 +48,10 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, today, reload }:
       setMsg([good.length ? `Posted to ${good.join(", ")}.` : "", ...bad.map((x: any) => `${x.platform}: ${x.error}`)].filter(Boolean).join(" "));
       reload();
     } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
+  async function toggleAuto() {
+    await api("/api/marketing/media", { method: "PUT", json: { autopost: !autopost } }).catch((e) => setMsg(e.message));
+    reload();
   }
   async function saveCaption() {
     if (!m) return;
@@ -114,6 +118,12 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, today, reload }:
             className="w-full sm:w-auto rounded-xl px-6 py-3 text-white text-lg font-bold inline-flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: "#1F9D55" }}>
             {busy ? <Loader2 className="animate-spin" /> : <Send size={20} />} Post now{chosen.length ? ` to ${chosen.length}` : ""}
           </button>
+          {owner && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={autopost} onChange={toggleAuto} disabled={!ghlOn} />
+              <span><b>Auto-post</b>: each new daily video posts itself to every connected account. Leave it off to check each one first.</span>
+            </label>
+          )}
           {msg && <p className="text-sm break-words">{msg}</p>}
           {(m.posts ?? []).map((p, i) => (
             <p key={i} className={`text-xs ${p.ok ? "text-green-700" : "text-red-600"}`}>

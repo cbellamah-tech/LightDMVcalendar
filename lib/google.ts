@@ -159,6 +159,31 @@ export async function inboxThreads(limit = 60): Promise<InboxThread[]> {
   return out.sort((a, b) => b.lastAt - a.lastAt);
 }
 
+/* ---------- Cold email (Smartlead, run by The Headline Theory) ---------- */
+
+export type ColdReport = { id: string; day: string; sent: number; responses: number; positive: number };
+const num = (m: RegExpMatchArray | null) => (m ? Number(m[1].replace(/,/g, "")) : 0);
+
+/** The agency's weekly update emails ("This week we sent 2164 emails, got 102 responses, and 12 positive responses"). */
+export async function coldEmailReports(): Promise<ColdReport[]> {
+  const q = encodeURIComponent('from:theheadlinetheory.com subject:"weekly update" newer_than:120d');
+  const list = await gapi(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=30&q=${q}`);
+  const out: ColdReport[] = [];
+  for (const m of list.messages ?? []) {
+    const msg = await gapi(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata`);
+    const text = String(msg.snippet ?? "").replace(/&#39;/g, "'");
+    const sent = num(text.match(/sent\s+([\d,]+)\s+emails/i));
+    if (!sent) continue;
+    out.push({
+      id: m.id, sent,
+      day: new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(Number(msg.internalDate) || Date.now()),
+      responses: num(text.match(/([\d,]+)\s+responses/i)),
+      positive: num(text.match(/([\d,]+)\s+positive/i)),
+    });
+  }
+  return out.sort((a, b) => b.day.localeCompare(a.day));
+}
+
 /* ---------- Campaign sheet ---------- */
 
 const colName = (i: number) => { let s = ""; for (i++; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s; return s; };

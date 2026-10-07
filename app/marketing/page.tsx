@@ -18,6 +18,8 @@ type Data = {
   google: { configured: boolean; connected: boolean; email?: string; sheetUrl: string };
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
+  autopost: boolean;
+  cold: { url: string; latest: { day: string; sent: number; responses: number; positive: number } | null };
   media: Media[];
   platforms: { id: "facebook" | "instagram" | "linkedin" | "google"; label: string }[];
   lastFill: { at: number; week: string; by: string; written: { range: string; row: string; value: number }[]; missingRows: string[]; error?: string } | null;
@@ -90,21 +92,23 @@ export default function Marketing() {
       </div>
       {msg && <p className="text-sm bg-white border border-slate-200 rounded-lg p-2">{msg}</p>}
 
-      <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} today={d.today} reload={load} />
+      <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} autopost={d.autopost} owner={owner} today={d.today} reload={load} />
 
       {/* The map: where customers find us, then where leads land */}
       <section className="rounded-xl border border-slate-200 bg-slate-100 p-3 space-y-3">
         <div className="text-sm font-bold" style={{ color: NAVY }}>Where customers find us</div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {d.boxes.map((b) => (
-            <button key={b.id} onClick={() => setOpen(open === b.id ? null : b.id)}
+            <button key={b.id} onClick={() => b.id === "cold" ? window.open(d.cold.url, "_blank", "noopener") : setOpen(open === b.id ? null : b.id)}
               className={`text-left bg-white rounded-xl border p-3 hover:shadow ${open === b.id ? "border-slate-500" : "border-slate-200"}`}>
               <div className="flex items-center gap-2">
                 <Dot l={b.light} />
                 <span className="font-bold flex-1">{b.title}</span>
                 {b.goal ? <span className="text-sm font-semibold tabular-nums">{b.done} / {b.goal}</span> : <span className="text-sm tabular-nums">{b.done}</span>}
               </div>
-              <div className="text-xs text-slate-500 mt-1">{b.line}</div>
+              <div className="text-xs text-slate-500 mt-1">{b.id === "cold" && d.cold.latest
+                ? `Last week: ${d.cold.latest.sent.toLocaleString()} sent, ${d.cold.latest.responses} replies, ${d.cold.latest.positive} positive · Open Smartlead ↗`
+                : b.id === "cold" ? `${b.line} · Open Smartlead ↗` : b.line}</div>
               <div className="text-xs mt-1 flex gap-1 flex-wrap">
                 <span className="text-slate-500">{LIGHT_WORD[b.light]}</span>
                 {b.bots.map((x) => <span key={x} className="rounded bg-slate-100 px-1.5 text-slate-600">{x} bot</span>)}

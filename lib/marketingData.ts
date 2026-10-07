@@ -1,7 +1,8 @@
+import { getAutoPost } from "./autopost";
 import { kvGet, kvSet } from "./store";
-import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, sheetWeek, weekOf, weekTotals } from "./marketing";
+import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
 import { getGhlSnap, ghlConfigured, leadSource, refreshGhl } from "./ghl";
-import { googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
+import { coldEmailReports, ColdReport, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
 import { getMedia, PLATFORMS, runnerKey } from "./media";
 import { stableOrigin } from "./jobber";
 
@@ -19,12 +20,27 @@ function light(done: number, goal: number, daysIn: number): Light {
   return done >= expected * 0.6 ? "warning" : "critical";
 }
 
+/* Cold emails sent count themselves from the agency's weekly Smartlead update in info@ (counted on the day it arrives). */
+const COLD = "ldmv:mkt:smartlead";
+export const SMARTLEAD_URL = "https://app.smartlead.ai/client-login";
+async function syncColdEmail() {
+  const seen = (await kvGet<Record<string, ColdReport>>(COLD)) ?? {};
+  for (const r of await coldEmailReports()) {
+    if (seen[r.id]) continue;
+    await logCount({ channel: "cold_emails", n: r.sent, day: r.day, by: "Smartlead weekly report", via: "bot", note: `${r.responses} responses, ${r.positive} positive` });
+    seen[r.id] = r;
+  }
+  await kvSet(COLD, seen);
+}
+const latestCold = async () => Object.values((await kvGet<Record<string, ColdReport>>(COLD)) ?? {}).sort((a, b) => b.day.localeCompare(a.day))[0] ?? null;
+
 async function inbox(force = false) {
   const g = await googleStatus();
   if (!g.connected) return null;
   const cur = await kvGet<{ at: number; threads: InboxThread[]; error?: string }>(INBOX);
   if (cur && !force && Date.now() - cur.at < 5 * 60_000 && cur.threads.every((t) => t.kind)) return cur;
   try {
+    await syncColdEmail().catch(() => {});
     const next = { at: Date.now(), threads: await inboxThreads() };
     await kvSet(INBOX, next);
     return next;
@@ -82,6 +98,8 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     google: { ...(await googleStatus()), sheetUrl: sheetUrl() },
     inbox: mail,
     feed,
+    autopost: (await getAutoPost()).on,
+    cold: { url: SMARTLEAD_URL, latest: await latestCold() },
     media: (await getMedia()).filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
     platforms: PLATFORMS,
     lastFill: await kvGet<FillResult>(FILL),
