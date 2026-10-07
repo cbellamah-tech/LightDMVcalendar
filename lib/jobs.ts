@@ -20,7 +20,7 @@ export type Job = {
   updatedAt: number;
 };
 
-export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string };
+export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string; counts?: Record<string, number> };
 export type Checklist = { jobId: string; kind: JobKind; items: Record<string, CheckEntry>; completedAt?: number; completedBy?: string; rev: number };
 
 const JOBS = "ldmv:jobs";
@@ -116,3 +116,21 @@ export async function ensureSampleJobs() {
   if (await kvGet("ldmv:jobber:tokens")) return;
   await upsertJobs(sampleJobs());
 }
+
+// ---------- materials used (read later by the inventory ledger sync) ----------
+
+export type MaterialRecord = {
+  jobId: string; jobberJobId?: string; jobberVisitId?: string; jobNumber?: number; kind: JobKind; date: string; crew?: string;
+  c9Feet: number; c7Bulbs: number; miniStrands: number; by: string; at: number;
+};
+const MATERIALS = "ldmv:materials";
+
+export async function recordMaterials(job: Job, counts: Record<string, number>, by: string) {
+  const r: MaterialRecord = {
+    jobId: job.id, jobberJobId: job.jobberJobId, jobberVisitId: job.jobberVisitId, jobNumber: job.jobNumber, kind: job.kind, date: job.start, crew: job.crew,
+    c9Feet: counts.c9Feet ?? 0, c7Bulbs: counts.c7Bulbs ?? 0, miniStrands: counts.miniStrands ?? 0, by, at: Date.now(),
+  };
+  await kvUpdate<Record<string, MaterialRecord>>(MATERIALS, {}, (all) => { all[job.id] = r; return all; });
+}
+
+export const listMaterials = async () => Object.values((await kvGet<Record<string, MaterialRecord>>(MATERIALS)) ?? {}).sort((a, b) => a.date.localeCompare(b.date));

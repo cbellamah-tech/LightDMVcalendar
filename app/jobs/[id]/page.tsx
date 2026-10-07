@@ -74,7 +74,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
             <li key={item.id} className={`bg-white rounded-xl border p-3 space-y-2 ${e.done ? "border-green-300" : item.required ? "border-red-200" : "border-slate-200"}`}>
               <div className="flex gap-3 items-start">
                 <button aria-label={e.done ? "Uncheck" : "Check"}
-                  onClick={() => (item.photo && !e.photos.length ? setToast("Add a photo first.") : update({ itemId: item.id, done: !e.done }))}
+                  onClick={() => (item.photo && !e.photos.length ? setToast("Add a photo first.") : item.counts ? setToast("Fill in the three numbers; the box checks itself.") : update({ itemId: item.id, done: !e.done }))}
                   className={`w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center ${e.done ? "bg-green-600 border-green-600 text-white" : "border-slate-300"}`}>
                   {e.done && <Check size={20} />}
                 </button>
@@ -87,6 +87,18 @@ export default function JobPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
               </div>
+              {item.counts && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {item.counts.map((k) => (
+                    <label key={k.key} className="block text-sm">
+                      <span className="font-semibold">{k.label}</span>
+                      <input inputMode="numeric" defaultValue={e.counts?.[k.key] ?? ""} placeholder="0"
+                        onBlur={(ev) => { const v = ev.target.value.replace(/[^\d]/g, ""); if (v !== String(e.counts?.[k.key] ?? "")) update({ itemId: item.id, counts: { [k.key]: v } }); }}
+                        className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5" />
+                    </label>
+                  ))}
+                </div>
+              )}
               {item.noteLabel && (
                 <input defaultValue={e.note || ""} placeholder={item.noteLabel}
                   onBlur={(ev) => ev.target.value !== (e.note || "") && update({ itemId: item.id, note: ev.target.value })}

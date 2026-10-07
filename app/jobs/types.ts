@@ -3,9 +3,9 @@ export type Job = {
   start: string; end?: string; kind: "install" | "takedown"; crew?: string; assignedNames: string[];
 };
 export type Progress = { done: number; total: number; requiredLeft: string[] };
-export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string };
+export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string; counts?: Record<string, number> };
 export type Checklist = { jobId: string; kind: string; items: Record<string, CheckEntry>; completedAt?: number; completedBy?: string; rev: number };
-export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; noteLabel?: string };
+export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; noteLabel?: string; counts?: { key: string; label: string }[] };
 export type DetailFile = { name: string; url: string; image: boolean };
 export type JobDetail = {
   fetchedAt: number; error?: string; instructions?: string; quoteNumber?: string; quoteMessage?: string;

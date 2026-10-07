@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { checklistProgress, ensureSampleJobs, getChecklist, getJobs, jobVisibleTo, saveChecklist } from "@/lib/jobs";
+import { checklistProgress, ensureSampleJobs, getChecklist, getJobs, jobVisibleTo, recordMaterials, saveChecklist } from "@/lib/jobs";
 import { SOPS } from "@/lib/sops";
 import { getJobDetail, withDrive } from "@/lib/jobDetails";
 import { loadDriveIndex } from "@/lib/drive";
@@ -34,7 +34,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail });
 }
 
-/* Body: { itemId, done?, addPhotos?: string[], removePhoto?: string, note? } or { complete: true } or { reopen: true } */
+/* Body: { itemId, done?, addPhotos?: string[], removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands } } or { complete: true } or { reopen: true } */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const s = await requireRole();
   if (s instanceof NextResponse) return s;
@@ -62,15 +62,32 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (Array.isArray(b.addPhotos)) e.photos.push(...b.addPhotos.filter((u: unknown) => typeof u === "string").slice(0, 20));
     if (typeof b.removePhoto === "string") e.photos = e.photos.filter((u) => u !== b.removePhoto);
     if (typeof b.note === "string") e.note = b.note.slice(0, 500) || undefined;
+    if (item.counts && b.counts && typeof b.counts === "object") {
+      e.counts ??= {};
+      for (const k of item.counts) {
+        const raw = b.counts[k.key];
+        if (raw === "" || raw === null) delete e.counts[k.key];
+        else if (raw !== undefined) {
+          const v = Number(raw);
+          if (!Number.isFinite(v) || v < 0 || v > 100000) return NextResponse.json({ error: `${k.label}: enter a number.` }, { status: 400 });
+          e.counts[k.key] = Math.round(v);
+        }
+      }
+    }
+    const countsMissing = item.counts?.filter((k) => e.counts?.[k.key] == null) ?? [];
     if (typeof b.done === "boolean") {
       if (b.done && item.photo && !e.photos.length) return NextResponse.json({ error: "Add a photo first." }, { status: 400 });
+      if (b.done && countsMissing.length) return NextResponse.json({ error: `Fill in: ${countsMissing.map((k) => k.label).join("; ")}` }, { status: 400 });
       e.done = b.done;
     }
     if (item.photo && !e.photos.length) e.done = false;
+    if (item.counts) e.done = !countsMissing.length; // the box is the counts: checked once all three are in
     e.by = s.uid; e.byName = s.name; e.at = Date.now();
     if (!e.done && item.required) { c.completedAt = undefined; c.completedBy = undefined; }
   }
   c.rev = (c.rev || 0) + 1;
   await saveChecklist(c);
+  const m = sop.items.find((i) => i.counts && i.id === b.itemId);
+  if (m && c.items[m.id]?.done) await recordMaterials(job, c.items[m.id].counts ?? {}, s.name);
   return NextResponse.json({ checklist: c, progress: checklistProgress(c) });
 }

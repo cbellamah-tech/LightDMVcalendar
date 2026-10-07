@@ -3,7 +3,15 @@
    photo: the box needs at least one photo before it can be checked.
    Items marked REQUIRED, and items that ask for a picture, are required. Edit here to change. */
 
-export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; noteLabel?: string };
+export type SopCount = { key: "c9Feet" | "c7Bulbs" | "miniStrands"; label: string };
+/** counts: numbers the crew must enter before the box can be checked (materials used, for the ledger). */
+export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; noteLabel?: string; counts?: SopCount[] };
+
+export const MATERIAL_COUNTS: SopCount[] = [
+  { key: "c9Feet", label: "Feet of C9 roofline (count the bulbs)" },
+  { key: "c7Bulbs", label: "C7 bulbs used (0 if none)" },
+  { key: "miniStrands", label: "Mini strands used" },
+];
 export type JobKind = "install" | "takedown";
 
 export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
@@ -19,6 +27,7 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
       { id: "white-house-cord", text: "On a white house, use a white wire extension cord for the wreath" },
       { id: "white-columns", text: "Use white wire minis on white columns" },
       { id: "timer", text: "Make sure the timer is set, and send a picture of it", required: true, photo: true },
+      { id: "materials", text: "Enter the material used on this job", required: true, counts: MATERIAL_COUNTS },
       { id: "review", text: "Ask for a Google review while wearing the review tag ($50)", noteLabel: "Customer said" },
       { id: "goodie-bag", text: "Leave goodie bags" },
       { id: "yard-sign", text: "Put the yard sign in after the job is done" },
