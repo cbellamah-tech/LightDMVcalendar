@@ -38,7 +38,8 @@ function listIn(j: any, keys: string[]): any[] {
 export type GhlAccount = { id: string; platform: string; name: string; expired?: boolean };
 export type GhlPost = { platform: string; day: string; text: string; status: string };
 export type GhlLead = { id: string; name: string; source: string; tags: string[]; day: string; at: number; phone?: string; email?: string };
-export type GhlSnap = { at: number; accounts: GhlAccount[]; posts: GhlPost[]; leads: GhlLead[]; errors: string[] };
+export type GhlStage = { name: string; count: number; value: number };
+export type GhlSnap = { at: number; accounts: GhlAccount[]; posts: GhlPost[]; leads: GhlLead[]; pipeline: GhlStage[]; errors: string[] };
 
 async function accounts(): Promise<GhlAccount[]> {
   const j = await ghl(`/social-media-posting/${loc()}/accounts`);
@@ -92,6 +93,28 @@ async function leads(): Promise<GhlLead[]> {
     .sort((a, b) => b.at - a.at);
 }
 
+/** Open deals per pipeline stage (the SOP's 7 stages: Warm Leads through Invoice Paid, plus Lost Quotes). */
+async function pipeline(): Promise<GhlStage[]> {
+  const pj = await ghl(`/opportunities/pipelines?locationId=${encodeURIComponent(loc())}`);
+  const stageName = new Map<string, string>();
+  const order: string[] = [];
+  for (const p of listIn(pj, ["pipelines"]))
+    for (const st of p.stages ?? []) { stageName.set(st.id, st.name); if (!order.includes(st.name)) order.push(st.name); }
+  const counts = new Map<string, GhlStage>();
+  for (let page = 1; page <= 10; page++) {
+    const j = await ghl(`/opportunities/search?location_id=${encodeURIComponent(loc())}&limit=100&page=${page}`);
+    const list = listIn(j, ["opportunities"]);
+    for (const o of list) {
+      const name = stageName.get(o.pipelineStageId) ?? "Other";
+      const c = counts.get(name) ?? { name, count: 0, value: 0 };
+      c.count++; c.value += Number(o.monetaryValue) || 0;
+      counts.set(name, c);
+    }
+    if (list.length < 100) break;
+  }
+  return [...counts.values()].sort((a, b) => (order.indexOf(a.name) + 1 || 99) - (order.indexOf(b.name) + 1 || 99));
+}
+
 export const getGhlSnap = () => kvGet<GhlSnap>(SNAP);
 
 /** Refresh from GoHighLevel if the copy is older than `maxAgeMs`. Each part fails on its own. */
@@ -104,7 +127,8 @@ export async function refreshGhl(maxAgeMs = 10 * 60_000): Promise<GhlSnap | null
   const accts = await accounts().catch((e) => { errors.push(e.message); return cur?.accounts ?? []; });
   const ps = await posts(accts, since).catch((e) => { errors.push(e.message); return cur?.posts ?? []; });
   const ls = await leads().catch((e) => { errors.push(e.message); return cur?.leads ?? []; });
-  const snap: GhlSnap = { at: Date.now(), accounts: accts, posts: ps, leads: ls, errors };
+  const pl = await pipeline().catch((e) => { errors.push(e.message); return cur?.pipeline ?? []; });
+  const snap: GhlSnap = { at: Date.now(), accounts: accts, posts: ps, leads: ls, pipeline: pl, errors };
   await kvSet(SNAP, snap);
   return snap;
 }

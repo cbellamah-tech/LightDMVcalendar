@@ -13,7 +13,7 @@ type Data = {
   today: string; week: string; thisWeek: string; daysIn: number; role: string;
   channels: Ch[]; boxes: Box[];
   events: { id: string; channel: string; n: number; day: string; at: number; by: string; via: string; note?: string }[];
-  ghl: { configured: boolean; at: number | null; errors: string[]; accounts: { platform: string; name: string; expired?: boolean }[]; leads: Lead[]; weekLeads: number; bySource: Record<string, number> };
+  ghl: { configured: boolean; at: number | null; errors: string[]; accounts: { platform: string; name: string; expired?: boolean }[]; leads: Lead[]; weekLeads: number; bySource: Record<string, number>; pipeline: { name: string; count: number; value: number }[] };
   google: { configured: boolean; connected: boolean; email?: string; sheetUrl: string };
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
@@ -115,6 +115,15 @@ export default function Marketing() {
             <div className="text-xs text-slate-500 mt-1">
               {Object.keys(d.ghl.bySource).length ? Object.entries(d.ghl.bySource).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") : "Every lead, text and reply, with where they came from"}
             </div>
+            {d.ghl.pipeline.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {d.ghl.pipeline.map((st) => (
+                  <span key={st.name} className="text-xs rounded bg-slate-100 px-1.5 py-0.5" title={st.value ? `$${Math.round(st.value).toLocaleString()}` : undefined}>
+                    {st.name} <b className="tabular-nums">{st.count}</b>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3">
             <div className="flex items-center gap-2"><span className="font-bold flex-1">info@lightdmv.com</span>
@@ -144,7 +153,7 @@ export default function Marketing() {
         <Card title={`${isThisWeek ? "This week" : `Week of ${shortDay(d.week)}`} against the campaign sheet`}
           right={<a href={d.google.sheetUrl} target="_blank" rel="noreferrer" className="text-xs underline inline-flex items-center gap-1">Sheet <ExternalLink size={11} /></a>}>
           <ChannelRows rows={d.channels} onLog={log} busy={busy} />
-          <p className="text-xs text-slate-500">Weekly goal = the sheet's monthly goal ÷ 4. Yard signs count themselves from the Yard signs tab; social posts count from GoHighLevel once it's connected. Tap + when you post a listing or hand out cards.</p>
+          <p className="text-xs text-slate-500">Weekly goal = the sheet's monthly goal ÷ 4. Door-to-door, car magnets and Bing aren't rows in the sheet, so they count here only. Yard signs count themselves from the Yard signs tab; social posts count from GoHighLevel once it's connected. Tap + when you post a listing or hand out cards.</p>
           {d.events.length > 0 && (
             <details className="text-sm">
               <summary className="cursor-pointer text-slate-600">Recent taps</summary>
@@ -301,6 +310,6 @@ Header: Authorization: Bearer ${key}
 JSON body: {"bot": "<your name, e.g. SEO>", "title": "<one line result>", "body": "<details>", "link": "<https link if any>",
 "ask": "<a yes/no question for an owner, only if you need one>", "options": ["Yes", "No"],
 "counts": {"<channel>": <number done>}}
-Channels: google_posts, facebook_posts, instagram_posts, linkedin_posts, linkedin_engage, fb_groups, marketplace, craigslist, nextdoor, blog, cold_emails, door_hangers, tree_shop_cards, eddm.
+Channels: google_posts, facebook_posts, instagram_posts, linkedin_posts, linkedin_engage, fb_groups, marketplace, craigslist, nextdoor, blog, cold_emails, door_hangers, tree_shop_cards, eddm, door_to_door, car_magnets, bing_posts.
 At the start of every run, GET ${url}?bot=<your name> with the same header and act on any answers to your questions.`;
 }

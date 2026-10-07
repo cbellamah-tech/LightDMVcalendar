@@ -9,7 +9,7 @@ import { getVisits } from "./signs";
 export type ChannelId =
   | "google_posts" | "facebook_posts" | "fb_groups" | "marketplace" | "craigslist" | "linkedin_posts"
   | "linkedin_engage" | "instagram_posts" | "nextdoor" | "blog" | "cold_emails" | "yard_signs"
-  | "door_hangers" | "tree_shop_cards" | "eddm";
+  | "door_hangers" | "tree_shop_cards" | "eddm" | "door_to_door" | "car_magnets" | "bing_posts";
 
 export type BoxId = "signs" | "social" | "listings" | "website" | "paid" | "cold";
 
@@ -30,10 +30,14 @@ export const CHANNELS: Channel[] = [
   { id: "door_hangers", label: "Door hangers", sheetRow: "Door Hangers", monthlyGoal: 300, box: "signs" },
   { id: "tree_shop_cards", label: "Tree shop business cards", sheetRow: "Christmas Tree Shops Giving Biz cards", monthlyGoal: 20, box: "signs" },
   { id: "eddm", label: "Direct mail (EDDM)", sheetRow: "Direct Mail (EDDM)", box: "signs" },
+  // In the company SOP (Part 3) but not rows in the 2026 sheet: counted in the app only.
+  { id: "door_to_door", label: "Door-to-door after jobs", sheetRow: "Door to Door", box: "signs" },
+  { id: "car_magnets", label: "Car magnets out", sheetRow: "Car Magnets", box: "signs" },
   { id: "google_posts", label: "Google Business posts", sheetRow: "Google Image Posting (Automated)", monthlyGoal: 28, box: "social", bot: "SEO", auto: "ghl", ghlPlatform: "google" },
   { id: "facebook_posts", label: "Facebook Page posts", sheetRow: "Facebook Account Posting (Automated)", monthlyGoal: 28, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "facebook" },
   { id: "instagram_posts", label: "Instagram posts", sheetRow: "Instagram Posting", monthlyGoal: 4, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "instagram" },
   { id: "linkedin_posts", label: "LinkedIn posts", sheetRow: "LinkedIn Posting", monthlyGoal: 4, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "linkedin" },
+  { id: "bing_posts", label: "Bing Places posts", sheetRow: "Bing Posting", box: "social" },
   { id: "linkedin_engage", label: "LinkedIn comments and follows", sheetRow: "LinkedIn Commenting Following", monthlyGoal: 100, box: "social" },
   { id: "fb_groups", label: "Facebook Groups posts", sheetRow: "Facebook Groups Posting", monthlyGoal: 10, box: "listings" },
   { id: "marketplace", label: "Marketplace listings", sheetRow: "FB marketplace posting", monthlyGoal: 5, box: "listings" },
@@ -44,11 +48,11 @@ export const CHANNELS: Channel[] = [
 ];
 
 export const BOXES: { id: BoxId; title: string; line: string; bots: string[] }[] = [
-  { id: "signs", title: "Yard signs, door hangers", line: "Signs count from the Yard signs tab", bots: [] },
+  { id: "signs", title: "Yard signs and in person", line: "Signs, door hangers, tree lots, door-to-door", bots: [] },
   { id: "social", title: "Social posts", line: "Facebook, Instagram, LinkedIn, Google, via GoHighLevel", bots: ["CMO", "SEO"] },
   { id: "listings", title: "One-tap listings", line: "Craigslist, Marketplace, FB Groups, Nextdoor", bots: [] },
-  { id: "website", title: "Website on Vercel", line: "City pages, blog, reviews", bots: ["Website", "SEO"] },
-  { id: "paid", title: "Paid ads", line: "Meta and Google ads", bots: ["Paid"] },
+  { id: "website", title: "Website and SEO", line: "LightDMV.com city pages, blog, reviews", bots: ["Website", "SEO"] },
+  { id: "paid", title: "Paid ads", line: "Facebook ads run by Goohoo, Google ads", bots: ["Paid"] },
   { id: "cold", title: "Cold email", line: "Smartlead, run by the agency", bots: [] },
 ];
 

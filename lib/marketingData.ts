@@ -75,6 +75,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
       leads: (ghl?.leads ?? []).slice(0, 40).map((l) => ({ ...l, sourceName: leadSource(l) })),
       weekLeads: weekLeads.length,
       bySource,
+      pipeline: ghl?.pipeline ?? [],
     },
     google: { ...(await googleStatus()), sheetUrl: sheetUrl() },
     inbox: mail,

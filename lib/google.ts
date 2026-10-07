@@ -127,7 +127,8 @@ export function sheetColumn(month: number, week: number): string | null {
 
 export type SheetCell = { row: string; month: number; week: number; value: number };
 
-/** Write counts into the sheet. Rows are matched by their name in column A; only the given cells change. */
+/** Write counts into the sheet. Rows are matched by their name in column A; only the given cells change.
+ *  Channels with no row in the sheet (door-to-door, car magnets, Bing) are skipped and listed back. */
 export async function writeSheet(cells: SheetCell[]): Promise<{ written: { range: string; row: string; value: number }[]; missingRows: string[] }> {
   const meta = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`);
   const tab = meta.sheets?.[0]?.properties?.title ?? "Sheet1";
