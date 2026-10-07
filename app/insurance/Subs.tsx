@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CircleCheck, CircleHelp, Clock, ExternalLink, Pencil, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import { api, NAVY } from "@/components/ui";
 import type { Sub, SubCoi, SubDoc } from "@/lib/insurance";
@@ -8,22 +8,22 @@ import type { Sub, SubCoi, SubDoc } from "@/lib/insurance";
 /* Per-subcontractor compliance for 1099 workers: hold harmless, their own workers' comp + employer's liability,
    and a liability certificate with limits at least ours, waiver of subrogation and Light DMV as additional insured. */
 
-type Level = "ok" | "soon" | "unknown" | "bad";
-const LOOK: Record<Level, { fg: string; bg: string; icon: typeof CircleCheck }> = {
+export const LOOK: Record<Level, { fg: string; bg: string; icon: typeof CircleCheck }> = {
   ok: { fg: "#067647", bg: "#ECFDF3", icon: CircleCheck },
   soon: { fg: "#B54708", bg: "#FFFAEB", icon: Clock },
   unknown: { fg: "#475467", bg: "#F2F4F7", icon: CircleHelp },
   bad: { fg: "#B42318", bg: "#FEF3F2", icon: TriangleAlert },
 };
-const RANK: Level[] = ["bad", "soon", "unknown", "ok"];
-const worst = (ls: Level[]) => RANK.find((r) => ls.includes(r)) ?? "ok";
+export const RANK: Level[] = ["bad", "soon", "unknown", "ok"];
+export const worst = (ls: Level[]) => RANK.find((r) => ls.includes(r)) ?? "ok";
 
 const DAY = 86_400_000;
 const daysTo = (d: string) => Math.round((new Date(`${d}T12:00:00`).getTime() - Date.now()) / DAY);
 const fmt = (d?: string) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "");
 const money = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-type Check = { label: string; level: Level; text: string; url?: string };
+export type Level = "ok" | "soon" | "unknown" | "bad";
+export type Check = { label: string; level: Level; text: string; url?: string };
 
 function expiry(d: SubDoc, what: string): { level: Level; text: string } {
   if (!d.onFile) return { level: "bad", text: `No ${what} on file` };
@@ -60,10 +60,8 @@ function limitCheck(c: SubCoi, ours: OurLimits): Check {
     : { label, level: "ok", text: `${money(c.eachOccurrence)} / ${money(c.aggregate)}` };
 }
 
-export function Subcontractors({ ours }: { ours: OurLimits }) {
-  const [subs, setSubs] = useState<Sub[] | null>(null);
+export function Subcontractors({ ours, subs, setSubs }: { ours: OurLimits; subs: Sub[] | null; setSubs: (s: Sub[]) => void }) {
   const [editing, setEditing] = useState<Sub | "new" | null>(null);
-  useEffect(() => { api<{ subs: Sub[] }>("/api/insurance/subs").then((r) => setSubs(r.subs)).catch(() => setSubs([])); }, []);
 
   const active = (subs ?? []).filter((s) => s.active);
   const rated = active.map((s) => ({ s, checks: checksFor(s, ours) })).map((x) => ({ ...x, level: worst(x.checks.map((c) => c.level)) }))
@@ -147,8 +145,8 @@ const blank = (): Sub => ({
   holdHarmless: { onFile: false }, workersComp: { onFile: false }, gl: { onFile: false, waiver: false, additionalInsured: false },
 });
 
-function SubForm({ sub, onClose, onSaved }: { sub: Sub | null; onClose: () => void; onSaved: (s: Sub[]) => void }) {
-  const [f, setF] = useState<Sub>(sub ? structuredClone(sub) : blank());
+export function SubForm({ sub, name, onClose, onSaved }: { sub: Sub | null; name?: string; onClose: () => void; onSaved: (s: Sub[]) => void }) {
+  const [f, setF] = useState<Sub>(sub ? structuredClone(sub) : { ...blank(), name: name ?? "" });
   const [msg, setMsg] = useState("");
   const set = (patch: Partial<Sub>) => setF({ ...f, ...patch });
   const setDoc = (k: "holdHarmless" | "workersComp" | "gl", patch: Partial<SubCoi>) => setF({ ...f, [k]: { ...f[k], ...patch } });

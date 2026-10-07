@@ -16,6 +16,7 @@ export type Policy = {
   premium: { annual: number; note?: string } | null;
   namedInsured?: string; location?: string; classification?: string;
   limits: Limit[]; deductibles: Limit[]; notes: string[]; sources: Doc[];
+  drivers?: string[]; // auto policies: the people listed as drivers (first names are enough)
 };
 export type Risk = {
   id: string; risk: string; icon: string; status: CoverageStatus; policyIds: string[];
@@ -127,4 +128,22 @@ export async function deleteSub(id: string): Promise<Sub[]> {
   const subs = (await loadSubs()).filter((s) => s.id !== id);
   await kvSet(SUBS_KEY, subs);
   return subs;
+}
+
+/* ---------- team classification ----------
+   Owners mark each person as owner, W-2 employee or 1099 sub; the tab works out who is covered by what. */
+export type WorkerClass = "owner" | "w2" | "1099" | "unset";
+const TEAM_KEY = "ldmv:insurance:team";
+const CLASSES: WorkerClass[] = ["owner", "w2", "1099", "unset"];
+
+export async function loadTeam(): Promise<Record<string, WorkerClass>> {
+  return (await kvGet<Record<string, WorkerClass>>(TEAM_KEY)) ?? {};
+}
+
+export async function setClass(userId: string, cls: unknown): Promise<Record<string, WorkerClass>> {
+  if (!CLASSES.includes(cls as WorkerClass)) throw new Error("Pick owner, W-2 or 1099.");
+  const team = await loadTeam();
+  team[userId] = cls as WorkerClass;
+  await kvSet(TEAM_KEY, team);
+  return team;
 }

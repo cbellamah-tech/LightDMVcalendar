@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { api, NAVY } from "@/components/ui";
 import { Subcontractors, type OurLimits } from "./Subs";
-import type { CoverageStatus, InsuranceData, InsuranceView, Limit, Policy, Risk } from "@/lib/insurance";
+import { Team } from "./Team";
+import type { CoverageStatus, InsuranceData, InsuranceView, Limit, Policy, Risk, Sub } from "@/lib/insurance";
 
 /* ---------- look ---------- */
 const STATUS: Record<CoverageStatus, { label: string; fg: string; bg: string; ring: string; icon: typeof CircleCheck }> = {
@@ -104,6 +105,8 @@ function Dashboard({ view, setView }: { view: InsuranceView; setView: (v: Insura
     const amt = (label: string) => gl?.limits.find((l) => l.label === label)?.amount;
     return { eachOccurrence: amt("Each occurrence"), aggregate: amt("General aggregate") };
   }, [d]);
+  const [subs, setSubs] = useState<Sub[] | null>(null);
+  useEffect(() => { api<{ subs: Sub[] }>("/api/insurance/subs").then((r) => setSubs(r.subs)).catch(() => setSubs([])); }, []);
 
   return (
     <div className="pb-10">
@@ -126,6 +129,8 @@ function Dashboard({ view, setView }: { view: InsuranceView; setView: (v: Insura
       </section>
 
       <div className="max-w-6xl mx-auto px-4 space-y-8 mt-6">
+        <Team d={d} ours={ours} subs={subs} setSubs={setSubs} />
+
         <DueSoon dates={dates} />
 
         {/* Coverage map */}
@@ -176,7 +181,7 @@ function Dashboard({ view, setView }: { view: InsuranceView; setView: (v: Insura
           </section>
         )}
 
-        <Subcontractors ours={ours} />
+        <Subcontractors ours={ours} subs={subs} setSubs={setSubs} />
 
         {d.vehicles.length > 0 && (
           <section>
