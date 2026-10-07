@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { googleExchange } from "@/lib/google";
+import { ensureRunnerFile } from "@/lib/marketingData";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(req: Request) {
   if (!code) return back(`error=${encodeURIComponent(url.searchParams.get("error") || "no_code")}`);
   try {
     await googleExchange(code, url.origin);
+    await ensureRunnerFile(true).catch(() => {});
   } catch (e: any) {
     return back(`error=${encodeURIComponent(e.message)}`);
   }

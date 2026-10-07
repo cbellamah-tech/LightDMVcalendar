@@ -1,7 +1,8 @@
 import { kvDel, kvGet, kvSet } from "./store";
 import { stableOrigin } from "./jobber";
 
-/* Google for the Marketing tab: read the info@ inbox and write weekly counts into the campaign sheet.
+/* Google for the Marketing tab: read the info@ inbox, read job photos in Drive for the daily video,
+   and keep the campaign sheet in sync.
    Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (an OAuth client of type "Web application").
    Redirect URL to register in Google Cloud: <your site>/api/google/callback
    Optional: MARKETING_SHEET_ID to point at a different sheet than the 2026 one. */
@@ -12,6 +13,8 @@ const SCOPES = [
   "openid", "email",
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.readonly", // job photos for the daily video
+  "https://www.googleapis.com/auth/drive.file",     // the one small file the app writes (the video runner's key)
 ];
 const TOKENS = "ldmv:google:tokens";
 
@@ -149,4 +152,61 @@ export async function writeSheet(cells: SheetCell[]): Promise<{ written: { range
       body: { valueInputOption: "USER_ENTERED", data: written.map((w) => ({ range: w.range, values: [[w.value]] })) },
     });
   return { written, missingRows: [...missing] };
+}
+
+/** The whole campaign sheet as text, for showing it on the Marketing tab. */
+export async function readSheetGrid(): Promise<{ title: string; rows: string[][] }> {
+  const meta = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`);
+  const tab = meta.sheets?.[0]?.properties?.title ?? "Sheet1";
+  const v = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`'${tab}'!A1:AF40`)}?valueRenderOption=FORMATTED_VALUE`);
+  return { title: tab, rows: (v.values ?? []) as string[][] };
+}
+
+/* ---------- Drive photos for the daily video ---------- */
+
+export type DrivePic = { id: string; name: string; createdTime: string; folder?: string; width?: number; height?: number };
+
+/** Photos added to Drive in the last `days` days, newest first. HEIC is fine: thumbnails come back as JPEG. */
+export async function recentDrivePhotos(days = 30, limit = 150): Promise<DrivePic[]> {
+  const since = new Date(Date.now() - days * 86400_000).toISOString();
+  const q = encodeURIComponent(`mimeType contains 'image/' and trashed = false and createdTime > '${since}'`);
+  const fields = encodeURIComponent("files(id,name,createdTime,parents,imageMediaMetadata(width,height))");
+  const j = await gapi(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=${limit}&fields=${fields}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`);
+  return (j.files ?? []).map((f: any) => ({
+    id: f.id, name: f.name, createdTime: f.createdTime, folder: f.parents?.[0],
+    width: f.imageMediaMetadata?.width, height: f.imageMediaMetadata?.height,
+  }));
+}
+
+/** A JPEG of a Drive photo, `w` pixels on its long side (Drive renders it, HEIC included). */
+export async function drivePhotoJpeg(id: string, w = 1600): Promise<Response> {
+  const f = await gapi(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=thumbnailLink,mimeType&supportsAllDrives=true`);
+  if (!f.thumbnailLink || !/^image\//.test(f.mimeType)) throw new Error("Not a photo, or Drive has no preview for it yet.");
+  const url = String(f.thumbnailLink).replace(/=s\d+$/, `=s${Math.min(2400, Math.max(200, w))}`);
+  const res = await fetch(url, { headers: { authorization: `Bearer ${await access()}` }, cache: "no-store" });
+  if (!res.ok) throw new Error(`Drive preview failed (${res.status})`);
+  return res;
+}
+
+const RUNNER_FILE = "Light DMV app - daily video key (do not share).txt";
+
+/** Leave the video runner its key in Drive, where it reads it with its own Drive access. Only this app can see files it made. */
+export async function writeRunnerFile(text: string) {
+  const q = encodeURIComponent(`name = '${RUNNER_FILE}' and trashed = false`);
+  const found = await gapi(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`);
+  const id = found.files?.[0]?.id;
+  const boundary = "ldmv" + Date.now();
+  const body = [
+    `--${boundary}`, "Content-Type: application/json; charset=UTF-8", "", JSON.stringify(id ? {} : { name: RUNNER_FILE, mimeType: "text/plain" }),
+    `--${boundary}`, "Content-Type: text/plain; charset=UTF-8", "", text, `--${boundary}--`, "",
+  ].join("\r\n");
+  const url = id
+    ? `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=multipart`
+    : "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+  const res = await fetch(url, {
+    method: id ? "PATCH" : "POST",
+    headers: { authorization: `Bearer ${await access()}`, "content-type": `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  if (!res.ok) throw new Error(`Couldn't save the runner key to Drive (${res.status})`);
 }

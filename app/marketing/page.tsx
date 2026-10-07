@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, Mail, Plus, RefreshCw, Undo2 } from "lucide-react";
 import { ago, api, fmtDay, NAVY } from "@/components/ui";
 import { Card, Dot, Feed, FeedItem, Light, LIGHT_WORD } from "./parts";
+import { Media, MediaBoard, SheetView } from "./media";
 
 type Ch = { id: string; label: string; box: string; bot?: string; auto?: string; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; done: number; goal: number; light: Light; channels: string[] };
@@ -17,6 +18,8 @@ type Data = {
   google: { configured: boolean; connected: boolean; email?: string; sheetUrl: string };
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
+  media: Media[];
+  platforms: { id: "facebook" | "instagram" | "linkedin" | "google"; label: string }[];
   lastFill: { at: number; week: string; by: string; written: { range: string; row: string; value: number }[]; missingRows: string[]; error?: string } | null;
   botBox: { url: string; key: string } | null;
 };
@@ -39,7 +42,7 @@ export default function Marketing() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (q.get("error")) setMsg(`Couldn't connect: ${q.get("error")}`);
-    if (q.get("google")) setMsg("Google is connected. The inbox shows below and the sheet fills every Monday.");
+    if (q.get("google")) setMsg("Google is connected. The inbox shows below and the sheet fills every morning. The first daily video comes tomorrow morning.");
   }, []);
 
   async function log(channel: string, ask = false) {
@@ -82,6 +85,8 @@ export default function Marketing() {
         </button>
       </div>
       {msg && <p className="text-sm bg-white border border-slate-200 rounded-lg p-2">{msg}</p>}
+
+      <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} today={d.today} reload={load} />
 
       {/* The map: where customers find us, then where leads land */}
       <section className="rounded-xl border border-slate-200 bg-slate-100 p-3 space-y-3">
@@ -209,6 +214,8 @@ export default function Marketing() {
         </div>
       </div>
 
+      <SheetView today={d.today} owner={owner} sheetUrl={d.google.sheetUrl} />
+
       <Card title="Bot reports">
         <Feed items={reports} canAnswer={owner} onChange={load} empty="Nothing from the bots yet. Once a bot has the drop box line (Setup below), its results land here." />
       </Card>
@@ -274,7 +281,7 @@ function Setup({ d, reload }: { d: Data; reload: () => void }) {
           ) : <p className="text-slate-600">Waiting on the GHL key in Vercel (GHL_API_KEY and GHL_LOCATION_ID).</p>}
         </div>
         <div className="rounded-lg border border-slate-200 p-3 space-y-2">
-          <div className="font-bold">Google (info@ and the sheet)</div>
+          <div className="font-bold">Google (info@, the sheet, Drive photos)</div>
           {d.google.connected ? (
             <>
               <div className="text-green-700 font-semibold">Connected{d.google.email ? ` as ${d.google.email}` : ""}</div>
@@ -282,7 +289,7 @@ function Setup({ d, reload }: { d: Data; reload: () => void }) {
                 <button disabled={busy} onClick={() => fill(true)} className="rounded-lg px-3 py-1.5 font-semibold border border-slate-300">Preview fill</button>
                 <button disabled={busy} onClick={() => fill(false)} className="rounded-lg px-3 py-1.5 font-semibold text-white" style={{ background: NAVY }}>Fill last week now</button>
               </div>
-              <p className="text-xs text-slate-500">Runs by itself every Monday. Only cells the app has numbers for change.
+              <p className="text-xs text-slate-500">Runs by itself every morning (this week and last week). Only cells the app has numbers for change.
                 {d.lastFill ? ` Last fill ${ago(d.lastFill.at)}: ${d.lastFill.error ? d.lastFill.error : `${d.lastFill.written.length} cells`}.` : ""}</p>
             </>
           ) : d.google.configured ? (

@@ -1,7 +1,9 @@
 import { kvGet, kvSet } from "./store";
 import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, sheetWeek, weekOf, weekTotals } from "./marketing";
 import { getGhlSnap, ghlConfigured, leadSource, refreshGhl } from "./ghl";
-import { googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeSheet } from "./google";
+import { googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
+import { getMedia, PLATFORMS, runnerKey } from "./media";
+import { stableOrigin } from "./jobber";
 
 /* Everything the Marketing tab shows, in one read. */
 
@@ -80,6 +82,8 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     google: { ...(await googleStatus()), sheetUrl: sheetUrl() },
     inbox: mail,
     feed,
+    media: (await getMedia()).filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
+    platforms: PLATFORMS,
     lastFill: await kvGet<FillResult>(FILL),
   };
 }
@@ -127,3 +131,23 @@ export async function fillSheet(week: string, by: string, dry = false): Promise<
 
 export const channelIds = new Set<string>(CHANNELS.map((c) => c.id));
 export const isChannel = (x: unknown): x is ChannelId => typeof x === "string" && channelIds.has(x);
+
+/** Daily: this week and last week into the sheet (a new week's first days also finish last week's cells). */
+export async function syncSheet(by: string) {
+  const thisWeek = weekOf(etDay(Date.now()));
+  const last = await fillSheet(addDays(thisWeek, -7), by);
+  const now = await fillSheet(thisWeek, by);
+  return { written: last.written.length + now.written.length, error: now.error || last.error };
+}
+
+/* The daily video run finds the app through a small file this app keeps in Drive (only the production app
+   writes it: previews sit behind Vercel's login, which the run can't get past). */
+const RUNNER_AT = "ldmv:mkt:runnerfile";
+export async function ensureRunnerFile(force = false) {
+  if (process.env.VERCEL_ENV !== "production" && !process.env.APP_URL) return;
+  if (!(await googleStatus()).connected) return;
+  const at = await kvGet<number>(RUNNER_AT);
+  if (!force && at && Date.now() - at < 86400_000) return;
+  await writeRunnerFile(JSON.stringify({ url: stableOrigin(""), key: await runnerKey() }));
+  await kvSet(RUNNER_AT, Date.now());
+}

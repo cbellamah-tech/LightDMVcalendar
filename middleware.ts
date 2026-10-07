@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { COOKIE, verifySession } from "./lib/session";
 
 // The bot drop box checks its own key; the callbacks check the session themselves.
-const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/google/callback", "/manifest.webmanifest", "/icon"];
+const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/marketing/runner/", "/api/google/callback", "/manifest.webmanifest", "/icon"];
 const OWNER_ONLY = ["/calendar", "/api/board", "/people", "/api/people", "/settings", "/api/jobber", "/marketing", "/api/marketing", "/api/google", "/briefing"];
 
 export async function middleware(req: NextRequest) {

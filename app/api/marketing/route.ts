@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { OFFICE, requireRole } from "@/lib/auth";
-import { marketingDashboard } from "@/lib/marketingData";
+import { ensureRunnerFile, marketingDashboard } from "@/lib/marketingData";
 import { botKey } from "@/lib/marketing";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const area = q.get("area") === "owners" ? "owners" : "marketing";
   if (area === "owners" && s.role !== "owner") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  ensureRunnerFile().catch(() => {});
   const d = await marketingDashboard({ week: q.get("week") || undefined, refresh: q.get("refresh") === "1" });
   return NextResponse.json({
     ...d,

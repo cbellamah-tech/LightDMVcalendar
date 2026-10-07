@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/marketing/cron",
-      "schedule": "0 12 * * 1"
+      "schedule": "0 10 * * *"
     }
   ]
 }

@@ -145,3 +145,33 @@ export function leadSource(l: GhlLead): string {
   for (const [re, name] of rules) if (re.test(all)) return name;
   return l.source || "Unknown";
 }
+
+/* ---------- Posting ---------- */
+
+/** GoHighLevel wants a user on every post: the first admin on the account, remembered. */
+async function ghlUserId(): Promise<string> {
+  const key = "ldmv:ghl:userid";
+  const cur = await kvGet<string>(key);
+  if (cur) return cur;
+  const j = await ghl(`/users/?locationId=${encodeURIComponent(loc())}`);
+  const users = listIn(j, ["users"]);
+  const u = users.find((x: any) => /admin/i.test(x.roles?.role ?? x.role ?? "")) ?? users[0];
+  if (!u?.id) throw new Error("GoHighLevel has no user to post as (the key needs View Users).");
+  await kvSet(key, String(u.id));
+  return String(u.id);
+}
+
+/** Post now to the given Social Planner accounts. */
+export async function ghlPostNow(accountIds: string[], text: string, media: { url: string; type: string }[]) {
+  if (!accountIds.length) throw new Error("Pick at least one account.");
+  return ghl(`/social-media-posting/${loc()}/posts`, {
+    method: "POST",
+    body: { accountIds, summary: text, media, type: "post", status: "published", userId: await ghlUserId() },
+  });
+}
+
+/** Clear the cached copy so the next read shows a post that was just made. */
+export const expireGhlSnap = async () => {
+  const cur = await getGhlSnap();
+  if (cur) await kvSet(SNAP, { ...cur, at: 0 });
+};
