@@ -95,15 +95,16 @@ export function routesFromCsv(text: string): Route[] {
       order,
       name: r.name || `Stop ${order}`,
       lat, lng,
-      type: r.type || "intersection",
+      type: (r.type || "intersection") + (truthy(r.signal || "") ? " · traffic light" : ""),
       near: r.near || undefined,
       nearM: num(r.near_m),
       homesNearby: num(r.homes_nearby),
       state: r.state || undefined,
       photoRequired: r.photo_required === "" || r.photo_required == null ? true : truthy(r.photo_required),
       radiusM: num(r.arrival_radius_m) ?? 75,
-      notes: r.notes || r.why || undefined,
-      cluster: (r.cluster || r.cluster_name || r.group || r.group_name || r.cluster_id || r.group_id || "").trim() || undefined,
+      notes: r.notes || r.why_picked || r.why || undefined,
+      // Prefer a readable group name over an id like R04-G2.
+      cluster: (r.cluster_name || r.group_name || r.cluster || r.group || r.cluster_id || r.group_id || "").trim() || undefined,
     });
   }
   const routes = [...byRoute.values()];
