@@ -5,6 +5,7 @@ import { syncIfStale } from "@/lib/jobber";
 import { listUsers } from "@/lib/users";
 import { kvGet } from "@/lib/store";
 import { JobDetail, withDrive } from "@/lib/jobDetails";
+import { loadDriveIndex } from "@/lib/drive";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
@@ -23,11 +24,12 @@ export async function GET(req: Request) {
   const jobs = Object.values(await getJobs())
     .filter((j) => j.start >= from && j.start < to && jobVisibleTo(j, s, me))
     .sort((a, b) => a.start.localeCompare(b.start));
+  const idx = await loadDriveIndex();
   const withProgress = await Promise.all(jobs.map(async (j) => {
     const c = await getChecklist(j);
     // Repeat / new and bin from what's already cached; the job page fetches fresh details.
     const d = j.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${j.jobberJobId}`) : null;
-    const v = j.source === "jobber" ? withDrive(d, j.client) : null;
+    const v = j.source === "jobber" ? withDrive(idx, d, j.client) : null;
     const info = v ? { repeat: v.repeat, bins: v.drive.bins.map((b) => b.bin), known: !!d } : undefined;
     return { ...j, progress: checklistProgress(c), completedAt: c.completedAt, info };
   }));

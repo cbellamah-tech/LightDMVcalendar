@@ -97,7 +97,35 @@ export default function JobberSettings() {
         {(s.lastError || qErr) && <p className="text-sm text-red-600 break-words">Last error: {qErr || s.lastError}</p>}
         {msg && <p className="text-sm">{msg}</p>}
       </div>
+      <DriveIndexCard />
       <p className="text-sm text-slate-500">Each job lands on a crew by matching Jobber's assigned team members to the "Name in Jobber" on the People page.</p>
+    </div>
+  );
+}
+
+/** Bin lists and takedown photo names from Google Drive, uploaded as one file (it has customer names, so it stays out of the code). */
+function DriveIndexCard() {
+  const [info, setInfo] = useState<{ generatedAt: string | null; bins: number; photos: number } | null>(null);
+  const [msg, setMsg] = useState("");
+  useEffect(() => { api("/api/drive-index").then(setInfo).catch(() => {}); }, []);
+  async function upload(f: File) {
+    setMsg("");
+    try {
+      const r = await api("/api/drive-index", { method: "POST", json: JSON.parse(await f.text()) });
+      setInfo(r); setMsg("Loaded. Jobs now show bin numbers and last takedown photos.");
+    } catch (e: any) { setMsg(e instanceof SyntaxError ? "That file isn't the Drive index." : e.message); }
+  }
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+      <div className="font-bold">Bins and takedown photos (Google Drive)</div>
+      <p className="text-sm text-slate-600">
+        {info?.generatedAt ? `${info.bins} bin rows and ${info.photos} takedown photos, from Drive on ${new Date(info.generatedAt).toLocaleDateString()}.` : "Not loaded yet."}
+      </p>
+      <label className="inline-block rounded-lg px-4 py-2 font-semibold border border-slate-300 cursor-pointer text-sm">
+        Upload drive_index.json
+        <input type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f); }} />
+      </label>
+      {msg && <p className="text-sm">{msg}</p>}
     </div>
   );
 }

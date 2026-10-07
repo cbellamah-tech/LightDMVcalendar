@@ -1,7 +1,7 @@
 import { kvGet, kvSet } from "./store";
 import { gql } from "./jobber";
 import { buildSelection, rows, Spec } from "./jobberSchema";
-import { driveFor, DriveMatch } from "./drive";
+import { driveFor, DriveIndex, DriveMatch } from "./drive";
 
 /* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices. */
 
@@ -120,9 +120,9 @@ export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolea
 }
 
 /** Detail plus what Drive knows (bin list, takedown photos), for the job page. */
-export function withDrive(d: JobDetail | null, clientName: string): JobDetailView | null {
+export function withDrive(idx: DriveIndex, d: JobDetail | null, clientName: string): JobDetailView | null {
   const base = d ?? { fetchedAt: 0, lines: [], notes: [], clientTags: [], otherJobs: [], repeat: false, bins: [] };
-  const drive = driveFor(clientName || base.clientName || "", base.bins);
+  const drive = driveFor(idx, clientName || base.clientName || "", base.bins);
   const repeat = base.repeat || drive.bins.length > 0 || drive.photos.length > 0;
   return { ...base, drive, repeat, repeatWhy: base.repeatWhy || (repeat ? "On last season's bin list" : undefined) };
 }

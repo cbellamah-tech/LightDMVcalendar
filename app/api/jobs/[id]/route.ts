@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { checklistProgress, ensureSampleJobs, getChecklist, getJobs, jobVisibleTo, saveChecklist } from "@/lib/jobs";
 import { SOPS } from "@/lib/sops";
 import { getJobDetail, withDrive } from "@/lib/jobDetails";
+import { loadDriveIndex } from "@/lib/drive";
 import { isConnected } from "@/lib/jobber";
 import { listUsers } from "@/lib/users";
 import type { Session } from "@/lib/session";
@@ -26,9 +27,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const checklist = await getChecklist(job);
   // Job details only on the first load (the page re-polls every 5 s for checklist changes).
   let detail = null;
-  if (new URL(req.url).searchParams.get("detail") === "1") {
+  if (job.source === "jobber" && new URL(req.url).searchParams.get("detail") === "1") {
     const d = job.jobberJobId && (await isConnected()) ? await getJobDetail(job.jobberJobId).catch(() => null) : null;
-    detail = withDrive(d, job.client);
+    detail = withDrive(await loadDriveIndex(), d, job.client);
   }
   return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail });
 }
