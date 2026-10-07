@@ -200,7 +200,7 @@ function Dashboard({ view, setView }: { view: InsuranceView; setView: (v: Insura
                       {v.vinLast6 && <div className="text-xs text-slate-500">VIN ending {v.vinLast6}</div>}
                       {v.note && <div className="text-sm text-slate-600 mt-1">{v.note}</div>}
                       <div className="text-xs font-semibold mt-1" style={{ color: ok ? STATUS.covered.fg : STATUS.gap.fg }}>
-                        {ok ? `Insured: ${p!.carrier}` : "Auto policy not on file yet"}
+                        {ok ? `Insured: ${p!.carrier}` : v.policyId ? "Auto policy not on file yet" : "Not on any auto policy"}
                       </div>
                     </div>
                   </div>

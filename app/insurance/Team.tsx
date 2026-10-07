@@ -21,7 +21,8 @@ function coverage(d: InsuranceData, ours: OurLimits, cls: WorkerClass, name: str
   const wc = active("wc"), auto = active("auto");
   const gl = d.policies.find((p) => p.status === "active" && p.limits.some((l) => l.label === "Each occurrence"));
   const listed = !!auto?.drivers?.some((x) => first(x) === first(name));
-  const carrier = (p: Policy) => ((p.kind === "bop" ? p.broker?.name : null) ?? p.carrier ?? "").replace(/ (Commercial|\(.*\))$/, "");
+  // Short name people use: the broker for the BOP (biBERK), else the carrier's first word (Progressive).
+  const carrier = (p: Policy) => (p.kind === "bop" ? p.broker?.name : null) ?? (p.carrier ?? "").split(" ")[0];
 
   const drive: Check = !auto ? { label: "Driving a van", level: "bad", text: "No auto policy on file" }
     : listed ? { label: "Driving a van", level: "ok", text: `Listed driver on ${carrier(auto)} auto` }
@@ -30,7 +31,7 @@ function coverage(d: InsuranceData, ours: OurLimits, cls: WorkerClass, name: str
   if (cls === "1099") {
     if (!sub) {
       const missing: Check = { label: "Our 1099 rules", level: "bad", text: "No papers on file: hold harmless, workers' comp, liability certificate" };
-      return { lines: [missing], headline: "Not following our 1099 rules", level: "bad" };
+      return { lines: [missing, drive], headline: "Not following our 1099 rules", level: "bad" };
     }
     const checks = checksFor(sub, ours);
     const met = checks.filter((c) => c.level === "ok").length;
@@ -45,6 +46,7 @@ function coverage(d: InsuranceData, ours: OurLimits, cls: WorkerClass, name: str
         { label: "If they get hurt", level: hurt.level, text: hurt.level === "ok" ? `Their own workers' comp${sub.workersComp.carrier ? ` (${sub.workersComp.carrier})` : ""}` : hurt.text },
         { label: "If they damage a home", level: damage.level, text: damage.level === "ok" ? `Their own liability${sub.gl.carrier ? ` (${sub.gl.carrier})` : ""}, then ours` : damage.text },
         rules,
+        drive,
       ],
       headline: level === "ok" ? "Following our 1099 rules" : "Not following our 1099 rules yet",
       level,
