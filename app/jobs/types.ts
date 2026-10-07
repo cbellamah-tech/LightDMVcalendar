@@ -6,3 +6,16 @@ export type Progress = { done: number; total: number; requiredLeft: string[] };
 export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string };
 export type Checklist = { jobId: string; kind: string; items: Record<string, CheckEntry>; completedAt?: number; completedBy?: string; rev: number };
 export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; noteLabel?: string };
+export type DetailFile = { name: string; url: string; image: boolean };
+export type JobDetail = {
+  fetchedAt: number; error?: string; instructions?: string; quoteNumber?: string; quoteMessage?: string;
+  lines: { name: string; description?: string; quantity?: number; images: DetailFile[] }[];
+  notes: { from: "job" | "quote"; message: string; at?: string; files: DetailFile[] }[];
+  clientTags: string[]; otherJobs: { jobNumber?: number; title?: string; createdAt?: string }[];
+  repeat: boolean; repeatWhy?: string; bins: string[];
+  drive: {
+    bins: { bin: string; status: string; source: string }[];
+    photos: { fileId: string; title: string; year: number; bin: string | null; thumb: string; link: string; sure: boolean }[];
+    indexedAt: string | null;
+  };
+};

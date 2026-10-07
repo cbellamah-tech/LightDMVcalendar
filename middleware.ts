@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE, verifySession } from "./lib/session";
 
-const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/manifest.webmanifest", "/icon"];
+const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/manifest.webmanifest", "/icon"];
 const OWNER_ONLY = ["/calendar", "/api/board", "/people", "/api/people", "/settings", "/api/jobber"];
 
 export async function middleware(req: NextRequest) {

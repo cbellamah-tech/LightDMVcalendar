@@ -9,7 +9,8 @@ import AddSignButton from "./AddSignButton";
 import VisitSheet from "./VisitSheet";
 import { arrived, useGps } from "./useGps";
 import { ago, api, NAVY } from "@/components/ui";
-import { CREW_LABEL, SignsData, Stop, STATUS_COLOR, STATUS_LABEL } from "./types";
+import { CREW_LABEL, NearStop, SignsData, Stop, STATUS_COLOR, STATUS_LABEL, Visit } from "./types";
+import { useRouter } from "next/navigation";
 
 const SignMap = dynamic(() => import("@/components/SignMap"), { ssr: false });
 
@@ -23,6 +24,7 @@ export default function SignsPage() {
   const { pos, err: gpsErr } = useGps(gpsOn);
   const [sheet, setSheet] = useState<{ stop: Stop; auto: boolean } | null>(null);
   const [added, setAdded] = useState("");
+  const [q, setQ] = useState("");
   const dismissed = useRef<Set<string>>(new Set());
   const sheetRef = useRef(sheet);
   sheetRef.current = sheet;
@@ -34,27 +36,36 @@ export default function SignsPage() {
     try { on ? localStorage.setItem("ldmv-gps", "on") : localStorage.removeItem("ldmv-gps"); } catch {}
   }
 
-  // Nearest planned spot on any route this person can see.
+  // Spots near the phone, fetched from the server (there are thousands) when the truck has moved.
+  const [near, setNear] = useState<{ stops: NearStop[]; lastVisit: Record<string, Visit> } | null>(null);
+  const nearFrom = useRef<{ lat: number; lng: number; at: number } | null>(null);
+  useEffect(() => {
+    if (!pos) return;
+    const f = nearFrom.current;
+    if (f && distanceM(f, pos) < 300 && Date.now() - f.at < 60_000) return;
+    nearFrom.current = { lat: pos.lat, lng: pos.lng, at: Date.now() };
+    api(`/api/signs/near?lat=${pos.lat}&lng=${pos.lng}`).then(setNear).catch(() => {});
+  }, [pos]);
   const nearest = useMemo(() => {
-    if (!pos || !data) return null;
+    if (!pos || !near) return null;
     let best: { stop: Stop; routeName: string; d: number } | null = null;
-    for (const r of data.routes) for (const st of r.stops) {
+    for (const st of near.stops) {
       const d = distanceM(pos, st);
-      if (!best || d < best.d) best = { stop: st, routeName: r.name, d };
+      if (!best || d < best.d) best = { stop: st, routeName: st.routeName, d };
     }
     return best;
-  }, [pos, data]);
+  }, [pos, near]);
 
   // Arriving at a spot opens the photo prompt, unless it was logged in the last 12 hours.
   useEffect(() => {
-    if (!nearest || !pos || !data || sheetRef.current || dismissed.current.has(nearest.stop.id)) return;
-    const last = data.lastVisit[nearest.stop.id];
+    if (!nearest || !pos || !near || sheetRef.current || dismissed.current.has(nearest.stop.id)) return;
+    const last = near.lastVisit[nearest.stop.id];
     if (last && Date.now() - last.at < 12 * 3600_000) return;
     if (arrived(nearest.d, nearest.stop.radiusM, pos.accuracyM)) {
       navigator.vibrate?.([200, 100, 200]);
       setSheet({ stop: nearest.stop, auto: true });
     }
-  }, [nearest, pos, data]);
+  }, [nearest, pos, near]);
 
   const load = useCallback(() => api<SignsData>("/api/signs").then(setData).catch((e) => setErr(e.message)), []);
   useEffect(() => {
@@ -63,23 +74,24 @@ export default function SignsPage() {
     return () => clearInterval(t);
   }, [load]);
 
+  // One marker per route (its center), sized up for the best-ranked areas; tap to open the route.
+  const router = useRouter();
   const points = useMemo(() => {
     if (!data) return [];
-    const stops = data.routes.flatMap((r) => r.stops.map((s) => {
-      const v = data.lastVisit[s.id];
-      return {
-        id: s.id, lat: s.lat, lng: s.lng, color: STATUS_COLOR[v?.status || "none"],
-        label: `${r.id} #${s.order}: ${s.name}`,
-        popup: `<b>${s.name}</b><br/>${r.name}<br/>${STATUS_LABEL[v?.status || "none"]}${v ? ` by ${v.byName}, ${ago(v.at)}` : ""}`,
-      };
+    const routes = data.routes.map((r) => ({
+      id: r.id, lat: r.lat, lng: r.lng, big: (r.rank ?? 99) <= 10,
+      color: r.visited ? (r.visited >= r.stops ? STATUS_COLOR.placed : "#D97706") : NAVY,
+      label: `${r.rank ? `#${r.rank} ` : ""}${r.name} · ${r.visited}/${r.stops} signs`,
     }));
-    const crews = data.live.map((p) => ({
+    const crews = data.live.filter((p) => p.uid !== data.me.uid).map((p) => ({
       id: `live-${p.uid}`, lat: p.lat, lng: p.lng, color: "#2563EB", big: true,
       label: `${p.name} (${ago(p.at)})`,
     }));
-    const me = pos ? [{ id: "me", lat: pos.lat, lng: pos.lng, color: "#2563EB", big: true, label: "You" }] : [];
-    return [...stops, ...crews.filter((c) => c.id !== `live-${data.me.uid}`), ...me];
-  }, [data, pos]);
+    const spots = (near?.stops || []).map((st) => ({
+      id: `near-${st.id}`, lat: st.lat, lng: st.lng, color: STATUS_COLOR[near!.lastVisit[st.id]?.status || "none"], label: `${st.name} (${st.routeName})`,
+    }));
+    return [...routes, ...spots, ...crews];
+  }, [data, near]);
 
   async function assign(routeId: string, value: string) {
     const [kind, id] = value.split(":");
@@ -104,7 +116,7 @@ export default function SignsPage() {
         <div>
           <h1 className="text-2xl font-extrabold" style={{ color: NAVY }}>Yard sign routes</h1>
           <p className="text-sm text-slate-500">
-            {data.routes.length} routes, {data.routes.reduce((n, r) => n + r.stops.length, 0)} stops
+            {data.routes.length} routes, {data.routes.reduce((n, r) => n + r.stops, 0)} spots, best areas first
             {data.meta && <> · stops from {data.meta.source}, imported {ago(data.meta.importedAt)}</>}
           </p>
         </div>
@@ -141,32 +153,36 @@ export default function SignsPage() {
                 </div>
               </div>
             )}
-            <AddSignButton pos={pos} className="w-full" onAdded={(m) => { setAdded(m); load(); }} />
+            <AddSignButton pos={pos} className="w-full" onAdded={(m) => { setAdded(m); load(); nearFrom.current = null; }} />
             {added && <p className="text-sm text-green-700">{added}</p>}
           </>
         )}
       </div>
 
-      <SignMap points={points} height={380} fitKey={data.routes.map((r) => r.id).join(",")} />
+      <SignMap points={points} me={pos} height={380} fitKey={String(data.routes.length)}
+        onPick={(id) => { if (data.routes.some((r) => r.id === id)) router.push(`/signs/${id}`); }} />
+
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${data.routes.length} routes by area`}
+        className="w-full border border-slate-300 rounded-lg px-3 py-2" />
 
       <div className="grid md:grid-cols-2 gap-3">
-        {data.routes.map((r) => {
-          const visited = r.stops.filter((s) => data.lastVisit[s.id] && data.lastVisit[s.id].status !== "skipped").length;
-          const last = r.stops.map((s) => data.lastVisit[s.id]?.at || 0).reduce((a, b) => Math.max(a, b), 0);
+        {data.routes.filter((r) => !q.trim() || `${r.name} ${r.id} ${r.state || ""}`.toLowerCase().includes(q.trim().toLowerCase())).map((r) => {
+          const visited = r.visited;
+          const last = r.lastAt;
           return (
             <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-xs font-bold text-slate-400">{r.id} · {r.state}</div>
+                  <div className="text-xs font-bold text-slate-400">{r.rank ? `#${r.rank} · ` : ""}{r.id}{r.state ? ` · ${r.state}` : ""} · {r.groups ? `${r.groups} groups` : ""}</div>
                   <div className="font-bold">{r.name}</div>
-                  <div className="text-sm text-slate-500">{visited}/{r.stops.length} signs out{last ? ` · last stop ${ago(last)}` : ""}</div>
+                  <div className="text-sm text-slate-500">{visited}/{r.stops} signs out{last ? ` · last stop ${ago(last)}` : ""}</div>
                 </div>
                 <Link href={`/signs/${r.id}`} className="shrink-0 rounded-lg px-3 py-2 text-white font-semibold text-sm flex items-center" style={{ background: NAVY }}>
                   Open <ChevronRight size={16} />
                 </Link>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-green-600" style={{ width: `${(visited / Math.max(1, r.stops.length)) * 100}%` }} />
+                <div className="h-full bg-green-600" style={{ width: `${(visited / Math.max(1, r.stops)) * 100}%` }} />
               </div>
               {data.office ? (
                 <select className="text-sm border border-slate-300 rounded-lg px-2 py-1.5 bg-white"
@@ -184,10 +200,10 @@ export default function SignsPage() {
       </div>
 
       {sheet && (
-        <VisitSheet stop={sheet.stop} auto={sheet.auto} pos={pos} last={data.lastVisit[sheet.stop.id]}
+        <VisitSheet stop={sheet.stop} auto={sheet.auto} pos={pos} last={near?.lastVisit[sheet.stop.id]}
           routeName={data.routes.find((r) => r.id === sheet.stop.routeId)?.name}
           onClose={() => { dismissed.current.add(sheet.stop.id); setSheet(null); }}
-          onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); }} />
+          onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); nearFrom.current = null; }} />
       )}
 
       {data.office && (

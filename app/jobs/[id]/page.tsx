@@ -6,7 +6,8 @@ import { ArrowLeft, Camera, Check, CheckCircle2, Loader2, Navigation, X } from "
 import PhotoButton from "@/components/PhotoButton";
 import { ago, api, fmtDay, fmtTime, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../../signs/types";
-import type { Checklist, Job, Progress, SopItem } from "../types";
+import type { Checklist, Job, JobDetail, Progress, SopItem } from "../types";
+import JobInfo from "./JobInfo";
 
 type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress };
 
@@ -16,6 +17,11 @@ export default function JobPage({ params }: { params: { id: string } }) {
   const [toast, setToast] = useState("");
   const [viewer, setViewer] = useState("");
   const busy = useRef(0);
+  const [detail, setDetail] = useState<JobDetail | null>(null);
+  // Jobber notes, line items and Drive bin/photos: once per visit (the checklist re-polls below).
+  useEffect(() => {
+    api<{ detail: JobDetail | null }>(`/api/jobs/${params.id}?detail=1`).then((r) => setDetail(r.detail)).catch(() => {});
+  }, [params.id]);
 
   const load = useCallback(() => {
     if (busy.current) return; // don't overwrite while a save is in flight
@@ -53,6 +59,8 @@ export default function JobPage({ params }: { params: { id: string } }) {
           </a>
         )}
       </div>
+
+      {detail && <JobInfo d={detail} onView={setViewer} />}
 
       <div className="flex items-center justify-between">
         <h2 className="font-bold">{sop.title}</h2>

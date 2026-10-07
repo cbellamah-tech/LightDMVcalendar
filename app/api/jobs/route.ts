@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/auth";
 import { checklistProgress, ensureSampleJobs, getChecklist, getJobs, jobVisibleTo } from "@/lib/jobs";
 import { syncIfStale } from "@/lib/jobber";
 import { listUsers } from "@/lib/users";
+import { kvGet } from "@/lib/store";
+import { JobDetail, withDrive } from "@/lib/jobDetails";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
@@ -23,7 +25,11 @@ export async function GET(req: Request) {
     .sort((a, b) => a.start.localeCompare(b.start));
   const withProgress = await Promise.all(jobs.map(async (j) => {
     const c = await getChecklist(j);
-    return { ...j, progress: checklistProgress(c), completedAt: c.completedAt };
+    // Repeat / new and bin from what's already cached; the job page fetches fresh details.
+    const d = j.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${j.jobberJobId}`) : null;
+    const v = j.source === "jobber" ? withDrive(d, j.client) : null;
+    const info = v ? { repeat: v.repeat, bins: v.drive.bins.map((b) => b.bin), known: !!d } : undefined;
+    return { ...j, progress: checklistProgress(c), completedAt: c.completedAt, info };
   }));
   return NextResponse.json({ jobs: withProgress, sample: jobs.some((j) => j.source === "sample") });
 }

@@ -7,7 +7,7 @@ import { api, fmtDay, fmtTime, Me, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../signs/types";
 import type { Job, Progress } from "./types";
 
-type Row = Job & { progress: Progress; completedAt?: number };
+type Row = Job & { progress: Progress; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean } };
 
 export default function JobsPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -65,7 +65,14 @@ export default function JobsPage() {
                   <div className="text-xs font-bold text-slate-400">
                     {fmtTime(j.start)} · {j.kind === "install" ? "Install" : "Takedown"} · {j.crew ? CREW_LABEL[j.crew] : j.assignedNames.join(", ") || "Unassigned"}
                   </div>
-                  <div className="font-bold truncate">{j.client || j.title}</div>
+                  <div className="font-bold truncate flex items-center gap-2">
+                    <span className="truncate">{j.client || j.title}</span>
+                    {j.info && (j.info.repeat || j.info.known) && (
+                      <span className={`shrink-0 text-[11px] font-bold px-1.5 py-0.5 rounded ${j.info.repeat ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800"}`}>
+                        {j.info.repeat ? `REPEAT${j.info.bins.length ? ` · BIN ${j.info.bins.join(", ")}` : ""}` : "NEW"}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-slate-500 truncate">{j.address}</div>
                 </div>
                 {j.completedAt ? <CheckCircle2 className="text-green-600 shrink-0" /> : <span className="text-sm font-semibold text-slate-500 shrink-0">{j.progress.done}/{j.progress.total}</span>}

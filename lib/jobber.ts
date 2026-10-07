@@ -71,7 +71,7 @@ async function accessToken(): Promise<string> {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Jobber meters queries by cost and answers "Throttled" when the bucket is low; wait for it to refill and retry. */
-async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+export async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
       return await gqlOnce<T>(query, variables);
@@ -141,7 +141,7 @@ type VisitNode = {
 };
 
 /** Pull visits from 2 days ago to 21 days ahead into the app's job list. */
-export async function syncJobber(): Promise<number> {
+export async function syncJobber(detailLimit = 25): Promise<number> {
   const from = new Date(Date.now() - 2 * 86400_000);
   const to = new Date(Date.now() + 21 * 86400_000);
   try {
@@ -179,6 +179,9 @@ export async function syncJobber(): Promise<number> {
     await clearSampleJobs();
     await upsertJobs(jobs, { source: "jobber", from: from.toISOString(), to: to.toISOString() });
     await kvSet<SyncStatus>(STATUS, { ...(await getStatus()), lastSyncAt: Date.now(), lastCount: jobs.length, lastError: undefined });
+    // Notes, line items and client history for each job, a batch at a time (oldest first).
+    const { refreshStaleDetails } = await import("./jobDetails");
+    await refreshStaleDetails(jobs.map((j) => j.jobberJobId!).filter(Boolean), detailLimit).catch(() => {});
     return jobs.length;
   } catch (e: any) {
     await kvSet<SyncStatus>(STATUS, { ...(await getStatus()), lastError: e.message });
@@ -191,7 +194,7 @@ export async function syncIfStale() {
   if (!jobberConfigured() || !(await isConnected())) return;
   const s = await getStatus();
   if (s.lastSyncAt && Date.now() - s.lastSyncAt < 5 * 60_000) return;
-  await syncJobber().catch(() => {});
+  await syncJobber(4).catch(() => {});
 }
 
 // Quotes with line items, one page per call so a long history never hits the function time limit.

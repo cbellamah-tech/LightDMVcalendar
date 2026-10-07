@@ -10,7 +10,7 @@ import { arrived, useGps } from "../useGps";
 import { ago, api, NAVY } from "@/components/ui";
 import { distanceM, fmtDist, mapsLink } from "@/lib/geo";
 import { mapsMultiLink, pathLengthM, planOrder } from "@/lib/routeplan";
-import { SignsData, Stop, STATUS_COLOR, STATUS_LABEL } from "../types";
+import { RouteData, Stop, STATUS_COLOR, STATUS_LABEL } from "../types";
 
 const SignMap = dynamic(() => import("@/components/SignMap"), { ssr: false });
 
@@ -20,7 +20,7 @@ type Run = { start: number; group: string; order: string[]; from: From };
 const ALL = "__all";
 
 export default function RoutePage({ params }: { params: { id: string } }) {
-  const [data, setData] = useState<SignsData | null>(null);
+  const [data, setData] = useState<RouteData | null>(null);
   const [err, setErr] = useState("");
   const [run, setRun] = useState<Run | null>(null);
   const [group, setGroup] = useState(ALL);
@@ -35,7 +35,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
   sheetRef.current = sheet;
   const runKey = `ldmv-run-${params.id}`;
 
-  const load = useCallback(() => api<SignsData>("/api/signs").then(setData).catch((e) => setErr(e.message)), []);
+  const load = useCallback(() => api<RouteData>(`/api/signs/route/${params.id}`).then(setData).catch((e) => setErr(e.message)), [params.id]);
   useEffect(() => {
     load();
     try {
@@ -46,7 +46,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
     return () => clearInterval(t);
   }, [load, runKey]);
 
-  const route = data?.routes.find((r) => r.id === params.id);
+  const route = data?.route;
   const lastVisit = useMemo(() => data?.lastVisit || {}, [data]);
   const groups = useMemo(() => {
     const m = new Map<string, number>();

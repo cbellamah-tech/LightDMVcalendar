@@ -29,6 +29,7 @@ export type Stop = {
 export type Route = {
   id: string;            // R01
   name: string;
+  rank?: number;         // 1 = best area
   state?: string;
   stops: Stop[];
   assignedCrew?: string; // crew1 / crew2
@@ -62,9 +63,31 @@ export type Visit = {
 export type LivePos = { uid: string; name: string; lat: number; lng: number; accuracyM?: number; at: number; routeId?: string };
 
 const ROUTES = "ldmv:signs:routes";
+const ROUTES_REV = "ldmv:signs:routes:rev"; // bumped on every write so each server can keep routes in memory
 const META = "ldmv:signs:meta";
 const VISITS = "ldmv:signs:visits"; // Record<stopId, Visit[]> newest first
 const LIVE = "ldmv:signs:live";     // Record<uid, LivePos>
+
+// Thousands of stops: read the big routes value only when another write has changed it.
+let cache: { rev: number; routes: Route[] } | null = null;
+async function readRoutes(): Promise<Route[] | null> {
+  const rev = (await kvGet<number>(ROUTES_REV)) ?? 0;
+  if (cache && cache.rev === rev) return cache.routes;
+  const routes = await kvGet<Route[]>(ROUTES);
+  if (routes) cache = { rev, routes };
+  return routes;
+}
+async function writeRoutes(routes: Route[]) {
+  await kvSet(ROUTES, routes);
+  const rev = Date.now();
+  await kvSet(ROUTES_REV, rev);
+  cache = { rev, routes };
+}
+async function updateRoutes(fn: (routes: Route[]) => void) {
+  const routes = structuredClone((await readRoutes()) ?? []);
+  fn(routes);
+  await writeRoutes(routes);
+}
 
 export type ImportMeta = { importedAt: number; source: string; routes: number; stops: number; by?: string; bundle?: string };
 
@@ -85,7 +108,7 @@ export function routesFromCsv(text: string): Route[] {
     if (!r.route_id || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
     let route = byRoute.get(r.route_id);
     if (!route) {
-      route = { id: r.route_id, name: r.route_name || r.route_id, state: r.state || undefined, stops: [] };
+      route = { id: r.route_id, name: r.route_name || r.route_id, rank: num(r.route_rank), state: r.state || undefined, stops: [] };
       byRoute.set(r.route_id, route);
     }
     const order = Number(r.stop_order) || route.stops.length + 1;
@@ -109,7 +132,7 @@ export function routesFromCsv(text: string): Route[] {
   }
   const routes = [...byRoute.values()];
   routes.forEach((rt) => rt.stops.sort((a, b) => a.order - b.order));
-  return routes.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  return routes.sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || a.id.localeCompare(b.id, undefined, { numeric: true }));
 }
 
 /** Replace routes and stops from a CSV. Re-runnable: keeps crew assignments by route id,
@@ -117,7 +140,7 @@ export function routesFromCsv(text: string): Route[] {
 export async function importRoutes(csv: string, source: string, by?: string, bundle?: string): Promise<ImportMeta> {
   const incoming = routesFromCsv(csv);
   if (!incoming.length) throw new Error("No stops found in that file. Check the column names.");
-  const old = (await kvGet<Route[]>(ROUTES)) ?? [];
+  const old = (await readRoutes()) ?? [];
   for (const r of incoming) {
     const prev = old.find((o) => o.id === r.id);
     if (prev) { r.assignedCrew = prev.assignedCrew; r.assignedUser = prev.assignedUser; }
@@ -130,28 +153,28 @@ export async function importRoutes(csv: string, source: string, by?: string, bun
   const was = new Map(old.flatMap((r) => r.stops).map((st) => [st.id, st]));
   const moved = incoming.flatMap((r) => r.stops).filter((st) => { const o = was.get(st.id); return o && distanceM(o, st) > 100; }).map((st) => st.id);
   if (moved.length) await kvUpdate<Record<string, Visit[]>>(VISITS, {}, (all) => { for (const id of moved) delete all[id]; });
-  await kvSet(ROUTES, incoming);
+  await writeRoutes(incoming);
   const meta: ImportMeta = { importedAt: Date.now(), source, routes: incoming.length, stops: incoming.reduce((n, r) => n + r.stops.length, 0), by, bundle };
   await kvSet(META, meta);
   return meta;
 }
 
 export async function getRoutes(): Promise<Route[]> {
-  const routes = await kvGet<Route[]>(ROUTES);
+  const routes = await readRoutes();
   if (routes) {
     // Routes still on an older bundled list (not an owner's own upload) move to the new one.
     const meta = await kvGet<ImportMeta>(META);
     if (!meta || !meta.source.startsWith("bundled") || meta.bundle === BUNDLE) return routes;
   }
   await importBundled();
-  return (await kvGet<Route[]>(ROUTES)) ?? [];
+  return (await readRoutes()) ?? [];
 }
 
 export const importBundled = (by?: string) => importRoutes(bundledCsv, BUNDLED_SOURCE, by, BUNDLE);
 export const getMeta = () => kvGet<ImportMeta>(META);
 
 export async function assignRoute(routeId: string, crew?: string, user?: string) {
-  await kvUpdate<Route[]>(ROUTES, [], (routes) => {
+  await updateRoutes((routes) => {
     const r = routes.find((x) => x.id === routeId);
     if (r) { r.assignedCrew = crew || undefined; r.assignedUser = user || undefined; }
   });
@@ -183,7 +206,7 @@ export const routeVisibleTo = (r: Route, s: { uid: string; role: string; crew?: 
  *  If a stop is already within 30 m, that stop is returned instead of making a duplicate. */
 export async function addStop(at: { lat: number; lng: number }, by: string, visible: (r: Route) => boolean, routeId?: string, name?: string) {
   let result: Stop | undefined, created = false;
-  await kvUpdate<Route[]>(ROUTES, [], (routes) => {
+  await updateRoutes((routes) => {
     const mine = routes.filter(visible);
     let near: { s: Stop; d: number } | undefined;
     for (const r of mine) for (const st of r.stops) {
