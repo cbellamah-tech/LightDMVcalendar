@@ -66,7 +66,11 @@ const META = "ldmv:signs:meta";
 const VISITS = "ldmv:signs:visits"; // Record<stopId, Visit[]> newest first
 const LIVE = "ldmv:signs:live";     // Record<uid, LivePos>
 
-export type ImportMeta = { importedAt: number; source: string; routes: number; stops: number; by?: string };
+export type ImportMeta = { importedAt: number; source: string; routes: number; stops: number; by?: string; bundle?: string };
+
+// Fingerprint of the bundled stop list, so a new list shipped in code replaces the old bundled one on its own.
+const BUNDLE = (() => { let h = 0; for (let i = 0; i < bundledCsv.length; i++) h = (h * 31 + bundledCsv.charCodeAt(i)) | 0; return `${bundledCsv.length}:${h}`; })();
+const BUNDLED_SOURCE = "bundled stop list (data/yard-signs/yard_sign_stops.csv)";
 
 const truthy = (v: string) => /^(true|yes|1|y)$/i.test(v);
 const num = (v: string) => (v === "" || v == null ? undefined : Number(v));
@@ -98,7 +102,7 @@ export function routesFromCsv(text: string): Route[] {
       state: r.state || undefined,
       photoRequired: r.photo_required === "" || r.photo_required == null ? true : truthy(r.photo_required),
       radiusM: num(r.arrival_radius_m) ?? 75,
-      notes: r.notes || undefined,
+      notes: r.notes || r.why || undefined,
       cluster: (r.cluster || r.cluster_name || r.group || r.group_name || r.cluster_id || r.group_id || "").trim() || undefined,
     });
   }
@@ -109,7 +113,7 @@ export function routesFromCsv(text: string): Route[] {
 
 /** Replace routes and stops from a CSV. Re-runnable: keeps crew assignments by route id,
  *  and visit history stays keyed by stop id. */
-export async function importRoutes(csv: string, source: string, by?: string): Promise<ImportMeta> {
+export async function importRoutes(csv: string, source: string, by?: string, bundle?: string): Promise<ImportMeta> {
   const incoming = routesFromCsv(csv);
   if (!incoming.length) throw new Error("No stops found in that file. Check the column names.");
   const old = (await kvGet<Route[]>(ROUTES)) ?? [];
@@ -121,20 +125,28 @@ export async function importRoutes(csv: string, source: string, by?: string): Pr
     let order = Math.max(0, ...r.stops.map((st) => st.order));
     for (const st of prev?.stops ?? []) if (st.addedAt && !ids.has(st.id)) r.stops.push({ ...st, order: ++order });
   }
+  // A stop id that now points somewhere else (a redrawn list) shouldn't inherit the old spot's photos.
+  const was = new Map(old.flatMap((r) => r.stops).map((st) => [st.id, st]));
+  const moved = incoming.flatMap((r) => r.stops).filter((st) => { const o = was.get(st.id); return o && distanceM(o, st) > 100; }).map((st) => st.id);
+  if (moved.length) await kvUpdate<Record<string, Visit[]>>(VISITS, {}, (all) => { for (const id of moved) delete all[id]; });
   await kvSet(ROUTES, incoming);
-  const meta: ImportMeta = { importedAt: Date.now(), source, routes: incoming.length, stops: incoming.reduce((n, r) => n + r.stops.length, 0), by };
+  const meta: ImportMeta = { importedAt: Date.now(), source, routes: incoming.length, stops: incoming.reduce((n, r) => n + r.stops.length, 0), by, bundle };
   await kvSet(META, meta);
   return meta;
 }
 
 export async function getRoutes(): Promise<Route[]> {
   const routes = await kvGet<Route[]>(ROUTES);
-  if (routes) return routes;
-  await importRoutes(bundledCsv, "bundled draft (data/yard-signs/yard_sign_stops.csv)");
+  if (routes) {
+    // Routes still on an older bundled list (not an owner's own upload) move to the new one.
+    const meta = await kvGet<ImportMeta>(META);
+    if (!meta || !meta.source.startsWith("bundled") || meta.bundle === BUNDLE) return routes;
+  }
+  await importBundled();
   return (await kvGet<Route[]>(ROUTES)) ?? [];
 }
 
-export const importBundled = (by?: string) => importRoutes(bundledCsv, "bundled draft (data/yard-signs/yard_sign_stops.csv)", by);
+export const importBundled = (by?: string) => importRoutes(bundledCsv, BUNDLED_SOURCE, by, BUNDLE);
 export const getMeta = () => kvGet<ImportMeta>(META);
 
 export async function assignRoute(routeId: string, crew?: string, user?: string) {
