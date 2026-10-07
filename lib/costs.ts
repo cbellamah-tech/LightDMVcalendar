@@ -39,11 +39,11 @@ export type Settings = {
   runFt: number;          // one male + one female plug per run of this many feet
   extFtPerJob: number;    // extension cord per job
   crewPct: number;        // crew pay as % of the sold price (install 15 + takedown 5)
-  repeatUsesBin: boolean; // repeat customers' lights come out of their bin, so no new stock is used
+  repeatNewPct: number;   // repeat customers reuse their bin; this % of the material is new, for breakage (chris: 5 to 10%)
   chargePerFt: number;    // what we charge per foot of roofline (quoting rule), for the price check
   chargePerStrand: number;
 };
-export const DEFAULT_SETTINGS: Settings = { bulbsPerFt: 1, clipsPerBulb: 1, runFt: 50, extFtPerJob: 50, crewPct: 20, repeatUsesBin: true, chargePerFt: 10, chargePerStrand: 35 };
+export const DEFAULT_SETTINGS: Settings = { bulbsPerFt: 1, clipsPerBulb: 1, runFt: 50, extFtPerJob: 50, crewPct: 20, repeatNewPct: 7.5, chargePerFt: 10, chargePerStrand: 35 };
 
 export type Logged = { rooflineFt: number; c7Bulbs: number; miniStrands: number; byName?: string; at?: number };
 export type Sold = { amount: number; source: "jobber" | "owner"; at: number };
@@ -165,22 +165,24 @@ export async function ledger(opts: { from?: string; to?: string; refreshSold?: b
     const d = j.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${j.jobberJobId}`) : null;
     const repeat = d ? d.repeat : undefined;
     const use = logged ? usage(logged, settings) : {};
-    const fromBin = !!repeat && settings.repeatUsesBin;
+    const fromBin = !!repeat;
+    const share = fromBin ? settings.repeatNewPct / 100 : 1;
+    if (share !== 1) for (const k of Object.keys(use) as MaterialKey[]) use[k] = (use[k] ?? 0) * share;
     const { total, missing } = costOf(use, uc);
-    const materials = fromBin ? 0 : total;
+    const materials = total;
     const s = sold[j.id];
     const crewPay = s ? (s.amount * settings.crewPct) / 100 : 0;
     const left = s ? s.amount - materials - crewPay : undefined;
     return {
       id: j.id, jobNumber: j.jobNumber, title: j.title, client: j.client, start: j.start, kind: j.kind, crew: j.crew,
-      repeat, logged, use, materials, fromBin, missing: fromBin ? [] : missing, sold: s, crewPay, left,
+      repeat, logged, use, materials, fromBin, missing, sold: s, crewPay, left,
       marginPct: s && s.amount ? ((left ?? 0) / s.amount) * 100 : undefined,
     };
   }));
 
-  // Stock: bought minus what new (non-bin) jobs used.
+  // Stock: bought minus what jobs used (repeat jobs only their breakage share).
   const used: Partial<Record<MaterialKey, number>> = {};
-  for (const r of rows) if (!r.fromBin) for (const [k, n] of Object.entries(r.use) as [MaterialKey, number][]) used[k] = (used[k] ?? 0) + n;
+  for (const r of rows) for (const [k, n] of Object.entries(r.use) as [MaterialKey, number][]) used[k] = (used[k] ?? 0) + n;
   const stock = MATERIAL_KEYS.filter((k) => uc[k] || used[k]).map((k) => {
     const bought = uc[k]?.bought ?? 0, u = used[k] ?? 0;
     return { key: k, name: MATERIALS[k].name, unit: MATERIALS[k].unit, bought, used: u, onHand: bought - u, value: (bought - u) * (uc[k]?.perUnit ?? 0) };

@@ -9,7 +9,7 @@ import { api, fmtDay, GREEN, NAVY, RED } from "@/components/ui";
 type Key = "c9" | "c7" | "clip" | "male" | "female" | "wire" | "ext" | "mini";
 type Line = { key: Key; description: string; qty: number; perQty: number; price: number; landed: number };
 type Order = { id: string; label: string; date?: string; discountPct?: number; lines: Line[]; addedAt: number; addedBy?: string };
-type Settings = { bulbsPerFt: number; clipsPerBulb: number; runFt: number; extFtPerJob: number; crewPct: number; repeatUsesBin: boolean; chargePerFt: number; chargePerStrand: number };
+type Settings = { bulbsPerFt: number; clipsPerBulb: number; runFt: number; extFtPerJob: number; crewPct: number; repeatNewPct: number; chargePerFt: number; chargePerStrand: number };
 type Unit = { perUnit: number; bought: number; landed: number; cf: number };
 type Row = {
   id: string; jobNumber?: number; title: string; client: string; start: string; kind: string; crew?: string; repeat?: boolean;
@@ -109,7 +109,7 @@ export default function CostsPage() {
         <h2 className={h2} style={{ color: NAVY }}>Job ledger</h2>
         <p className="text-sm text-slate-500 mb-3">
           Fills in by itself from each job checklist (feet of roofline, C7 bulbs, mini strands). Sold price comes from Jobber; tap it to fix.
-          {s.repeatUsesBin && " Repeat customers use the lights in their bin, so no new material is charged to them."}
+          {` Repeat customers reuse the lights in their bin, so only ${s.repeatNewPct}% new material (for breakage) is charged to them.`}
         </p>
         {shown.length === 0 ? <p className="text-slate-500 text-sm">No install jobs synced yet.</p> : (
           <div className="overflow-x-auto -mx-4 px-4">
@@ -135,7 +135,7 @@ export default function CostsPage() {
                         <td className="pr-2 text-right">{n0(r.logged.rooflineFt)}</td>
                         <td className="pr-2 text-right">{r.logged.c7Bulbs ? n0(r.logged.c7Bulbs) : ""}</td>
                         <td className="pr-2 text-right">{r.logged.miniStrands ? n0(r.logged.miniStrands) : ""}</td>
-                        <td className="pr-2 text-right">{r.fromBin ? <span className="text-slate-400">bin</span> : $(r.materials, true)}</td>
+                        <td className="pr-2 text-right">{$(r.materials, true)}{r.fromBin && <div className="text-xs text-slate-500">bin + {s.repeatNewPct}% new</div>}</td>
                       </>
                     ) : <td colSpan={4} className="pr-2 text-right text-slate-400">not counted yet</td>}
                     <td className="pr-2 text-right"><SoldCell row={r} onSave={(amount) => post({ action: "sold", jobId: r.id, amount })} /></td>
@@ -339,6 +339,7 @@ function SettingsCard({ s, busy, onSave }: { s: Settings; busy: boolean; onSave:
     { k: "runFt", label: "Feet per run (one male + one female plug)" },
     { k: "extFtPerJob", label: "Extension cord feet per job" },
     { k: "crewPct", label: "Crew pay, % of sold price" },
+    { k: "repeatNewPct", label: "Repeat customers: % new material for breakage" },
     { k: "chargePerFt", label: "We charge per foot of roofline ($)" },
     { k: "chargePerStrand", label: "We charge per mini strand ($)" },
   ];
@@ -353,10 +354,6 @@ function SettingsCard({ s, busy, onSave }: { s: Settings; busy: boolean; onSave:
               onChange={(e) => setV({ ...v, [f.k]: e.target.value as any })} />
           </label>
         ))}
-        <label className="text-sm flex items-center gap-2 pt-5">
-          <input type="checkbox" checked={v.repeatUsesBin} onChange={(e) => setV({ ...v, repeatUsesBin: e.target.checked })} />
-          Repeat customers use the lights in their bin
-        </label>
       </div>
       {dirty && <button disabled={busy} className="mt-3 rounded-lg px-4 py-2 text-white font-semibold" style={{ background: NAVY }} onClick={() => onSave(v)}>Save</button>}
     </div>
