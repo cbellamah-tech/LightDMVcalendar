@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CalendarDays, ClipboardCheck, GraduationCap, Hammer, Home, LogOut, MapPin, Megaphone, Newspaper, Settings, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, GraduationCap, Hammer, Home, LogOut, MapPin, Megaphone, Newspaper, Settings, ShieldCheck, Users } from "lucide-react";
 import { api, Me, NAVY } from "./ui";
 
 const TABS = [
@@ -15,6 +15,7 @@ const TABS = [
   { href: "/marketing", label: "Marketing", icon: Megaphone, roles: ["owner", "manager"] },
   { href: "/briefing", label: "Briefing", icon: Newspaper, roles: ["owner"] },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, roles: ["owner"] },
+  { href: "/insurance", label: "Insurance", icon: ShieldCheck, roles: ["owner"] },
   { href: "/people", label: "People", icon: Users, roles: ["owner", "manager"] },
   { href: "/settings/jobber", label: "Jobber", icon: Settings, roles: ["owner", "manager"] },
 ];
