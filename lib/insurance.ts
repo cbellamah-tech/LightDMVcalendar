@@ -83,3 +83,48 @@ export async function setDone(id: string, on: boolean, by: string): Promise<Reco
   await kvSet(DONE_KEY, done);
   return done;
 }
+
+/* ---------- 1099 subcontractors ----------
+   Each sub needs: a signed hold harmless, their own workers' comp + employer's liability, and a general liability
+   certificate with limits at least ours, waiver of subrogation, and Light DMV as additional insured. */
+export type SubDoc = { onFile: boolean; date?: string; expires?: string; carrier?: string; url?: string };
+export type SubCoi = SubDoc & { eachOccurrence?: number; aggregate?: number; waiver?: boolean; additionalInsured?: boolean };
+export type Sub = {
+  id: string; name: string; company?: string; phone?: string; email?: string; active: boolean; notes?: string;
+  holdHarmless: SubDoc; workersComp: SubDoc; gl: SubCoi; updatedAt: string;
+};
+const SUBS_KEY = "ldmv:insurance:subs";
+
+export async function loadSubs(): Promise<Sub[]> {
+  return (await kvGet<Sub[]>(SUBS_KEY)) ?? [];
+}
+
+const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 300) : undefined);
+const num = (v: unknown) => (v === "" || v == null || !isFinite(Number(v)) ? undefined : Math.max(0, Number(v)));
+const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+const doc = (v: any): SubDoc => ({ onFile: !!v?.onFile, date: date(v?.date), expires: date(v?.expires), carrier: str(v?.carrier), url: str(v?.url) });
+
+export async function saveSub(raw: any): Promise<Sub[]> {
+  const name = str(raw?.name);
+  if (!name) throw new Error("Give the subcontractor a name.");
+  const sub: Sub = {
+    id: str(raw.id) ?? Math.random().toString(36).slice(2, 10),
+    name, company: str(raw.company), phone: str(raw.phone), email: str(raw.email), notes: str(raw.notes),
+    active: raw.active !== false,
+    holdHarmless: doc(raw.holdHarmless),
+    workersComp: doc(raw.workersComp),
+    gl: { ...doc(raw.gl), eachOccurrence: num(raw.gl?.eachOccurrence), aggregate: num(raw.gl?.aggregate), waiver: !!raw.gl?.waiver, additionalInsured: !!raw.gl?.additionalInsured },
+    updatedAt: new Date().toISOString(),
+  };
+  const subs = await loadSubs();
+  const i = subs.findIndex((s) => s.id === sub.id);
+  if (i >= 0) subs[i] = sub; else subs.push(sub);
+  await kvSet(SUBS_KEY, subs);
+  return subs;
+}
+
+export async function deleteSub(id: string): Promise<Sub[]> {
+  const subs = (await loadSubs()).filter((s) => s.id !== id);
+  await kvSet(SUBS_KEY, subs);
+  return subs;
+}

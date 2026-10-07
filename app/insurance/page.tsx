@@ -7,6 +7,7 @@ import {
   Umbrella, Upload, User, Users, Warehouse, Wrench,
 } from "lucide-react";
 import { api, NAVY } from "@/components/ui";
+import { Subcontractors, type OurLimits } from "./Subs";
 import type { CoverageStatus, InsuranceData, InsuranceView, Limit, Policy, Risk } from "@/lib/insurance";
 
 /* ---------- look ---------- */
@@ -97,6 +98,12 @@ function Dashboard({ view, setView }: { view: InsuranceView; setView: (v: Insura
   const next = dates.find((x) => daysUntil(x.date) >= 0);
   const active = d.policies.filter((p) => p.status === "active").length;
   const openTodos = d.actions.filter((a) => !view.done[a.id]).length;
+  // Subs must carry at least our own general liability limits.
+  const ours = useMemo<OurLimits>(() => {
+    const gl = d.policies.find((p) => p.status === "active" && p.limits.some((l) => l.label === "Each occurrence"));
+    const amt = (label: string) => gl?.limits.find((l) => l.label === label)?.amount;
+    return { eachOccurrence: amt("Each occurrence"), aggregate: amt("General aggregate") };
+  }, [d]);
 
   return (
     <div className="pb-10">
@@ -168,6 +175,8 @@ function Dashboard({ view, setView }: { view: InsuranceView; setView: (v: Insura
             </div>
           </section>
         )}
+
+        <Subcontractors ours={ours} />
 
         {d.vehicles.length > 0 && (
           <section>
