@@ -156,7 +156,7 @@ function Dashboard({ view, setView }: { view: InsuranceView; setView: (v: Insura
 
         {d.requirements.length > 0 && (
           <section>
-            <SectionHead title="What others require of us" sub="Lease, lender and subcontractor rules, checked against our policies." />
+            <SectionHead title="Requirements" sub="Our own SOP, the lease, the lender and subcontractors, checked against what we have." />
             <div className="grid lg:grid-cols-3 gap-3">
               {d.requirements.map((r) => (
                 <div key={r.who} className="bg-white rounded-xl border border-slate-200 p-4">
