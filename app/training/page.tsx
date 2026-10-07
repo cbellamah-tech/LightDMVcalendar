@@ -37,7 +37,7 @@ export default function TrainingHome() {
       <H1 sub={`${passed} of ${d.modules!.length} modules passed. You're ready to quote when you can price 5 past jobs blind within 10%.`}>Quote training</H1>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <Tile href="/training/helper" icon={<Calculator size={18} />} label="Price helper" sub="How would we price this?" />
-        <Tile href="/training/trees" icon={<TreePine size={18} />} label="Tree trainer" sub="Price past trees" />
+        <Tile href="/training/trees" icon={<TreePine size={18} />} label="Trees" sub="Every size, with mockups" />
         {office && <Tile href="/training/team" icon={<BarChart3 size={18} />} label="Team progress" sub="Scores and rates" />}
       </div>
       <div className="space-y-2">

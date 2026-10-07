@@ -8,16 +8,14 @@ export type Block =
   | { t: "p"; text: string }
   | { t: "ol" | "ul"; items: string[] }
   | { t: "table"; head: string[]; rows: string[][] };
-export type Band = { cat: string; n: number; p25: number; median: number; p75: number };
+export type Band = { cat: string; n: number; p25: number; median: number; p75: number; avg?: number };
 export type Rates = {
   rooflinePerFt: number; perStrand: number; pillar: number; wreath: Record<string, number>;
   depositPct: number; taxPct: number; cashDiscountPct: number; returningDiscountPct: number; returningBefore: string; passPct: number;
 };
-export type BlindLine = { name: string; desc: string; qty: number; cat: string; optional: boolean };
-export type BlindItem = { id: string; season: string; title: string; included: string[]; lines: BlindLine[] };
-export type LineResult = { answer: number; real: number; unit: number; qty: number; cat: string; pctOff: number; grade: Grade; band: Band | null };
-export type QuoteResult = { item: string; total: number; answerTotal: number; pctOff: number; grade: Grade; lines: LineResult[] };
-type Grade = "pass" | "close" | "miss";
+export type Grade = "pass" | "close" | "miss";
+export type Check = { q: string; options: string[]; answer: number; why: string };
+export type LessonCard = { title: string; blocks: Block[]; check?: Check };
 
 export const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 export const GRADE: Record<Grade, { label: string; color: string; bg: string }> = {
@@ -74,54 +72,7 @@ export const Btn = ({ children, onClick, disabled, ghost }: { children: React.Re
 export const Spinner = ({ text = "Loading..." }: { text?: string }) =>
   <div className="p-6 text-slate-500 flex gap-2"><Loader2 className="animate-spin" /> {text}</div>;
 
-export const bandText = (b: Band | null) => (b ? `Usual ${money(b.p25)} to ${money(b.p75)} each (typical ${money(b.median)})` : "");
-
-/** One past quote with prices hidden: the trainee enters a price per line. */
-export function QuoteForm({ item, result, values, onChange }: {
-  item: BlindItem; result?: QuoteResult; values: string[]; onChange: (v: string[]) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="text-xs text-slate-500">{item.season} season · {item.title}</div>
-      {item.lines.map((l, i) => {
-        const r = result?.lines[i];
-        return (
-          <div key={i} className="rounded-lg border border-slate-200 p-3 space-y-2" style={r ? { background: GRADE[r.grade].bg } : undefined}>
-            <div className="font-semibold text-sm">{l.name}{l.optional && <span className="ml-2 text-[11px] font-bold text-slate-500">OPTIONAL</span>}</div>
-            {l.desc && <p className="text-sm text-slate-600 whitespace-pre-line">{l.desc}</p>}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-500">{l.qty !== 1 ? `Qty ${l.qty} · ` : ""}Your price for this line</span>
-              <span className="text-slate-500">$</span>
-              <input inputMode="decimal" value={values[i] ?? ""} disabled={!!result}
-                onChange={(e) => { const v = [...values]; v[i] = e.target.value.replace(/[^\d.]/g, ""); onChange(v); }}
-                className="w-28 rounded-md border border-slate-300 px-2 py-1" />
-            </div>
-            {r && (
-              <div className="text-sm">
-                <b style={{ color: GRADE[r.grade].color }}>{GRADE[r.grade].label}</b>: you said {money(r.answer)}, Light DMV charged <b>{money(r.real)}</b>
-                {r.qty !== 1 ? ` (${r.qty} × ${money(r.unit)})` : ""}, {r.pctOff}% off.
-                {r.band && <div className="text-xs text-slate-500">{bandText(r.band)}.</div>}
-              </div>
-            )}
-          </div>
-        );
-      })}
-      {item.included.length > 0 && <div className="text-xs text-slate-500">Also on the quote at $0: {item.included.join(" · ")}</div>}
-      {result && (
-        <div className="rounded-lg p-3 font-semibold" style={{ background: GRADE[result.grade].bg, color: GRADE[result.grade].color }}>
-          Total: you {money(result.answerTotal)}, real {money(result.total)}, {result.pctOff}% off.
-        </div>
-      )}
-    </div>
-  );
-}
-
-export async function gradeQuotes(mode: "blind" | "final", items: BlindItem[], values: string[][]) {
-  return api<{ results: QuoteResult[]; within: number; of: number; passPct: number }>("/api/training/practice", {
-    method: "POST",
-    json: { mode, answers: items.map((it, i) => ({ item: it.id, lines: it.lines.map((_, j) => Number(values[i]?.[j]) || 0) })) },
-  });
-}
+export const bandText = (b: Band | null) => (b ? `Average ${money(b.avg ?? b.median)}, most ${money(b.p25)} to ${money(b.p75)} each` : "");
 
 export function useBusy() {
   const [busy, setBusy] = useState(false);

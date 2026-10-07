@@ -1,72 +1,70 @@
 import { NextResponse } from "next/server";
 import { ANYONE, requireRole } from "@/lib/auth";
-import { Attempt, blindItem, getProgress, getRates, grade, loadPack, pctOff, pick, treeLines, updateProgress } from "@/lib/training";
+import { isOffice } from "@/lib/session";
+import { Attempt, Built, caseForTrainee, getProgress, getRates, grade, gradeCase, loadPack, pctOff, pick, updateProgress } from "@/lib/training";
 
 export const dynamic = "force-dynamic";
 
-/** Past sold quotes with the prices hidden: ?mode=blind (one quote), tree (one tree), final (five quotes). */
+/** ?mode=case: one real past request to quote. final: five. tree: one sold tree. Never includes what we charged. */
 export async function GET(req: Request) {
   const s = await requireRole(...ANYONE);
   if (s instanceof NextResponse) return s;
   const pack = await loadPack();
   if (!pack) return NextResponse.json({ error: "The course isn't loaded yet" }, { status: 400 });
-  const mode = new URL(req.url).searchParams.get("mode") || "blind";
+  const mode = new URL(req.url).searchParams.get("mode") || "case";
   const p = await getProgress(s.uid);
   const done = new Set(p.attempts.map((a) => a.item));
   if (mode === "tree") {
-    const [t] = pick(treeLines(pack), done, 1);
-    return NextResponse.json({ tree: t && { id: t.id, season: t.season, name: t.line.name, desc: t.line.desc, qty: t.line.qty } });
+    const [t] = pick(pack.trees.filter((x) => !x.reference), done, 1);
+    return NextResponse.json({ tree: t && { id: t.id, season: t.season, name: t.name, desc: t.desc, qty: t.qty, wrap: t.wrap } });
   }
-  return NextResponse.json({ items: pick(pack.practice, done, mode === "final" ? 5 : 1).map(blindItem) });
+  const cases = pick(pack.cases, done, mode === "final" ? 5 : 1).map(caseForTrainee);
+  return NextResponse.json({ cases, catalog: pack.catalog, run: mode === "final" ? `${Date.now().toString(36)}` : undefined });
 }
 
-type Answer = { item: string; lines?: number[]; strands?: number; price?: number };
-
-/** Grades answers against what Light DMV really charged and records the attempt. */
+/** Grades a quote (or a tree) against what Light DMV really sent and records the attempt. */
 export async function POST(req: Request) {
   const s = await requireRole(...ANYONE);
   if (s instanceof NextResponse) return s;
   const pack = await loadPack();
   if (!pack) return NextResponse.json({ error: "The course isn't loaded yet" }, { status: 400 });
   const rates = await getRates(pack);
-  const body = (await req.json().catch(() => ({}))) as { mode?: string; answers?: Answer[] };
-  const mode = body.mode === "tree" ? "tree" : body.mode === "final" ? "final" : "blind";
+  const body = await req.json().catch(() => ({}));
   const band = (cat: string) => pack.bands.find((b) => b.cat === cat) ?? null;
-  const attempts: Attempt[] = [];
 
-  if (mode === "tree") {
-    const a = body.answers?.[0];
-    const t = a && treeLines(pack).find((x) => x.id === a.item);
-    if (!a || !t) return NextResponse.json({ error: "Unknown tree" }, { status: 400 });
-    const off = pctOff(Number(a.price) || 0, t.line.total);
-    attempts.push({ at: Date.now(), mode, item: t.id, pctOff: off, lines: [{ cat: "tree", pctOff: off }] });
-    await updateProgress(s.uid, (p) => { p.attempts.push(...attempts); });
+  if (body.mode === "tree") {
+    const t = pack.trees.find((x) => x.id === body.item);
+    if (!t) return NextResponse.json({ error: "Unknown tree" }, { status: 400 });
+    const off = pctOff(Number(body.price) || 0, t.total);
+    await updateProgress(s.uid, (p) => { p.attempts.push({ at: Date.now(), mode: "tree", item: t.id, pctOff: off, lines: [{ cat: "tree", pctOff: off }] }); });
     return NextResponse.json({
-      real: t.line.total, unit: t.line.unit, pctOff: off, grade: grade(off, rates.passPct),
-      byRule: (Number(a.strands) || 0) * rates.perStrand, perStrand: rates.perStrand,
-      realStrands: t.line.unit % rates.perStrand === 0 ? t.line.unit / rates.perStrand : null, band: band("tree"),
+      real: t.total, unit: t.unit, pctOff: off, grade: grade(off, rates.passPct), perStrand: rates.perStrand,
+      realStrands: t.unit % rates.perStrand === 0 ? t.unit / rates.perStrand : null, band: band("tree"), size: t.size,
+      group: pack.treeGroups.find((g) => g.size === t.size) ?? null,
     });
   }
 
-  const results = [];
-  for (const a of body.answers ?? []) {
-    const it = pack.practice.find((x) => x.id === a.item);
-    if (!it) continue;
-    const lines = it.lines.map((l, i) => {
-      const ans = Number(a.lines?.[i]) || 0;
-      const off = pctOff(ans, l.total);
-      return { answer: ans, real: l.total, unit: l.unit, qty: l.qty, cat: l.cat, pctOff: off, grade: grade(off, rates.passPct), band: band(l.cat) };
-    });
-    const ansTotal = lines.reduce((t, l) => t + l.answer, 0);
-    const off = pctOff(ansTotal, it.total);
-    attempts.push({ at: Date.now(), mode, item: it.id, pctOff: off, lines: lines.map((l) => ({ cat: l.cat, pctOff: l.pctOff })) });
-    results.push({ item: it.id, total: it.total, answerTotal: ansTotal, pctOff: off, grade: grade(off, rates.passPct), lines });
-  }
-  if (!results.length) return NextResponse.json({ error: "Nothing to grade" }, { status: 400 });
-  const within = results.filter((r) => r.pctOff <= rates.passPct).length;
+  const c = pack.cases.find((x) => x.id === body.case);
+  if (!c) return NextResponse.json({ error: "Unknown request" }, { status: 400 });
+  const built = body.built as Built;
+  if (!built || !Array.isArray(built.lines)) return NextResponse.json({ error: "Nothing to grade" }, { status: 400 });
+  const r = gradeCase(c, { title: String(built.title || ""), lines: built.lines.slice(0, 30), answers: built.answers ?? {} }, rates.passPct);
+  const mode = body.mode === "final" ? "final" : "case";
+  const run = mode === "final" ? String(body.run || "") : undefined;
+  const attempt: Attempt = {
+    at: Date.now(), mode, item: c.id, run, pctOff: r.pctOff,
+    lines: r.rows.map((x) => ({ cat: x.real.cat, pctOff: x.pctOff })), missed: r.rows.filter((x) => !x.mine).map((x) => x.real.cat),
+  };
+  let final: { within: number; of: number } | null = null;
   await updateProgress(s.uid, (p) => {
-    p.attempts.push(...attempts);
-    if (mode === "final") p.finals.push({ at: Date.now(), within, of: results.length });
+    p.attempts.push(attempt);
+    if (run) {
+      const mine = p.attempts.filter((a) => a.run === run);
+      if (mine.length === 5) {
+        final = { within: mine.filter((a) => a.pctOff <= rates.passPct).length, of: 5 };
+        p.finals.push({ at: Date.now(), ...final });
+      }
+    }
   });
-  return NextResponse.json({ results, within, of: results.length, passPct: rates.passPct });
+  return NextResponse.json({ ...r, jobberUrl: isOffice(s) ? r.jobberUrl : null, bands: pack.bands, passPct: rates.passPct, final });
 }

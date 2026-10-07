@@ -4,7 +4,7 @@ import { getProgress, getRates, loadPack, moduleStatus } from "@/lib/training";
 
 export const dynamic = "force-dynamic";
 
-/** One module's lessons (and the intake drill's questions, without the answers). */
+/** One module's lesson cards (and its drill's questions, without the answers). */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const s = await requireRole(...ANYONE);
   if (s instanceof NextResponse) return s;
@@ -16,6 +16,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json({
     ...m, ...moduleStatus(m, p, rates.passPct), rates, bands: pack.bands,
     number: i + 1, next: pack.modules[i + 1]?.id ?? null,
-    intake: m.practice === "intake" ? { routes: pack.intake.routes, note: pack.intake.note, items: pack.intake.items.map(({ id, text }) => ({ id, text })) } : undefined,
+    drill: m.practice === "intake" ? { routes: pack.intake.routes, note: pack.intake.note, items: pack.intake.items.map(({ id, text }) => ({ id, text })) }
+      : m.practice === "objections" ? { items: pack.objections.map(({ id, text, options }) => ({ id, text, options })) } : undefined,
   });
 }

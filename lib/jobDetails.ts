@@ -26,9 +26,9 @@ export type JobDetail = {
 };
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
-const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
-const FILES: Spec[string] = { first: 10, sel: { nodes: { sel: FILE } } };
-const LINE: Spec = {
+export const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
+export const FILES: Spec[string] = { first: 10, sel: { nodes: { sel: FILE } } };
+export const LINE: Spec = {
   name: true, description: true, quantity: true, textOnly: true,
   image: { sel: FILE }, images: FILES, fileAttachments: FILES, photos: FILES, imageUrl: true,
 };
@@ -55,13 +55,13 @@ async function jobQuery() {
   return `query LdmvJob($id: EncodedId!) { job(id: $id) ${selCache} }`;
 }
 
-const toFile = (f: any): DetailFile | null => {
+export const toFile = (f: any): DetailFile | null => {
   const url = f?.url || f?.thumbnailUrl;
   if (!url) return null;
   const name = f.fileName || f.name || "file";
   return { name, url, image: /^image\//.test(f.contentType || "") || /\.(jpe?g|png|gif|webp|heic)$/i.test(name) };
 };
-const filesOf = (x: any): DetailFile[] =>
+export const filesOf = (x: any): DetailFile[] =>
   [...rows(x?.image), ...rows(x?.images), ...rows(x?.fileAttachments), ...rows(x?.photos), ...rows(x?.attachments)]
     .map(toFile).filter(Boolean) as DetailFile[];
 

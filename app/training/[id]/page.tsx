@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { api, GREEN, NAVY, RED } from "@/components/ui";
-import { BlindItem, Block, Blocks, Btn, Card, gradeQuotes, H1, QuoteForm, QuoteResult, Rates, Spinner, useBusy } from "../parts";
+import { Band, Blocks, Btn, Card, H1, LessonCard, money, Rates, Spinner, useBusy } from "../parts";
+import { Product, QuoteSim, SimCase, SimResult } from "../QuoteSim";
 
 type Mod = {
-  id: string; title: string; goal: string; practice: "read" | "intake" | "blind" | "final"; number: number; next: string | null;
-  status: string; detail: string; rates: Rates; lessons: { title: string; blocks: Block[] }[];
-  intake?: { routes: string[]; note?: string; items: { id: string; text: string }[] };
+  id: string; title: string; goal: string; practice: "read" | "intake" | "blind" | "final" | "objections"; number: number; next: string | null;
+  status: string; detail: string; rates: Rates; bands: Band[]; cards: LessonCard[];
+  drill?: { routes?: string[]; note?: string; items: { id: string; text: string; options?: string[] }[] };
 };
 
 export default function ModulePage({ params }: { params: { id: string } }) {
@@ -24,100 +25,148 @@ export default function ModulePage({ params }: { params: { id: string } }) {
       <Link href="/training" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> All modules</Link>
       <H1 sub={m.goal}>{m.number}. {m.title}</H1>
       {m.detail && <div className="text-sm font-semibold" style={{ color: m.status === "passed" ? GREEN : NAVY }}>{m.status === "passed" ? "Passed" : "In progress"} · {m.detail}</div>}
-      {m.lessons.map((l, i) => (
-        <Card key={i} className="space-y-3">
-          <h2 className="font-bold text-lg" style={{ color: NAVY }}>{l.title}</h2>
-          <Blocks blocks={l.blocks} />
-        </Card>
-      ))}
-      {m.practice === "read" && <MarkRead m={m} onDone={load} />}
-      {m.practice === "intake" && m.intake && <IntakeDrill m={m} onDone={load} />}
-      {m.practice === "blind" && <BlindPractice m={m} onDone={load} />}
-      {m.practice === "final" && <FinalCheck m={m} onDone={load} />}
+      <Lesson m={m} onDone={load} />
+      {(m.practice === "intake" || m.practice === "objections") && m.drill && <Drill m={m} onDone={load} />}
+      {m.practice === "blind" && <Practice m={m} onDone={load} />}
+      {m.practice === "final" && <Final m={m} onDone={load} />}
       {m.next && <Link href={`/training/${m.next}`} className="block text-right font-semibold" style={{ color: NAVY }}>Next module →</Link>}
     </div>
   );
 }
 
-function MarkRead({ m, onDone }: { m: Mod; onDone: () => void }) {
-  const { busy, run } = useBusy();
-  if (m.status === "passed") return <p className="text-sm font-semibold" style={{ color: GREEN }}>Marked as read.</p>;
-  return <Btn disabled={busy} onClick={() => run(async () => { await api("/api/training", { method: "POST", json: { action: "read", module: m.id } }); onDone(); })}>I've read this</Btn>;
+/** Lesson cards one at a time; a card with a quick check opens the next card once it's answered. */
+function Lesson({ m, onDone }: { m: Mod; onDone: () => void }) {
+  const [i, setI] = useState(0);
+  const [picked, setPicked] = useState<Record<number, number>>({});
+  const [finished, setFinished] = useState(false);
+  const card = m.cards[i];
+  if (!card) return null;
+  const ch = card.check;
+  const answered = !ch || picked[i] != null;
+  const last = i === m.cards.length - 1;
+
+  async function finish() {
+    setFinished(true);
+    await api("/api/training", { method: "POST", json: { action: "read", module: m.id } }).catch(() => {});
+    onDone();
+  }
+
+  return (
+    <Card className="space-y-4">
+      <div className="flex gap-1">{m.cards.map((_, j) => <div key={j} className="h-1.5 flex-1 rounded-full" style={{ background: j <= i ? NAVY : "#E2E8F0" }} />)}</div>
+      <h2 className="font-bold text-lg" style={{ color: NAVY }}>{card.title}</h2>
+      <Blocks blocks={card.blocks} />
+      {ch && (
+        <div className="rounded-lg bg-slate-50 p-3 space-y-2">
+          <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Quick check</div>
+          <div className="font-semibold text-sm">{ch.q}</div>
+          <div className="flex flex-col gap-1.5">
+            {ch.options.map((o, j) => {
+              const done = picked[i] != null, right = j === ch.answer, mine = picked[i] === j;
+              return (
+                <button key={j} disabled={done} onClick={() => setPicked({ ...picked, [i]: j })} className="text-left text-sm rounded-lg border px-3 py-2 bg-white"
+                  style={{ borderColor: done && right ? GREEN : done && mine ? RED : "#CBD5E1", background: done && right ? "#E8F6EE" : done && mine ? "#FDECEC" : "white" }}>
+                  {o}
+                </button>
+              );
+            })}
+          </div>
+          {picked[i] != null && <p className="text-sm" style={{ color: picked[i] === ch.answer ? GREEN : RED }}>{picked[i] === ch.answer ? "Right. " : "Not quite. "}<span className="text-slate-600">{ch.why}</span></p>}
+        </div>
+      )}
+      <div className="flex justify-between items-center">
+        <Btn ghost disabled={i === 0} onClick={() => setI(i - 1)}>Back</Btn>
+        <span className="text-xs text-slate-500">{i + 1} of {m.cards.length}</span>
+        {last
+          ? <Btn disabled={!answered || finished} onClick={finish}>{finished ? "Done" : "Finish lesson"}</Btn>
+          : <Btn disabled={!answered} onClick={() => setI(i + 1)}>Next</Btn>}
+      </div>
+    </Card>
+  );
 }
 
-function IntakeDrill({ m, onDone }: { m: Mod; onDone: () => void }) {
-  const q = m.intake!;
+/** Intake routing or objection handling: one question at a time with the answer right after. */
+function Drill({ m, onDone }: { m: Mod; onDone: () => void }) {
+  const d = m.drill!;
+  const [i, setI] = useState(0);
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [res, setRes] = useState<{ score: number; of: number; results: { id: string; answer: number; why: string; right: boolean }[] } | null>(null);
   const { busy, err, run } = useBusy();
-  const by = new Map(res?.results.map((r) => [r.id, r]));
+  const q = d.items[i];
+  const options = q?.options ?? d.routes ?? [];
+  const r = res?.results.find((x) => x.id === q?.id);
+  const title = m.practice === "intake" ? "Practice: what do you do with this request?" : "Practice: what do you say?";
+
+  async function check() {
+    await run(async () => {
+      setRes(await api("/api/training", { method: "POST", json: { action: m.practice, answers: picked } }));
+      onDone();
+    });
+  }
+  const allPicked = d.items.every((x) => picked[x.id] != null);
+
   return (
-    <Card className="space-y-4">
+    <Card className="space-y-3">
       <div>
-        <h2 className="font-bold text-lg" style={{ color: NAVY }}>Practice: route the request</h2>
-        <p className="text-sm text-slate-500">Pick what you'd do first with each request. Pass is 8 of {q.items.length}.{q.note ? ` ${q.note}` : ""}</p>
+        <h2 className="font-bold text-lg" style={{ color: NAVY }}>{title}</h2>
+        <p className="text-sm text-slate-500">{d.items.length} questions; pass is 8 in 10.{d.note ? ` ${d.note}` : ""}</p>
       </div>
-      {q.items.map((it, i) => {
-        const r = by.get(it.id);
-        return (
-          <div key={it.id} className="space-y-2">
-            <div className="font-semibold text-sm">{i + 1}. {it.text}</div>
-            <div className="flex flex-wrap gap-2">
-              {q.routes.map((route, j) => {
-                const on = picked[it.id] === j, right = r && r.answer === j;
-                return (
-                  <button key={j} disabled={!!res} onClick={() => setPicked({ ...picked, [it.id]: j })}
-                    className="text-sm rounded-full px-3 py-1 border"
-                    style={{ borderColor: right ? GREEN : on ? (r ? RED : NAVY) : "#CBD5E1", background: on ? (r ? (right ? "#E8F6EE" : "#FDECEC") : "#E6ECF5") : right ? "#E8F6EE" : "white" }}>
-                    {route}
-                  </button>
-                );
-              })}
-            </div>
-            {r && <p className="text-sm" style={{ color: r.right ? GREEN : RED }}>{r.right ? "Right. " : "Not quite. "}<span className="text-slate-600">{r.why}</span></p>}
+      <div className="flex gap-1">{d.items.map((x, j) => {
+        const rr = res?.results.find((y) => y.id === x.id);
+        return <button key={x.id} onClick={() => setI(j)} className="h-6 flex-1 rounded text-[11px] font-bold"
+          style={{ background: rr ? (rr.right ? "#E8F6EE" : "#FDECEC") : j === i ? NAVY : picked[x.id] != null ? "#E6ECF5" : "#F1F5F9", color: rr ? (rr.right ? GREEN : RED) : j === i ? "white" : NAVY }}>{j + 1}</button>;
+      })}</div>
+      {q && (
+        <div className="space-y-2">
+          <div className="font-semibold">{q.text}</div>
+          <div className="flex flex-col gap-1.5">
+            {options.map((o, j) => {
+              const mine = picked[q.id] === j, right = r && r.answer === j;
+              return (
+                <button key={j} disabled={!!res} onClick={() => { setPicked({ ...picked, [q.id]: j }); if (i < d.items.length - 1) setTimeout(() => setI(i + 1), 250); }}
+                  className="text-left text-sm rounded-lg border px-3 py-2"
+                  style={{ borderColor: right ? GREEN : mine ? (r ? RED : NAVY) : "#CBD5E1", background: right ? "#E8F6EE" : mine ? (r ? "#FDECEC" : "#E6ECF5") : "white" }}>
+                  {o}
+                </button>
+              );
+            })}
           </div>
-        );
-      })}
+          {r && <p className="text-sm" style={{ color: r.right ? GREEN : RED }}>{r.right ? "Right. " : "Not quite. "}<span className="text-slate-600">{r.why}</span></p>}
+        </div>
+      )}
       {err && <p className="text-sm text-red-600">{err}</p>}
       {res ? (
         <div className="flex items-center gap-3">
           <b style={{ color: res.score / res.of >= 0.8 ? GREEN : RED }}>{res.score} of {res.of} right</b>
-          <Btn ghost onClick={() => { setRes(null); setPicked({}); }}>Try again</Btn>
+          <span className="text-xs text-slate-500">Tap a number to see why.</span>
+          <Btn ghost onClick={() => { setRes(null); setPicked({}); setI(0); }}>Try again</Btn>
         </div>
       ) : (
-        <Btn disabled={busy || Object.keys(picked).length < q.items.length}
-          onClick={() => run(async () => { setRes(await api("/api/training", { method: "POST", json: { action: "intake", answers: picked } })); onDone(); })}>
-          Check my answers
-        </Btn>
+        <Btn disabled={busy || !allPicked} onClick={check}>{allPicked ? "Check my answers" : `Answer all ${d.items.length} to check`}</Btn>
       )}
     </Card>
   );
 }
 
-function BlindPractice({ m, onDone }: { m: Mod; onDone: () => void }) {
-  const [item, setItem] = useState<BlindItem | null>(null);
-  const [vals, setVals] = useState<string[]>([]);
-  const [res, setRes] = useState<QuoteResult | null>(null);
+type CasesResp = { cases: SimCase[]; catalog: Product[]; run?: string };
+
+/** Quote a real past request end to end, then compare with what we sent. */
+function Practice({ m, onDone }: { m: Mod; onDone: () => void }) {
+  const [d, setD] = useState<CasesResp | null>(null);
+  const [n, setN] = useState(0);
+  const [done, setDone] = useState(false);
   const { busy, err, run } = useBusy();
-  const next = () => run(async () => {
-    const r = await api<{ items: BlindItem[] }>("/api/training/practice?mode=blind");
-    setItem(r.items[0] ?? null); setVals([]); setRes(null);
-  });
+  const next = () => run(async () => { setD(await api<CasesResp>("/api/training/practice?mode=case")); setN(n + 1); setDone(false); });
   return (
     <Card className="space-y-3">
       <div>
-        <h2 className="font-bold text-lg" style={{ color: NAVY }}>Practice: price a past job blind</h2>
-        <p className="text-sm text-slate-500">A real sold quote with the prices hidden. Price every line, then see what Light DMV charged. Pass is 5 quotes with at least 3 totals within {m.rates.passPct}%.</p>
+        <h2 className="font-bold text-lg" style={{ color: NAVY }}>Practice: quote a real request</h2>
+        <p className="text-sm text-slate-500">A request we really got and sold. Look at the house, measure it, build the quote from our product list, then see what we sent. Pass is 5 quotes with 3 totals within {m.rates.passPct}%.</p>
       </div>
-      {!item ? <Btn disabled={busy} onClick={next}>Start a practice quote</Btn> : (
+      {!d?.cases[0] ? <Btn disabled={busy} onClick={next}>Start a practice quote</Btn> : (
         <>
-          <QuoteForm item={item} result={res ?? undefined} values={vals} onChange={setVals} />
-          {res ? <Btn disabled={busy} onClick={next}>Next quote</Btn> : (
-            <Btn disabled={busy || item.lines.some((_, i) => !vals[i])}
-              onClick={() => run(async () => { const r = await gradeQuotes("blind", [item], [vals]); setRes(r.results[0]); onDone(); })}>
-              Check my prices
-            </Btn>
-          )}
+          <QuoteSim key={`${d.cases[0].id}-${n}`} c={d.cases[0]} catalog={d.catalog} rates={m.rates} bands={m.bands} mode="case" onDone={() => { setDone(true); onDone(); }} />
+          {done && <Btn disabled={busy} onClick={next}>Next request</Btn>}
         </>
       )}
       {err && <p className="text-sm text-red-600">{err}</p>}
@@ -125,39 +174,33 @@ function BlindPractice({ m, onDone }: { m: Mod; onDone: () => void }) {
   );
 }
 
-function FinalCheck({ m, onDone }: { m: Mod; onDone: () => void }) {
-  const [items, setItems] = useState<BlindItem[] | null>(null);
-  const [vals, setVals] = useState<string[][]>([]);
-  const [res, setRes] = useState<{ results: QuoteResult[]; within: number; of: number } | null>(null);
+function Final({ m, onDone }: { m: Mod; onDone: () => void }) {
+  const [d, setD] = useState<CasesResp | null>(null);
+  const [i, setI] = useState(0);
+  const [results, setResults] = useState<SimResult[]>([]);
   const { busy, err, run } = useBusy();
-  const start = () => run(async () => {
-    const r = await api<{ items: BlindItem[] }>("/api/training/practice?mode=final");
-    setItems(r.items); setVals(r.items.map(() => [])); setRes(null);
-  });
-  const ready = items && items.every((it, i) => it.lines.every((_, j) => vals[i]?.[j]));
+  const start = () => run(async () => { setD(await api<CasesResp>("/api/training/practice?mode=final")); setI(0); setResults([]); });
+  const c = d?.cases[i];
+  const fin = results[results.length - 1]?.final;
   return (
-    <Card className="space-y-4">
+    <Card className="space-y-3">
       <div>
-        <h2 className="font-bold text-lg" style={{ color: NAVY }}>Final check: 5 past jobs</h2>
-        <p className="text-sm text-slate-500">Price all 5, then submit. You pass when every quote total is within {m.rates.passPct}% of the real price.</p>
+        <h2 className="font-bold text-lg" style={{ color: NAVY }}>Final check: 5 real requests</h2>
+        <p className="text-sm text-slate-500">Quote all 5 the way you would for real. You pass when every total is within {m.rates.passPct}% of what we sent.</p>
       </div>
-      {!items ? <Btn disabled={busy} onClick={start}>Start the final check</Btn> : (
+      {!d ? <Btn disabled={busy} onClick={start}>Start the final check</Btn> : (
         <>
-          {items.map((it, i) => (
-            <div key={it.id} className="space-y-2">
-              <div className="font-bold" style={{ color: NAVY }}>Job {i + 1} of {items.length}</div>
-              <QuoteForm item={it} result={res?.results[i]} values={vals[i] ?? []} onChange={(v) => { const n = [...vals]; n[i] = v; setVals(n); }} />
-            </div>
-          ))}
-          {res ? (
+          {c && <QuoteSim key={c.id} c={c} catalog={d.catalog} rates={m.rates} bands={m.bands} mode="final" run={d.run} label={`Request ${i + 1} of ${d.cases.length}`}
+            onDone={(r) => { setResults([...results, r]); onDone(); }} />}
+          {results.length === i + 1 && i < d.cases.length - 1 && <Btn onClick={() => setI(i + 1)}>Next request ({i + 2} of {d.cases.length})</Btn>}
+          {fin && (
             <div className="space-y-2">
-              <div className="font-bold text-lg" style={{ color: res.within === res.of ? GREEN : RED }}>
-                {res.within} of {res.of} within {m.rates.passPct}%. {res.within === res.of ? "Passed." : "Not yet: study the lines marked Off and try again."}
+              <div className="font-bold text-lg" style={{ color: fin.within === fin.of ? GREEN : RED }}>
+                {fin.within} of {fin.of} within {m.rates.passPct}%. {fin.within === fin.of ? "Passed. You're ready to quote." : "Not yet. Look at the lines you were furthest off on and try a new set."}
               </div>
+              <div className="text-sm text-slate-600">{results.map((r, j) => `#${j + 1}: you ${money(r.myTotal)} vs ${money(r.realTotal)}`).join(" · ")}</div>
               <Btn onClick={start} disabled={busy}>New set of 5</Btn>
             </div>
-          ) : (
-            <Btn disabled={busy || !ready} onClick={() => run(async () => { setRes(await gradeQuotes("final", items, vals)); onDone(); })}>Submit all 5</Btn>
           )}
         </>
       )}

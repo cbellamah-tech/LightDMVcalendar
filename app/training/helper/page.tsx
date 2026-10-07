@@ -33,7 +33,7 @@ export default function PriceHelper() {
   }
   if (f.stakes === "1") rows.push({ label: "Pathway / driveway stakes", rule: null, how: "no set rate yet", band: band("stakes/pathway"), count: 1 });
   if (f.garland === "1") rows.push({ label: "Garland", rule: null, how: "no set rate yet", band: band("garland"), count: 1 });
-  const total = rows.reduce((t, x) => t + (x.rule ?? (x.band ? x.band.median * x.count : 0)), 0);
+  const total = rows.reduce((t, x) => t + (x.rule ?? (x.band ? (x.band.avg ?? x.band.median) * x.count : 0)), 0);
 
   const field = (k: string, label: string, ph = "") => (
     <label className="block">
@@ -78,10 +78,10 @@ export default function PriceHelper() {
               <div>
                 <div className="font-semibold text-sm">{x.label}</div>
                 <div className="text-xs text-slate-500">
-                  {x.how}{x.band ? ` · past quotes ${money(x.band.p25)} to ${money(x.band.p75)}${x.count > 1 ? " each" : ""}, typical ${money(x.band.median)}` : ""}
+                  {x.how}{x.band ? ` · average ${money(x.band.avg ?? x.band.median)}, most ${money(x.band.p25)} to ${money(x.band.p75)}${x.count > 1 ? " each" : ""}` : ""}
                 </div>
               </div>
-              <div className="font-bold whitespace-nowrap">{x.rule != null ? money(x.rule) : x.band ? `~${money(x.band.median * x.count)}` : "?"}</div>
+              <div className="font-bold whitespace-nowrap">{x.rule != null ? money(x.rule) : x.band ? `~${money((x.band.avg ?? x.band.median) * x.count)}` : "?"}</div>
             </div>
           ))}
           <div className="flex justify-between font-extrabold text-lg" style={{ color: NAVY }}><span>Total before tax</span><span>{money(total)}</span></div>

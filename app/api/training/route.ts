@@ -13,7 +13,7 @@ export async function GET() {
   if (!pack) return NextResponse.json({ loaded: false, rates });
   const p = await getProgress(s.uid);
   return NextResponse.json({
-    loaded: true, builtAt: pack.builtAt, rates, bands: pack.bands, practiceCount: pack.practice.length,
+    loaded: true, builtAt: pack.builtAt, rates, bands: pack.bands, practiceCount: pack.cases.length,
     modules: pack.modules.map((m) => ({ id: m.id, title: m.title, goal: m.goal, practice: m.practice, ...moduleStatus(m, p, rates.passPct) })),
   });
 }
@@ -37,11 +37,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (body.action === "intake") {
+  if (body.action === "intake" || body.action === "objections") {
+    const kind = body.action as "intake" | "objections";
     const answers = (body.answers ?? {}) as Record<string, number>;
-    const results = pack.intake.items.map((q) => ({ id: q.id, picked: answers[q.id], answer: q.answer, why: q.why, right: answers[q.id] === q.answer }));
+    const items = kind === "intake" ? pack.intake.items : pack.objections;
+    const results = items.map((q) => ({ id: q.id, picked: answers[q.id], answer: q.answer, why: q.why, right: answers[q.id] === q.answer }));
     const score = results.filter((r) => r.right).length, of = results.length;
-    await updateProgress(s.uid, (p) => { p.intake = { at: Date.now(), score, of, best: Math.max(score, p.intake?.best ?? 0) }; });
+    await updateProgress(s.uid, (p) => { p[kind] = { at: Date.now(), score, of, best: Math.max(score, p[kind]?.best ?? 0) }; });
     return NextResponse.json({ score, of, results });
   }
 
