@@ -21,7 +21,7 @@ export type CaseLine = { name: string; desc: string; qty: number; unit: number; 
 export type Case = {
   id: string; season: string;
   request: { title: string; source: string; note: string; street: string; town: string; state: string; zip: string; attachments: number };
-  repeat: { prior: number; lastSeason: string | null };
+  repeat: { prior: number; lastSeason: string | null; last?: { season: string; status: string; lines: { name: string; total: number; optional: boolean }[] } | null };
   quote: { id: string; title: string; lines: CaseLine[]; subtotal: number; total: number; jobberUrl: string };
 };
 export type Tree = { id: string; quoteId: string; season: string; name: string; desc: string; qty: number; unit: number; total: number; size: string; wrap: string; reference?: boolean };

@@ -10,7 +10,7 @@ export type Product = { key: string; name: string; desc: string; cat: string; pr
 export type SimCase = {
   id: string; season: string;
   request: { title: string; source: string; note: string; street: string; town: string; state: string; zip: string; attachments: number };
-  repeat: { prior: number; lastSeason: string | null };
+  repeat: { prior: number; lastSeason: string | null; last?: { season: string; status: string; lines: { name: string; total: number; optional: boolean }[] } | null };
   links: { streetView: string; earth: string; listing: string };
 };
 type Line = { id: number; key: string; name: string; desc: string; cat: string; price: string; optional: boolean; mockup: boolean; textOnly?: boolean };
@@ -132,6 +132,7 @@ export function QuoteSim({ c, catalog, real, rates, bands, mode, run, label, onD
               options={["Design it fresh from the house", "Open last year's quote and mockups and start from that"]} answer={repeat ? 1 : 0} picked={start} onPick={setStart}
               why={repeat ? `Returning customer: same design and price as last year, plus ${rates.returningDiscountPct}% off if they book before ${rates.returningBefore}.` : "New customer, so you design it from the house and the note."} />
           )}
+          {start != null && <LastYear c={c} />}
           <Btn disabled={start == null} onClick={() => setStep(1)}>Next: see the house</Btn>
         </Card>
       )}
@@ -186,6 +187,7 @@ export function QuoteSim({ c, catalog, real, rates, bands, mode, run, label, onD
             </select>
           </Card>
 
+          <LastYear c={c} />
           <Card className="space-y-3">
             <div className="flex justify-between items-baseline">
               <div className="font-bold">Line items</div>
@@ -277,6 +279,20 @@ function Installs({ photos }: { photos: RealPhotos[string] }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** A returning customer's previous quote, as you'd find it in Jobber. */
+function LastYear({ c }: { c: SimCase }) {
+  const l = c.repeat.last;
+  if (!l || !l.lines.length) return null;
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-1">
+      <div className="text-sm font-bold">Their {l.season} quote in Jobber{l.status === "converted" || l.status === "approved" ? " (they bought it)" : ""}</div>
+      {l.lines.map((x, i) => (
+        <div key={i} className="flex justify-between gap-3 text-sm"><span>{x.name}{x.optional && <span className="ml-1 text-[11px] text-slate-500">OPTIONAL</span>}</span><span className="font-semibold">{money(x.total)}</span></div>
+      ))}
     </div>
   );
 }
