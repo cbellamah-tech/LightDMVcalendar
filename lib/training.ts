@@ -25,13 +25,14 @@ export type Case = {
   quote: { id: string; title: string; lines: CaseLine[]; subtotal: number; total: number; jobberUrl: string };
 };
 export type Tree = { id: string; quoteId: string; season: string; name: string; desc: string; qty: number; unit: number; total: number; size: string; wrap: string; reference?: boolean };
+export type Example = { id: string; quoteId: string; season: string; priority: boolean; photos: string[]; lines: { name: string; desc: string; qty: number; total: number; optional: boolean; textOnly: boolean; cat: string }[]; bought: string; total: number };
 export type TreeGroup = { size: string; n: number; avg: number; low: number; high: number };
 export type Drill = { id: string; text: string; options?: string[]; answer: number; why: string };
 export type Pack = {
   kind: "ldmv-training-pack"; version: number; builtAt: string; source: string;
   modules: Module[]; bands: Band[]; rates: Rates; catalog: Product[];
   intake: { routes: string[]; items: Drill[]; note?: string };
-  objections: Drill[]; cases: Case[]; trees: Tree[]; treeGroups: TreeGroup[]; averages: { cat: string; n: number; avg: number }[];
+  objections: Drill[]; cases: Case[]; trees: Tree[]; treeGroups: TreeGroup[]; examples?: Example[]; averages: { cat: string; n: number; avg: number }[];
 };
 
 const PACK = "ldmv:training:pack";
@@ -210,6 +211,7 @@ export function gradeCase(c: Case, b: Built, passPct: number) {
 export function mockupRef(pack: Pack, ref: string): { quoteId: string; lines: string[] } | null {
   const [kind, id] = ref.split(":", 2).length === 2 ? [ref.slice(0, ref.indexOf(":")), ref.slice(ref.indexOf(":") + 1)] : ["", ""];
   if (kind === "case") { const c = pack.cases.find((x) => x.id === id); return c ? { quoteId: c.quote.id, lines: c.quote.lines.map((l) => l.name) } : null; }
+  if (kind === "ex") { const e = pack.examples?.find((x) => x.id === id); return e ? { quoteId: e.quoteId, lines: e.lines.map((l) => l.name) } : null; }
   if (kind === "tree") { const t = pack.trees.find((x) => x.id === id); return t ? { quoteId: t.quoteId, lines: [t.name] } : null; }
   return null;
 }

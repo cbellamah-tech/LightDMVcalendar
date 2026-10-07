@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BarChart3, Calculator, CheckCircle2, ChevronRight, Circle, CircleDot, TreePine } from "lucide-react";
+import { BarChart3, Calculator, CheckCircle2, ChevronRight, Circle, CircleDot, Images, TreePine } from "lucide-react";
 import { api, GREEN, Me, NAVY } from "@/components/ui";
 import { Card, H1, Spinner } from "./parts";
 import { PackUpload } from "./PackUpload";
@@ -34,8 +34,9 @@ export default function TrainingHome() {
   const passed = d.modules!.filter((m) => m.status === "passed").length;
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <H1 sub={`${passed} of ${d.modules!.length} modules passed. You're ready to quote when you can price 5 past jobs blind within 10%.`}>Quote training</H1>
+      <H1 sub={`${passed} of ${d.modules!.length} modules passed. You're ready to quote when your quotes on 5 real past requests all land within 10% of what we sent.`}>Quote training</H1>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <Tile href="/training/examples" icon={<Images size={18} />} label="Real jobs" sub="Mockup next to the finished install" />
         <Tile href="/training/helper" icon={<Calculator size={18} />} label="Price helper" sub="How would we price this?" />
         <Tile href="/training/trees" icon={<TreePine size={18} />} label="Trees" sub="Every size, with mockups" />
         {office && <Tile href="/training/team" icon={<BarChart3 size={18} />} label="Team progress" sub="Scores and rates" />}
