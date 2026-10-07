@@ -52,7 +52,7 @@ export const BOXES: { id: BoxId; title: string; line: string; bots: string[] }[]
   { id: "social", title: "Social posts", line: "Facebook, Instagram, LinkedIn, Google, via GoHighLevel", bots: ["CMO", "SEO"] },
   { id: "listings", title: "One-tap listings", line: "Craigslist, Marketplace, FB Groups, Nextdoor", bots: [] },
   { id: "website", title: "Website and SEO", line: "LightDMV.com city pages, blog, reviews", bots: ["Website", "SEO"] },
-  { id: "paid", title: "Paid ads", line: "Facebook ads run by Goohoo, Google ads", bots: ["Paid"] },
+  { id: "paid", title: "Paid ads", line: "Facebook ads (Goohoo) and Google ads", bots: ["Paid"] },
   { id: "cold", title: "Cold email", line: "Smartlead, run by the agency", bots: [] },
 ];
 

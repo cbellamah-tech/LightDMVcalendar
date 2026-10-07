@@ -19,6 +19,7 @@ type Data = {
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
   autopost: boolean;
+  ads: { facebook: AdSide & { configured: boolean }; google: AdSide; error?: string };
   cold: { url: string; latest: { day: string; sent: number; responses: number; positive: number } | null };
   media: Media[];
   platforms: { id: "facebook" | "instagram" | "linkedin" | "google"; label: string }[];
@@ -108,7 +109,8 @@ export default function Marketing() {
               </div>
               <div className="text-xs text-slate-500 mt-1">{b.id === "cold" && d.cold.latest
                 ? `Last week: ${d.cold.latest.sent.toLocaleString()} sent, ${d.cold.latest.responses} replies, ${d.cold.latest.positive} positive · Open Smartlead ↗`
-                : b.id === "cold" ? `${b.line} · Open Smartlead ↗` : b.line}</div>
+                : b.id === "cold" ? `${b.line} · Open Smartlead ↗`
+                : b.id === "paid" && (d.ads.facebook.has || d.ads.google.has) ? adsLine(d.ads) : b.line}</div>
               <div className="text-xs mt-1 flex gap-1 flex-wrap">
                 <span className="text-slate-500">{LIGHT_WORD[b.light]}</span>
                 {b.bots.map((x) => <span key={x} className="rounded bg-slate-100 px-1.5 text-slate-600">{x} bot</span>)}
@@ -118,7 +120,9 @@ export default function Marketing() {
         </div>
         {open && (
           <div className="bg-white rounded-xl border border-slate-200 p-3">
-            <ChannelRows rows={d.channels.filter((c) => c.box === open)} onLog={log} busy={busy} />
+            {open === "paid"
+              ? <AdsPanel ads={d.ads} botBox={d.botBox} />
+              : <ChannelRows rows={d.channels.filter((c) => c.box === open)} onLog={log} busy={busy} />}
           </div>
         )}
         <div className="grid sm:grid-cols-2 gap-3">
@@ -339,4 +343,61 @@ JSON body: {"bot": "<your name, e.g. SEO>", "title": "<one line result>", "body"
 "counts": {"<channel>": <number done>}}
 Channels: google_posts, facebook_posts, instagram_posts, linkedin_posts, linkedin_engage, fb_groups, marketplace, craigslist, nextdoor, blog, cold_emails, door_hangers, tree_shop_cards, eddm, door_to_door, car_magnets, bing_posts.
 At the start of every run, GET ${url}?bot=<your name> with the same header and act on any answers to your questions.`;
+}
+
+type AdTotals = { spend: number; clicks: number; leads: number; lastDay?: string };
+type AdSide = { has: boolean; week: AdTotals; month: AdTotals };
+const money = (x: number) => `$${x.toLocaleString()}`;
+function adsLine(a: Data["ads"]) {
+  const part = (name: string, s: AdSide) => s.has ? `${name} ${money(s.week.spend)}, ${s.week.leads} leads` : "";
+  return `Last 7 days: ${[part("Facebook", a.facebook), part("Google", a.google)].filter(Boolean).join(" · ")}`;
+}
+
+function googleAdsScript(url: string, key: string) {
+  return `// Light DMV app: sends yesterday's and the last 30 days' Google Ads numbers to the Marketing tab.
+function main() {
+  var rows = AdsApp.search("SELECT segments.date, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions " +
+    "FROM customer WHERE segments.date DURING LAST_30_DAYS");
+  var days = [];
+  while (rows.hasNext()) {
+    var r = rows.next();
+    days.push({ day: r.segments.date, spend: r.metrics.costMicros / 1e6, clicks: Number(r.metrics.clicks),
+      impressions: Number(r.metrics.impressions), leads: Math.round(Number(r.metrics.conversions)) });
+  }
+  UrlFetchApp.fetch("${url}/ads", { method: "post", contentType: "application/json",
+    headers: { Authorization: "Bearer ${key}" }, payload: JSON.stringify({ source: "google", days: days }) });
+}`;
+}
+
+function AdsPanel({ ads, botBox }: { ads: Data["ads"]; botBox: Data["botBox"] }) {
+  const [copied, setCopied] = useState(false);
+  const side = (name: string, s: AdSide) => (
+    <div className="flex-1 min-w-[140px] rounded-lg bg-slate-50 p-2">
+      <div className="font-semibold">{name}</div>
+      {s.has ? (
+        <div className="text-xs text-slate-600 tabular-nums">
+          7 days: {money(s.week.spend)} · {s.week.clicks} clicks · {s.week.leads} leads<br />
+          This month: {money(s.month.spend)} · {s.month.leads} leads{s.month.spend && s.month.leads ? ` · ${money(Math.round(s.month.spend / s.month.leads))} a lead` : ""}
+        </div>
+      ) : <div className="text-xs text-slate-500">Not paired yet</div>}
+    </div>
+  );
+  return (
+    <div className="space-y-2 text-sm">
+      <div className="flex gap-2 flex-wrap">{side("Facebook ads", ads.facebook)}{side("Google ads", ads.google)}</div>
+      {ads.error && <p className="text-xs text-red-600 break-words">{ads.error}</p>}
+      {!ads.facebook.configured && (
+        <p className="text-xs text-slate-600"><b>Pair Facebook:</b> in Meta Business Settings, make a System User with the ad account assigned (view performance), generate a token with ads_read,
+          then add META_ADS_TOKEN and META_AD_ACCOUNT_ID (the number after act_) in Vercel, Production and Preview.</p>
+      )}
+      {!ads.google.has && botBox && (
+        <div className="text-xs text-slate-600 space-y-1">
+          <p><b>Pair Google:</b> in Google Ads go to Tools, Bulk actions, Scripts, press +, paste this, Authorize, then set Frequency to Daily.</p>
+          <button className="rounded-lg px-3 py-1.5 font-semibold border border-slate-300" onClick={() => {
+            navigator.clipboard.writeText(googleAdsScript(botBox.url, botBox.key)).then(() => setCopied(true)).catch(() => {});
+          }}>{copied ? "Copied" : "Copy the Google Ads script"}</button>
+        </div>
+      )}
+    </div>
+  );
 }

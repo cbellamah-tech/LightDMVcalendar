@@ -1,3 +1,4 @@
+import { adsSummary } from "./ads";
 import { getAutoPost } from "./autopost";
 import { kvGet, kvSet } from "./store";
 import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
@@ -99,6 +100,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     inbox: mail,
     feed,
     autopost: (await getAutoPost()).on,
+    ads: await adsSummary(),
     cold: { url: SMARTLEAD_URL, latest: await latestCold() },
     media: (await getMedia()).filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
     platforms: PLATFORMS,
