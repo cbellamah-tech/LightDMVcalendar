@@ -21,6 +21,7 @@ export type Stop = {
   photoRequired: boolean;
   radiusM: number;       // GPS arrival radius that triggers the photo prompt
   notes?: string;
+  cluster?: string;      // a tight group of spots inside the route, worked in one go
   addedBy?: string;      // name of the crew member who added this spot in the field
   addedAt?: number;
 };
@@ -71,7 +72,7 @@ const truthy = (v: string) => /^(true|yes|1|y)$/i.test(v);
 const num = (v: string) => (v === "" || v == null ? undefined : Number(v));
 
 /** Parse a stops CSV with columns route_id, route_name, stop_order, stop_id, name, lat, lng, type,
- *  near, near_m, homes_nearby, state, photo_required, arrival_radius_m, notes. */
+ *  near, near_m, homes_nearby, state, photo_required, arrival_radius_m, notes, and optionally cluster (or group). */
 export function routesFromCsv(text: string): Route[] {
   const rows = parseCsv(text);
   const byRoute = new Map<string, Route>();
@@ -98,6 +99,7 @@ export function routesFromCsv(text: string): Route[] {
       photoRequired: r.photo_required === "" || r.photo_required == null ? true : truthy(r.photo_required),
       radiusM: num(r.arrival_radius_m) ?? 75,
       notes: r.notes || undefined,
+      cluster: (r.cluster || r.cluster_name || r.group || r.group_name || r.cluster_id || r.group_id || "").trim() || undefined,
     });
   }
   const routes = [...byRoute.values()];
@@ -189,6 +191,7 @@ export async function addStop(at: { lat: number; lng: number }, by: string, visi
       state: route.state,
       photoRequired: true,
       radiusM: 75,
+      cluster: near?.s.routeId === route.id ? near.s.cluster : undefined,
       addedBy: by,
       addedAt: Date.now(),
     };

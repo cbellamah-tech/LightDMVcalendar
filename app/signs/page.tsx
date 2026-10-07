@@ -195,7 +195,7 @@ export default function SignsPage() {
           <h2 className="font-bold">Update the stop list</h2>
           <p className="text-sm text-slate-500">
             Upload a CSV with columns route_id, route_name, stop_order, stop_id, name, lat, lng, type, near, near_m, homes_nearby,
-            state, photo_required, arrival_radius_m, notes. Importing again is safe: crew assignments, sign photos and spots crews added in the field all stay.
+            state, photo_required, arrival_radius_m, notes, and optionally cluster to split a route into groups. Importing again is safe: crew assignments, sign photos and spots crews added in the field all stay.
           </p>
           <div className="flex gap-2 flex-wrap">
             <button disabled={busy} onClick={() => fileRef.current?.click()} className="rounded-lg px-3 py-2 text-white font-semibold text-sm flex items-center gap-2" style={{ background: NAVY }}>

@@ -1,7 +1,7 @@
 export type Stop = {
   id: string; routeId: string; order: number; name: string; lat: number; lng: number; type: string;
   near?: string; nearM?: number; homesNearby?: number; state?: string; photoRequired: boolean; radiusM: number; notes?: string;
-  addedBy?: string; addedAt?: number;
+  cluster?: string; addedBy?: string; addedAt?: number;
 };
 export type Route = { id: string; name: string; state?: string; stops: Stop[]; assignedCrew?: string; assignedUser?: string };
 export type Visit = {
