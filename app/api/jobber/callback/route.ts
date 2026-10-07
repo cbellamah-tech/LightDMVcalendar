@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { exchangeCode, syncJobber } from "@/lib/jobber";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

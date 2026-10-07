@@ -5,6 +5,7 @@ import { syncIfStale } from "@/lib/jobber";
 import { listUsers } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
 
 /* ?from=ISO&to=ISO (defaults: today through 7 days out) */
 export async function GET(req: Request) {

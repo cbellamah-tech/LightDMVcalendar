@@ -3,6 +3,7 @@ import { OFFICE, requireRole } from "@/lib/auth";
 import { quotesPage } from "@/lib/jobber";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
 
 /** One page of quotes with line items; the Jobber page loops over `next` and builds the CSV. */
 export async function GET(req: Request) {

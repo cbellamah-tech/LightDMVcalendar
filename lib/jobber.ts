@@ -68,7 +68,21 @@ async function accessToken(): Promise<string> {
   return fresh.access_token;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Jobber meters queries by cost and answers "Throttled" when the bucket is low; wait for it to refill and retry. */
 async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await gqlOnce<T>(query, variables);
+    } catch (e: any) {
+      if (attempt >= 4 || !/throttl/i.test(e.message)) throw e;
+      await sleep(e.waitMs ?? 2000 * (attempt + 1));
+    }
+  }
+}
+
+async function gqlOnce<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const res = await fetch(GQL_URL, {
     method: "POST",
     headers: {
@@ -79,7 +93,14 @@ async function gql<T>(query: string, variables: Record<string, unknown>): Promis
     body: JSON.stringify({ query, variables }),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok || j.errors?.length) throw new Error(`Jobber API error (${res.status}): ${j.errors?.map((e: any) => e.message).join("; ") || j.message || "unknown"}`);
+  if (!res.ok || j.errors?.length) {
+    const err: any = new Error(`Jobber API error (${res.status}): ${j.errors?.map((e: any) => e.message).join("; ") || j.message || "unknown"}`);
+    // Wait long enough for the bucket to refill to this query's cost.
+    const c = j.extensions?.cost;
+    const t = c?.throttleStatus;
+    if (t?.restoreRate && c?.requestedQueryCost) err.waitMs = Math.min(15000, Math.max(1000, ((c.requestedQueryCost - t.currentlyAvailable) / t.restoreRate) * 1000 + 500));
+    throw err;
+  }
   return j.data as T;
 }
 
@@ -93,13 +114,13 @@ export async function disconnect() {
 // If Jobber renames a field, the error shows on the Jobber settings page; adjust it here.
 const VISITS_QUERY = `
 query LdmvVisits($after: ISO8601DateTime!, $before: ISO8601DateTime!, $cursor: String) {
-  visits(first: 50, after: $cursor, filter: { startAt: { after: $after, before: $before } }) {
+  visits(first: 25, after: $cursor, filter: { startAt: { after: $after, before: $before } }) {
     nodes {
       id
       title
       startAt
       endAt
-      assignedUsers { nodes { id name { full } } }
+      assignedUsers(first: 10) { nodes { id name { full } } }
       job {
         id
         jobNumber
@@ -127,7 +148,7 @@ export async function syncJobber(): Promise<number> {
     const users = await listUsers();
     const nodes: VisitNode[] = [];
     let cursor: string | null = null;
-    for (let page = 0; page < 20; page++) {
+    for (let page = 0; page < 40; page++) {
       const d: { visits: { nodes: VisitNode[]; pageInfo: { hasNextPage: boolean; endCursor: string } } } =
         await gql(VISITS_QUERY, { after: from.toISOString(), before: to.toISOString(), cursor });
       nodes.push(...d.visits.nodes);
@@ -176,7 +197,7 @@ export async function syncIfStale() {
 // Quotes with line items, one page per call so a long history never hits the function time limit.
 const QUOTES_QUERY = `
 query LdmvQuotes($cursor: String) {
-  quotes(first: 15, after: $cursor) {
+  quotes(first: 10, after: $cursor) {
     nodes {
       id
       quoteNumber
@@ -187,7 +208,7 @@ query LdmvQuotes($cursor: String) {
       client { name }
       property { address { street city province postalCode } }
       amounts { subtotal total }
-      lineItems(first: 60) { nodes { name description quantity unitPrice totalPrice } }
+      lineItems(first: 50) { nodes { name description quantity unitPrice totalPrice } }
     }
     pageInfo { hasNextPage endCursor }
   }

@@ -3,6 +3,7 @@ import { OFFICE, requireRole } from "@/lib/auth";
 import { syncJobber } from "@/lib/jobber";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
 
 export async function POST() {
   const s = await requireRole(...OFFICE);
