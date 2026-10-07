@@ -18,7 +18,14 @@ type Tokens = { access_token: string; refresh_token: string; expires_at: number 
 export type SyncStatus = { lastSyncAt?: number; lastError?: string; lastCount?: number; connectedAt?: number };
 
 export const jobberConfigured = () => !!process.env.JOBBER_CLIENT_ID && !!process.env.JOBBER_CLIENT_SECRET;
-export const redirectUri = (origin: string) => `${process.env.APP_URL || origin}/api/jobber/callback`;
+/** The one address Jobber knows about. Every Vercel deployment also has its own unique URL,
+ *  so use the branch URL on previews and the main domain in production, never the request's host. */
+export function stableOrigin(origin: string) {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  const host = process.env.VERCEL_ENV === "production" ? process.env.VERCEL_PROJECT_PRODUCTION_URL : process.env.VERCEL_BRANCH_URL;
+  return host ? `https://${host}` : origin;
+}
+export const redirectUri = (origin: string) => `${stableOrigin(origin)}/api/jobber/callback`;
 
 export function authorizeUrl(origin: string, state: string) {
   const u = new URL(AUTH_URL);

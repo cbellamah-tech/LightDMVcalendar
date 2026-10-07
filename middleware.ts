@@ -9,7 +9,8 @@ export async function middleware(req: NextRequest) {
   if (PUBLIC.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   const s = await verifySession(req.cookies.get(COOKIE)?.value);
-  const isApi = pathname.startsWith("/api/");
+  // Connect Jobber is opened as a page (and may hop to the branch URL), so send it to sign-in like a page.
+  const isApi = pathname.startsWith("/api/") && pathname !== "/api/jobber/connect";
   if (!s) {
     if (isApi) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
     const url = req.nextUrl.clone();
