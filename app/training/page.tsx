@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BarChart3, Calculator, CheckCircle2, ChevronRight, Circle, CircleDot, Images, TreePine } from "lucide-react";
+import { BarChart3, Calculator, CheckCircle2, ChevronRight, Circle, CircleDot, Images } from "lucide-react";
 import { api, GREEN, Me, NAVY } from "@/components/ui";
 import { Card, H1, Spinner } from "./parts";
 import { PackUpload } from "./PackUpload";
@@ -23,7 +23,7 @@ export default function TrainingHome() {
   if (!d.loaded) {
     return (
       <div className="max-w-3xl mx-auto p-4 space-y-4">
-        <H1 sub="How Light DMV quotes holiday lighting, practiced on real past jobs.">Quote training</H1>
+        <H1 sub="How to build a Light DMV holiday lighting quote, practiced on real jobs.">Quote training</H1>
         <Card>
           {office ? <PackUpload onDone={load} /> : <p className="text-slate-600">The course isn't loaded yet. Ask Chris or Liam.</p>}
         </Card>
@@ -34,11 +34,10 @@ export default function TrainingHome() {
   const passed = d.modules!.filter((m) => m.status === "passed").length;
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <H1 sub={`${passed} of ${d.modules!.length} modules passed. You're ready to quote when your quotes on 5 real past requests all land within 10% of what we sent.`}>Quote training</H1>
+      <H1 sub={`${passed} of ${d.modules!.length} modules passed. How to build a Light DMV quote, from the house to the price of every line. You're ready when 5 real jobs in a row land within 10% of what we charged.`}>Quote training</H1>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <Tile href="/training/examples" icon={<Images size={18} />} label="Real jobs" sub="Mockup next to the finished install" />
+        <Tile href="/training/jobs" icon={<Images size={18} />} label="Photo library" sub="Every real job, every line, every price" />
         <Tile href="/training/helper" icon={<Calculator size={18} />} label="Price helper" sub="How would we price this?" />
-        <Tile href="/training/trees" icon={<TreePine size={18} />} label="Trees" sub="Every size, with mockups" />
         {office && <Tile href="/training/team" icon={<BarChart3 size={18} />} label="Team progress" sub="Scores and rates" />}
       </div>
       <div className="space-y-2">
@@ -56,7 +55,7 @@ export default function TrainingHome() {
           </Link>
         ))}
       </div>
-      <p className="text-xs text-slate-400">Practice uses {d.practiceCount?.toLocaleString()} real requests and sold quotes from Jobber (2025-26 and 2026-27 seasons), customer names removed.</p>
+      <p className="text-xs text-slate-400">Practice uses {d.practiceCount?.toLocaleString()} real jobs we sold and installed in 2025, with their finished-install photos. Prices are from Jobber; customer names removed.</p>
     </div>
   );
 }

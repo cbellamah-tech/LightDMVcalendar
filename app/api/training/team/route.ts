@@ -22,10 +22,8 @@ export async function GET() {
     out.push({
       uid, name: u?.name ?? uid,
       modules: (pack?.modules ?? []).map((m) => ({ id: m.id, title: m.title, ...moduleStatus(m, p, rates.passPct) })),
-      intake: p.intake ?? null,
-      objections: p.objections ?? null,
-      quotes: p.attempts.filter((a) => a.mode !== "tree").map((a) => ({ at: a.at, mode: a.mode, pctOff: a.pctOff })),
-      trees: p.attempts.filter((a) => a.mode === "tree").length,
+      quotes: p.attempts.filter((a) => a.mode !== "drill").map((a) => ({ at: a.at, mode: a.mode, pctOff: a.pctOff })),
+      drills: p.attempts.filter((a) => a.mode === "drill").length,
       finals: p.finals,
       worst: [...byCat].map(([cat, xs]) => ({ cat, n: xs.length, avgOff: avg(xs) })).sort((a, b) => b.avgOff - a.avgOff).slice(0, 4),
     });

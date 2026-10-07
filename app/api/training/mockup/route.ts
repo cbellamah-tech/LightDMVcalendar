@@ -6,7 +6,7 @@ import { loadPack, mockupRef } from "@/lib/training";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** ?ref=case:<id> or tree:<id>: how many mockups each line has. Add &l=<line>&k=<n> to open one. */
+/** ?ref=pq:<id>: how many mockups each line has. Add &l=<line>&k=<n> to open one. */
 export async function GET(req: Request) {
   const s = await requireRole(...ANYONE);
   if (s instanceof NextResponse) return s;

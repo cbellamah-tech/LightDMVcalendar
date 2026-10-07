@@ -1,13 +1,16 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Lightbulb, Loader2, X } from "lucide-react";
 import { api, GREEN, NAVY, RED } from "@/components/ui";
 
 export type Block =
   | { t: "p"; text: string }
+  | { t: "tip"; text: string }
   | { t: "ol" | "ul"; items: string[] }
-  | { t: "table"; head: string[]; rows: string[][] };
+  | { t: "table"; head: string[]; rows: string[][] }
+  | { t: "img"; id: string; caption: string }
+  | { t: "gallery"; items: { id: string; caption: string }[] };
 export type Band = { cat: string; n: number; p25: number; median: number; p75: number; avg?: number };
 export type Rates = {
   rooflinePerFt: number; perStrand: number; pillar: number; wreath: Record<string, number>;
@@ -34,6 +37,9 @@ export function Blocks({ blocks }: { blocks: Block[] }) {
     <div className="space-y-3 text-[15px] leading-relaxed text-slate-700">
       {blocks.map((b, i) => {
         if (b.t === "p") return <p key={i}><Inline text={b.text} /></p>;
+        if (b.t === "tip") return <div key={i} className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm"><Lightbulb size={18} className="shrink-0 text-amber-600" /><span><Inline text={b.text} /></span></div>;
+        if (b.t === "img") return <Photo key={i} id={b.id} caption={b.caption} big />;
+        if (b.t === "gallery") return <Gallery key={i} items={b.items} />;
         if (b.t !== "table") {
           const L = b.t === "ol" ? "ol" : "ul";
           return <L key={i} className={`pl-5 space-y-1 ${b.t === "ol" ? "list-decimal" : "list-disc"}`}>{b.items.map((x, j) => <li key={j}><Inline text={x} /></li>)}</L>;
@@ -49,6 +55,33 @@ export function Blocks({ blocks }: { blocks: Block[] }) {
       })}
     </div>
   );
+}
+
+export const imgSrc = (id: string) => `/api/training/img/${id}`;
+
+/** A real install photo from the course, tap to see it full screen. */
+export function Photo({ id, caption, big, className = "" }: { id: string; caption?: string; big?: boolean; className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <figure className={className}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={imgSrc(id)} alt={caption || "Install photo"} loading="lazy" onClick={() => setOpen(true)}
+        className={`w-full ${big ? "max-h-[28rem]" : "h-44"} object-cover rounded-lg border border-slate-200 bg-slate-900 cursor-zoom-in`} />
+      {caption && <figcaption className="text-sm text-slate-600 mt-1"><Inline text={caption} /></figcaption>}
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3" onClick={() => setOpen(false)}>
+          <button className="absolute top-3 right-3 text-white" aria-label="Close"><X /></button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imgSrc(id)} alt={caption || "Install photo"} className="max-h-[85vh] max-w-full object-contain rounded" />
+          {caption && <p className="text-white text-sm mt-2 text-center max-w-2xl">{caption.replace(/\*\*/g, "")}</p>}
+        </div>
+      )}
+    </figure>
+  );
+}
+
+export function Gallery({ items }: { items: { id: string; caption: string }[] }) {
+  return <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{items.map((x, i) => <Photo key={i} id={x.id} caption={x.caption} />)}</div>;
 }
 
 export const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) =>

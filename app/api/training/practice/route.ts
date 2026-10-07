@@ -1,28 +1,28 @@
 import { NextResponse } from "next/server";
 import { ANYONE, requireRole } from "@/lib/auth";
-import { isOffice } from "@/lib/session";
-import { Attempt, Built, caseForTrainee, getProgress, getRates, grade, gradeCase, loadPack, pctOff, pick, updateProgress } from "@/lib/training";
+import { askIdx, Attempt, forTrainee, getProgress, getRates, gradeQuote, loadPack, pick, updateProgress } from "@/lib/training";
 
 export const dynamic = "force-dynamic";
 
-/** ?mode=case: one real past request to quote. final: five. tree: one sold tree. Never includes what we charged. */
+/** ?mode=drill&module=q3: a real job with lines of that module's type to price. quote: one whole job. final: five. */
 export async function GET(req: Request) {
   const s = await requireRole(...ANYONE);
   if (s instanceof NextResponse) return s;
   const pack = await loadPack();
   if (!pack) return NextResponse.json({ error: "The course isn't loaded yet" }, { status: 400 });
-  const mode = new URL(req.url).searchParams.get("mode") || "case";
+  const u = new URL(req.url);
+  const mode = u.searchParams.get("mode") || "quote";
+  const m = pack.modules.find((x) => x.id === u.searchParams.get("module"));
+  const cats = mode === "drill" ? m?.cats : undefined;
+  if (mode === "drill" && !cats) return NextResponse.json({ error: "Unknown module" }, { status: 400 });
   const p = await getProgress(s.uid);
-  const done = new Set(p.attempts.map((a) => a.item));
-  if (mode === "tree") {
-    const [t] = pick(pack.trees.filter((x) => !x.reference), done, 1);
-    return NextResponse.json({ tree: t && { id: t.id, season: t.season, name: t.name, desc: t.desc, qty: t.qty, wrap: t.wrap } });
-  }
-  const cases = pick(pack.cases, done, mode === "final" ? 5 : 1).map(caseForTrainee);
-  return NextResponse.json({ cases, catalog: pack.catalog, real: pack.realPhotos ?? {}, run: mode === "final" ? `${Date.now().toString(36)}` : undefined });
+  const done = new Set(p.attempts.filter((a) => a.mode === (mode === "final" ? "final" : mode)).map((a) => a.item));
+  const pool = cats ? pack.quotes.filter((q) => askIdx(q, cats).length) : pack.quotes;
+  const jobs = pick(pool, done, mode === "final" ? 5 : 1).map((q) => forTrainee(q, cats));
+  return NextResponse.json({ jobs, run: mode === "final" ? Date.now().toString(36) : undefined });
 }
 
-/** Grades a quote (or a tree) against what Light DMV really sent and records the attempt. */
+/** Grades the trainee's prices against what Light DMV charged and records the attempt. */
 export async function POST(req: Request) {
   const s = await requireRole(...ANYONE);
   if (s instanceof NextResponse) return s;
@@ -30,31 +30,14 @@ export async function POST(req: Request) {
   if (!pack) return NextResponse.json({ error: "The course isn't loaded yet" }, { status: 400 });
   const rates = await getRates(pack);
   const body = await req.json().catch(() => ({}));
-  const band = (cat: string) => pack.bands.find((b) => b.cat === cat) ?? null;
-
-  if (body.mode === "tree") {
-    const t = pack.trees.find((x) => x.id === body.item);
-    if (!t) return NextResponse.json({ error: "Unknown tree" }, { status: 400 });
-    const off = pctOff(Number(body.price) || 0, t.total);
-    await updateProgress(s.uid, (p) => { p.attempts.push({ at: Date.now(), mode: "tree", item: t.id, pctOff: off, lines: [{ cat: "tree", pctOff: off }] }); });
-    return NextResponse.json({
-      real: t.total, unit: t.unit, pctOff: off, grade: grade(off, rates.passPct), perStrand: rates.perStrand,
-      realStrands: t.unit % rates.perStrand === 0 ? t.unit / rates.perStrand : null, band: band("tree"), size: t.size,
-      group: pack.treeGroups.find((g) => g.size === t.size) ?? null,
-    });
-  }
-
-  const c = pack.cases.find((x) => x.id === body.case);
-  if (!c) return NextResponse.json({ error: "Unknown request" }, { status: 400 });
-  const built = body.built as Built;
-  if (!built || !Array.isArray(built.lines)) return NextResponse.json({ error: "Nothing to grade" }, { status: 400 });
-  const r = gradeCase(c, { title: String(built.title || ""), lines: built.lines.slice(0, 30), answers: built.answers ?? {} }, rates.passPct);
-  const mode = body.mode === "final" ? "final" : "case";
+  const q = pack.quotes.find((x) => x.id === body.job);
+  if (!q) return NextResponse.json({ error: "Unknown job" }, { status: 400 });
+  const mode = body.mode === "final" ? "final" : body.mode === "drill" ? "drill" : "quote";
+  const m = mode === "drill" ? pack.modules.find((x) => x.id === body.module) : undefined;
+  if (mode === "drill" && !m?.cats) return NextResponse.json({ error: "Unknown module" }, { status: 400 });
+  const r = gradeQuote(q, body.prices ?? {}, rates.passPct, m?.cats);
   const run = mode === "final" ? String(body.run || "") : undefined;
-  const attempt: Attempt = {
-    at: Date.now(), mode, item: c.id, run, pctOff: r.pctOff,
-    lines: r.rows.map((x) => ({ cat: x.real.cat, pctOff: x.pctOff })), missed: r.rows.filter((x) => !x.mine).map((x) => x.real.cat),
-  };
+  const attempt: Attempt = { at: Date.now(), mode, module: m?.id, item: q.id, run, pctOff: r.pctOff, lines: r.rows.map((x) => ({ cat: x.cat, pctOff: x.pctOff })) };
   let final: { within: number; of: number } | null = null;
   await updateProgress(s.uid, (p) => {
     p.attempts.push(attempt);
@@ -66,5 +49,5 @@ export async function POST(req: Request) {
       }
     }
   });
-  return NextResponse.json({ ...r, jobberUrl: isOffice(s) ? r.jobberUrl : null, bands: pack.bands, passPct: rates.passPct, final });
+  return NextResponse.json({ ...r, passPct: rates.passPct, final });
 }

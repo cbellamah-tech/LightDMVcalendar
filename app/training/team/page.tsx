@@ -10,9 +10,8 @@ import { PackUpload } from "../PackUpload";
 type Trainee = {
   uid: string; name: string;
   modules: { id: string; title: string; status: string; detail: string }[];
-  intake: { best: number; of: number } | null;
   quotes: { at: number; mode: string; pctOff: number }[];
-  trees: number;
+  drills: number;
   finals: { at: number; within: number; of: number }[];
   worst: { cat: string; n: number; avgOff: number }[];
 };
@@ -65,8 +64,7 @@ export default function TeamProgress() {
             )}
             {t.worst.length > 0 && <div className="text-sm"><b>Furthest off:</b> {t.worst.map((w) => `${w.cat} (${w.avgOff}% avg, ${w.n} lines)`).join(" · ")}</div>}
             <div className="text-sm text-slate-600">
-              {t.intake ? `Intake drill best ${t.intake.best} of ${t.intake.of}. ` : ""}
-              {t.trees ? `${t.trees} trees practiced. ` : ""}
+              {t.drills ? `${t.drills} line item drills. ` : ""}
               {t.finals.length ? `Final check: ${t.finals.map((f) => `${f.within}/${f.of} on ${fmtDay(f.at)}`).join(", ")}.` : ""}
             </div>
           </Card>
