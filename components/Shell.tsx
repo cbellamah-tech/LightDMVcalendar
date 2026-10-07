@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CalendarDays, ClipboardCheck, Home, LogOut, MapPin, Settings, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, GraduationCap, Home, LogOut, MapPin, Settings, Users } from "lucide-react";
 import { api, Me, NAVY } from "./ui";
 
 const TABS = [
   { href: "/", label: "Home", icon: Home, roles: ["owner", "manager", "lead", "crew"] },
   { href: "/signs", label: "Yard signs", icon: MapPin, roles: ["owner", "manager", "lead", "crew"] },
   { href: "/jobs", label: "Jobs", icon: ClipboardCheck, roles: ["owner", "manager", "lead", "crew"] },
+  { href: "/training", label: "Training", icon: GraduationCap, roles: ["owner", "manager", "lead", "crew"] },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, roles: ["owner"] },
   { href: "/people", label: "People", icon: Users, roles: ["owner", "manager"] },
   { href: "/settings/jobber", label: "Jobber", icon: Settings, roles: ["owner", "manager"] },
