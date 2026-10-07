@@ -24,9 +24,16 @@ export type QLine = { name: string; raw: string; desc: string; qty: number; unit
 /** A real sold quote and the photo of the finished install. */
 export type PQuote = { id: string; quoteId: string; season: string; photos: string[]; lines: QLine[]; included: string[]; total: number; featured: boolean };
 export type TreeGroup = { size: string; n: number; avg: number; low: number; high: number };
+/** The crews' install and takedown guide (Install tab), written by the Installer thread. */
+export type InstallGuide = {
+  intro: Block[];
+  parts: { title: string; intro: Block[]; steps: { title: string; blocks: Block[] }[] }[];
+  ownerTodo: { title: string; intro: Block[] } | null;
+};
 export type Pack = {
   kind: "ldmv-training-pack"; version: number; builtAt: string; source: string;
   modules: Module[]; bands: Band[]; rates: Rates; catalog: Product[]; treeGroups: TreeGroup[]; quotes: PQuote[];
+  install?: InstallGuide;
 };
 
 const PACK = "ldmv:training:pack";

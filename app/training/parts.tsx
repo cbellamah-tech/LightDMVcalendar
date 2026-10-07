@@ -27,9 +27,14 @@ export const GRADE: Record<Grade, { label: string; color: string; bg: string }> 
   miss: { label: "Off", color: RED, bg: "#FDECEC" },
 };
 
-/** **bold** inside lesson text. */
+/** **bold** and [links](https://...) inside lesson text. */
 export function Inline({ text }: { text: string }) {
-  return <>{text.split(/(\*\*[^*]+\*\*)/).map((s, i) => (s.startsWith("**") ? <b key={i}>{s.slice(2, -2)}</b> : <Fragment key={i}>{s}</Fragment>))}</>;
+  return <>{text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:[^)]+\))/).map((s, i) => {
+    if (s.startsWith("**")) return <b key={i}>{s.slice(2, -2)}</b>;
+    const m = s.match(/^\[([^\]]+)\]\((https?:[^)]+)\)$/);
+    if (m) return <a key={i} href={m[2]} target="_blank" rel="noreferrer" className="font-semibold underline" style={{ color: NAVY }}>{m[1]}</a>;
+    return <Fragment key={i}>{s}</Fragment>;
+  })}</>;
 }
 
 export function Blocks({ blocks }: { blocks: Block[] }) {
@@ -66,7 +71,7 @@ export function Photo({ id, caption, big, className = "" }: { id: string; captio
     <figure className={className}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={imgSrc(id)} alt={caption || "Install photo"} loading="lazy" onClick={() => setOpen(true)}
-        className={`w-full ${big ? "max-h-[28rem]" : "h-44"} object-cover rounded-lg border border-slate-200 bg-slate-900 cursor-zoom-in`} />
+        className={`w-full ${big ? "h-auto max-h-[28rem] object-contain" : "h-44 object-cover bg-slate-900"} rounded-lg border border-slate-200 cursor-zoom-in`} />
       {caption && <figcaption className="text-sm text-slate-600 mt-1"><Inline text={caption} /></figcaption>}
       {open && (
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3" onClick={() => setOpen(false)}>
