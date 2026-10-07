@@ -19,9 +19,14 @@ export async function middleware(req: NextRequest) {
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
-  // Maria (manager) can see People, Jobber settings and Marketing too; the owner calendar and Briefing stay owners-only.
+  // The owners' Briefing and the Google connection stay with owners, managers included.
+  if (["/briefing", "/api/google"].some((p) => pathname.startsWith(p)) && s.role !== "owner") {
+    if (isApi) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+  // Maria (manager) can see People and Jobber settings too; the owner calendar stays owners-only.
   const ownerOnly = OWNER_ONLY.some((p) => pathname.startsWith(p));
-  const officeOk = s.role === "manager" && !["/calendar", "/api/board", "/briefing", "/api/google"].some((p) => pathname.startsWith(p));
+  const officeOk = s.role === "manager" && !pathname.startsWith("/calendar") && !pathname.startsWith("/api/board");
   if (ownerOnly && s.role !== "owner" && !officeOk) {
     if (isApi) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
     return NextResponse.redirect(new URL("/", req.url));
