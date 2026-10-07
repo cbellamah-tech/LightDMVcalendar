@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { COOKIE, verifySession } from "./lib/session";
 
 const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/manifest.webmanifest", "/icon"];
-const OWNER_ONLY = ["/calendar", "/api/board", "/people", "/api/people", "/settings", "/api/jobber"];
+const OWNER_ONLY = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/people", "/api/people", "/settings", "/api/jobber"];
+
+const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -18,9 +20,9 @@ export async function middleware(req: NextRequest) {
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
-  // Maria (manager) can see People and Jobber settings too; the owner calendar stays owners-only.
+  // Maria (manager) can see People and Jobber settings too; the owner calendar and insurance stay owners-only.
   const ownerOnly = OWNER_ONLY.some((p) => pathname.startsWith(p));
-  const officeOk = s.role === "manager" && !pathname.startsWith("/calendar") && !pathname.startsWith("/api/board");
+  const officeOk = s.role === "manager" && !STRICT_OWNER.some((p) => pathname.startsWith(p));
   if (ownerOnly && s.role !== "owner" && !officeOk) {
     if (isApi) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
     return NextResponse.redirect(new URL("/", req.url));
