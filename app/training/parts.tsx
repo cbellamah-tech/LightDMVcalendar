@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { Lightbulb, Loader2, X } from "lucide-react";
+import { Lightbulb, Loader2, Play, X } from "lucide-react";
 import { api, GREEN, NAVY, RED } from "@/components/ui";
 
 export type Block =
@@ -9,7 +9,9 @@ export type Block =
   | { t: "tip"; text: string }
   | { t: "ol" | "ul"; items: string[] }
   | { t: "table"; head: string[]; rows: string[][] }
-  | { t: "img"; id: string; caption: string }
+  | { t: "h"; text: string }
+  | { t: "img"; id: string; caption: string; wide?: boolean }
+  | { t: "videos"; title: string; items: { yt: string; title: string; by: string }[] }
   | { t: "gallery"; items: { id: string; caption: string }[] };
 export type Band = { cat: string; n: number; p25: number; median: number; p75: number; avg?: number };
 export type Rates = {
@@ -43,7 +45,9 @@ export function Blocks({ blocks }: { blocks: Block[] }) {
       {blocks.map((b, i) => {
         if (b.t === "p") return <p key={i}><Inline text={b.text} /></p>;
         if (b.t === "tip") return <div key={i} className="flex gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm"><Lightbulb size={18} className="shrink-0 text-amber-600" /><span><Inline text={b.text} /></span></div>;
-        if (b.t === "img") return <Photo key={i} id={b.id} caption={b.caption} big />;
+        if (b.t === "h") return <h3 key={i} className="font-bold text-base pt-2" style={{ color: NAVY }}>{b.text}</h3>;
+        if (b.t === "img") return <Photo key={i} id={b.id} caption={b.caption} big wide={b.wide} />;
+        if (b.t === "videos") return <Videos key={i} title={b.title} items={b.items} />;
         if (b.t === "gallery") return <Gallery key={i} items={b.items} />;
         if (b.t !== "table") {
           const L = b.t === "ol" ? "ol" : "ul";
@@ -65,13 +69,13 @@ export function Blocks({ blocks }: { blocks: Block[] }) {
 export const imgSrc = (id: string) => `/api/training/img/${id}`;
 
 /** A real install photo from the course, tap to see it full screen. */
-export function Photo({ id, caption, big, className = "" }: { id: string; caption?: string; big?: boolean; className?: string }) {
+export function Photo({ id, caption, big, wide, className = "" }: { id: string; caption?: string; big?: boolean; wide?: boolean; className?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <figure className={className}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={imgSrc(id)} alt={caption || "Install photo"} loading="lazy" onClick={() => setOpen(true)}
-        className={`w-full ${big ? "h-auto max-h-[28rem] object-contain" : "h-44 object-cover bg-slate-900"} rounded-lg border border-slate-200 cursor-zoom-in`} />
+        className={`w-full ${wide ? "aspect-[16/10] object-cover" : big ? "h-auto max-h-[28rem] object-contain" : "h-44 object-cover bg-slate-900"} rounded-lg border border-slate-200 cursor-zoom-in`} />
       {caption && <figcaption className="text-sm text-slate-600 mt-1"><Inline text={caption} /></figcaption>}
       {open && (
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-3" onClick={() => setOpen(false)}>
@@ -82,6 +86,33 @@ export function Photo({ id, caption, big, className = "" }: { id: string; captio
         </div>
       )}
     </figure>
+  );
+}
+
+/** YouTube videos: tap a thumbnail to play it right here. */
+export function Videos({ title, items }: { title: string; items: { yt: string; title: string; by: string }[] }) {
+  const [playing, setPlaying] = useState<string | null>(null);
+  return (
+    <div className="space-y-2">
+      <div className="font-semibold text-sm text-slate-800">{title}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {items.map((v) => (
+          <div key={v.yt} className="space-y-1">
+            {playing === v.yt ? (
+              <iframe src={`https://www.youtube-nocookie.com/embed/${v.yt}?autoplay=1&rel=0`} title={v.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
+                className="w-full aspect-video rounded-lg border border-slate-200" />
+            ) : (
+              <button onClick={() => setPlaying(v.yt)} className="relative w-full block" aria-label={`Play ${v.title}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`https://i.ytimg.com/vi/${v.yt}/hqdefault.jpg`} alt="" loading="lazy" className="w-full aspect-video object-cover rounded-lg border border-slate-200 bg-slate-200" />
+                <span className="absolute inset-0 flex items-center justify-center"><span className="bg-red-600 text-white rounded-xl px-4 py-2"><Play size={22} fill="white" /></span></span>
+              </button>
+            )}
+            <div className="text-xs text-slate-600 leading-snug">{v.title}{v.by ? ` · ${v.by}` : ""}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

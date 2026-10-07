@@ -8,7 +8,9 @@ export type Block =
   | { t: "tip"; text: string }
   | { t: "ol" | "ul"; items: string[] }
   | { t: "table"; head: string[]; rows: string[][] }
-  | { t: "img"; id: string; caption: string }
+  | { t: "h"; text: string }
+  | { t: "img"; id: string; caption: string; wide?: boolean }
+  | { t: "videos"; title: string; items: { yt: string; title: string; by: string }[] }
   | { t: "gallery"; items: { id: string; caption: string }[] };
 export type Check = { q: string; options: string[]; answer: number; why: string };
 export type LessonCard = { title: string; blocks: Block[]; check?: Check };
@@ -27,8 +29,8 @@ export type TreeGroup = { size: string; n: number; avg: number; low: number; hig
 /** The crews' install and takedown guide (Install tab), written by the Installer thread. */
 export type InstallGuide = {
   intro: Block[];
-  parts: { title: string; intro: Block[]; steps: { title: string; blocks: Block[] }[] }[];
-  ownerTodo: { title: string; intro: Block[] } | null;
+  modules: { title: string; blocks: Block[] }[];
+  ownerTodo: { title: string; blocks: Block[] } | null;
 };
 export type Pack = {
   kind: "ldmv-training-pack"; version: number; builtAt: string; source: string;
