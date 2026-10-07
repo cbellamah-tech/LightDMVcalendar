@@ -56,7 +56,7 @@ export default function TrainingHome() {
           </Link>
         ))}
       </div>
-      <p className="text-xs text-slate-400">Practice uses {d.practiceCount?.toLocaleString()} sold quotes from Jobber (2024-25 on), customer names removed.</p>
+      <p className="text-xs text-slate-400">Practice uses {d.practiceCount?.toLocaleString()} real requests and sold quotes from Jobber (2025-26 and 2026-27 seasons), customer names removed.</p>
     </div>
   );
 }
