@@ -5,7 +5,8 @@ import { COOKIE, verifySession } from "./lib/session";
 const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/marketing/runner/", "/api/google/callback", "/manifest.webmanifest", "/icon"];
 const OWNER_ONLY = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/people", "/api/people", "/settings", "/api/jobber", "/marketing", "/api/marketing", "/api/google", "/briefing"];
 
-const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance"];
+// Owners only, not the manager either.
+const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -27,7 +28,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/", req.url));
   }
   // Maria (manager) can see People and Jobber settings too; the owner calendar and insurance stay owners-only.
-  const ownerOnly = OWNER_ONLY.some((p) => pathname.startsWith(p));
+  const ownerOnly = [...OWNER_ONLY, ...STRICT_OWNER].some((p) => pathname.startsWith(p));
   const officeOk = s.role === "manager" && !STRICT_OWNER.some((p) => pathname.startsWith(p));
   if (ownerOnly && s.role !== "owner" && !officeOk) {
     if (isApi) return NextResponse.json({ error: "Not allowed" }, { status: 403 });

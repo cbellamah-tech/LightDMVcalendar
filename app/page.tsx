@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CalendarDays, ClipboardCheck, MapPin, Settings, ShieldCheck, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, MapPin, Receipt, Settings, ShieldCheck, Users } from "lucide-react";
 import { api, Me, NAVY } from "@/components/ui";
 
 const TILES = [
@@ -10,6 +10,7 @@ const TILES = [
   { href: "/jobs", title: "Today's jobs", text: "Jobs from Jobber for your crew, with the install or takedown SOP checklist.", icon: ClipboardCheck, roles: ["owner", "manager", "lead", "crew"] },
   { href: "/calendar", title: "Owner calendar", text: "Chris and Liam's recurring task board.", icon: CalendarDays, roles: ["owner"] },
   { href: "/insurance", title: "Insurance", text: "Every policy, what is and isn't covered, renewals and certificates.", icon: ShieldCheck, roles: ["owner"] },
+  { href: "/costs", title: "Costs", text: "What our lights cost, what each job used and made, and stock on hand.", icon: Receipt, roles: ["owner"] },
   { href: "/people", title: "People", text: "Add workers, set PINs, put people on crews.", icon: Users, roles: ["owner", "manager"] },
   { href: "/settings/jobber", title: "Jobber connection", text: "Connect Jobber and sync scheduled visits.", icon: Settings, roles: ["owner", "manager"] },
 ];
