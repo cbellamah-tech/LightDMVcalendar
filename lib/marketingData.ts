@@ -23,7 +23,7 @@ async function inbox(force = false) {
   const g = await googleStatus();
   if (!g.connected) return null;
   const cur = await kvGet<{ at: number; threads: InboxThread[]; error?: string }>(INBOX);
-  if (cur && !force && Date.now() - cur.at < 5 * 60_000) return cur;
+  if (cur && !force && Date.now() - cur.at < 5 * 60_000 && cur.threads.every((t) => t.kind)) return cur;
   try {
     const next = { at: Date.now(), threads: await inboxThreads() };
     await kvSet(INBOX, next);

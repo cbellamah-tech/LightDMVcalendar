@@ -88,15 +88,51 @@ async function gapi<T = any>(url: string, init?: { method?: string; body?: unkno
 
 /* ---------- Inbox ---------- */
 
-export type InboxThread = { id: string; from: string; subject: string; snippet: string; lastAt: number; waiting: boolean; link: string };
+export type InboxThread = {
+  id: string; from: string; email: string; subject: string; snippet: string; lastAt: number; waiting: boolean; link: string;
+  kind: "customer" | "lead";   // lead = a cold-email agency's "New Lead" alert
+};
 
 const header = (m: any, name: string) => m?.payload?.headers?.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
 const addr = (s: string) => (s.match(/<([^>]+)>/)?.[1] ?? s).trim().toLowerCase();
 
-/** Customer threads in the inbox from the last 14 days. "waiting" = the last message is theirs, not ours. */
-export async function inboxThreads(limit = 40): Promise<InboxThread[]> {
+/* Only customers and leads reach the tab: vendors, insurers, staffing agencies, sales pitches and newsletters stay
+   in Gmail. A thread counts when it talks about lights (or is a reply to one of our quotes or receipts). */
+const LIGHTS = /\b(christmas|xmas|holiday|lights?|lighting|wreaths?|garland|roof ?line|install(ation)?|take ?down|estimate|quote #?\d+|your quote|event)\b/i;
+const OURS = /(thank you for approving quote|receipt for payment from light dmv|invoice from light dmv|quote from light dmv|light dmv)/i;
+const PITCH = /\b(seo|search traffic|ranking|chatgpt|website (design|built)|a (new )?website|web design|marketing agency|backlinks?|donation|sponsor(ship)?|pro partner|wholesale|supplier|onboarding|webinar|unsubscribe|ad credits?)\b/i;
+const BOT_SENDER = /(no-?reply|noreply|notifications?@|mailer-daemon|newsletter|marketing@|news@|updates?@|billing@|support@)/i;
+// Vendors and services Light DMV deals with (not customers). Owners can add more with "Not a customer".
+const VENDOR_DOMAINS = ["progressive.com", "wisetack.com", "guavasourcing.com", "tradewraps.com", "christmasdesigners.com",
+  "allamericanpublishing.com", "authority.builders", "apple.com", "google.com", "getjobber.com", "gohighlevel.com", "leadconnectorhq.com",
+  "vercel.com", "github.com", "biberk.com", "theheadlinetheory.com", "163.com"];
+const LEAD_ALERT = /^new lead:\s*(.+?)\s+-\s+the headline theory/i;
+const BLOCKED = "ldmv:google:inbox:blocked";
+
+export const blockedSenders = async () => (await kvGet<string[]>(BLOCKED)) ?? [];
+export async function blockSender(email: string) {
+  const e = email.trim().toLowerCase();
+  if (!e) return;
+  const cur = await blockedSenders();
+  if (!cur.includes(e)) await kvSet(BLOCKED, [...cur, e].slice(-500));
+}
+
+function classify(email: string, subject: string, snippet: string, blocked: string[]): InboxThread["kind"] | null {
+  const domain = email.split("@")[1] ?? "";
+  if (LEAD_ALERT.test(subject)) return "lead";
+  if (blocked.includes(email) || blocked.includes(`@${domain}`)) return null;
+  if (domain === "lightdmv.com" || VENDOR_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))) return null;
+  if (BOT_SENDER.test(email)) return null;
+  const text = `${subject} ${snippet}`;
+  if (PITCH.test(text)) return null;
+  return LIGHTS.test(text) || OURS.test(subject) ? "customer" : null;
+}
+
+/** Customer and lead threads in the inbox from the last 14 days. "waiting" = the last message is theirs, not ours. */
+export async function inboxThreads(limit = 60): Promise<InboxThread[]> {
   const me = (await kvGet<Tokens>(TOKENS))?.email?.toLowerCase() ?? "info@lightdmv.com";
-  const q = encodeURIComponent("in:inbox newer_than:14d -category:promotions -category:social -category:updates -from:me");
+  const blocked = await blockedSenders();
+  const q = encodeURIComponent("in:inbox newer_than:14d -category:promotions -category:social -from:me");
   const list = await gapi(`https://gmail.googleapis.com/gmail/v1/users/me/threads?maxResults=${limit}&q=${q}`);
   const out: InboxThread[] = [];
   for (const t of list.threads ?? []) {
@@ -105,11 +141,16 @@ export async function inboxThreads(limit = 40): Promise<InboxThread[]> {
     if (!msgs.length) continue;
     const first = msgs[0], last = msgs[msgs.length - 1];
     const customer = msgs.find((m) => addr(header(m, "From")) !== me) ?? first;
+    const email = addr(header(customer, "From"));
+    const subject = header(first, "Subject") || "(no subject)";
+    const kind = classify(email, subject, String(customer.snippet ?? ""), blocked);
+    if (!kind) continue;
+    const leadName = subject.match(LEAD_ALERT)?.[1];
     out.push({
-      id: t.id,
-      from: header(customer, "From").replace(/<[^>]+>/, "").replace(/"/g, "").trim() || addr(header(customer, "From")),
-      subject: header(first, "Subject") || "(no subject)",
-      snippet: String(last.snippet ?? "").slice(0, 160),
+      id: t.id, kind, email,
+      from: leadName || header(customer, "From").replace(/<[^>]+>/, "").replace(/"/g, "").trim() || email,
+      subject: leadName ? "Cold email reply: interested" : subject,
+      snippet: String(last.snippet ?? "").replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, '"').slice(0, 160),
       lastAt: Number(last.internalDate) || Date.now(),
       waiting: addr(header(last, "From")) !== me,
       link: `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(me)}#all/${t.id}`,

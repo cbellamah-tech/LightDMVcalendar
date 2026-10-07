@@ -38,7 +38,7 @@ function listIn(j: any, keys: string[]): any[] {
 export type GhlAccount = { id: string; platform: string; name: string; expired?: boolean };
 export type GhlPost = { platform: string; day: string; text: string; status: string };
 export type GhlLead = { id: string; name: string; source: string; tags: string[]; day: string; at: number; phone?: string; email?: string };
-export type GhlStage = { name: string; count: number; value: number };
+export type GhlStage = { name: string; count: number; value: number; pipeline?: string };
 export type GhlSnap = { at: number; accounts: GhlAccount[]; posts: GhlPost[]; leads: GhlLead[]; pipeline: GhlStage[]; errors: string[] };
 
 async function accounts(): Promise<GhlAccount[]> {
@@ -93,26 +93,31 @@ async function leads(): Promise<GhlLead[]> {
     .sort((a, b) => b.at - a.at);
 }
 
-/** Open deals per pipeline stage (the SOP's 7 stages: Warm Leads through Invoice Paid, plus Lost Quotes). */
+/** Open deals per stage, kept per pipeline (Light DMV runs several: sales, cold leads, permanent lighting...). */
 async function pipeline(): Promise<GhlStage[]> {
   const pj = await ghl(`/opportunities/pipelines?locationId=${encodeURIComponent(loc())}`);
-  const stageName = new Map<string, string>();
-  const order: string[] = [];
+  const stage = new Map<string, { pipeline: string; name: string; i: number }>();
   for (const p of listIn(pj, ["pipelines"]))
-    for (const st of p.stages ?? []) { stageName.set(st.id, st.name); if (!order.includes(st.name)) order.push(st.name); }
-  const counts = new Map<string, GhlStage>();
+    (p.stages ?? []).forEach((st: any, i: number) => stage.set(st.id, { pipeline: String(p.name ?? "Pipeline"), name: String(st.name), i }));
+  const counts = new Map<string, GhlStage & { i: number }>();
   for (let page = 1; page <= 10; page++) {
     const j = await ghl(`/opportunities/search?location_id=${encodeURIComponent(loc())}&limit=100&page=${page}`);
     const list = listIn(j, ["opportunities"]);
     for (const o of list) {
-      const name = stageName.get(o.pipelineStageId) ?? "Other";
-      const c = counts.get(name) ?? { name, count: 0, value: 0 };
+      const st = stage.get(o.pipelineStageId) ?? { pipeline: "Other", name: "Other", i: 99 };
+      const key = `${st.pipeline}|${st.name}`;
+      const c = counts.get(key) ?? { pipeline: st.pipeline, name: st.name, count: 0, value: 0, i: st.i };
       c.count++; c.value += Number(o.monetaryValue) || 0;
-      counts.set(name, c);
+      counts.set(key, c);
     }
     if (list.length < 100) break;
   }
-  return [...counts.values()].sort((a, b) => (order.indexOf(a.name) + 1 || 99) - (order.indexOf(b.name) + 1 || 99));
+  // Busiest pipeline first, stages in the pipeline's own order.
+  const size = new Map<string, number>();
+  for (const c of counts.values()) size.set(c.pipeline!, (size.get(c.pipeline!) ?? 0) + c.count);
+  return [...counts.values()]
+    .sort((a, b) => (size.get(b.pipeline!)! - size.get(a.pipeline!)!) || a.pipeline!.localeCompare(b.pipeline!) || a.i - b.i)
+    .map(({ i, ...c }) => c);
 }
 
 export const getGhlSnap = () => kvGet<GhlSnap>(SNAP);

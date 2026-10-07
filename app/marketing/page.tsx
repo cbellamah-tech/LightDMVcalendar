@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Copy, ExternalLink, Loader2, Mail, Plus, RefreshCw, Undo2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, ExternalLink, EyeOff, Loader2, Mail, Plus, RefreshCw, Undo2 } from "lucide-react";
 import { ago, api, fmtDay, NAVY } from "@/components/ui";
 import { Card, Dot, Feed, FeedItem, Light, LIGHT_WORD } from "./parts";
 import { Media, MediaBoard, SheetView } from "./media";
@@ -9,12 +9,12 @@ import { Media, MediaBoard, SheetView } from "./media";
 type Ch = { id: string; label: string; box: string; bot?: string; auto?: string; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; done: number; goal: number; light: Light; channels: string[] };
 type Lead = { id: string; name: string; sourceName: string; day: string; at: number; phone?: string; email?: string };
-type Thread = { id: string; from: string; subject: string; snippet: string; lastAt: number; waiting: boolean; link: string };
+type Thread = { id: string; from: string; email: string; subject: string; snippet: string; lastAt: number; waiting: boolean; link: string; kind?: "customer" | "lead" };
 type Data = {
   today: string; week: string; thisWeek: string; daysIn: number; role: string;
   channels: Ch[]; boxes: Box[];
   events: { id: string; channel: string; n: number; day: string; at: number; by: string; via: string; note?: string }[];
-  ghl: { configured: boolean; at: number | null; errors: string[]; accounts: { platform: string; name: string; expired?: boolean }[]; leads: Lead[]; weekLeads: number; bySource: Record<string, number>; pipeline: { name: string; count: number; value: number }[] };
+  ghl: { configured: boolean; at: number | null; errors: string[]; accounts: { platform: string; name: string; expired?: boolean }[]; leads: Lead[]; weekLeads: number; bySource: Record<string, number>; pipeline: { name: string; count: number; value: number; pipeline?: string }[] };
   google: { configured: boolean; connected: boolean; email?: string; sheetUrl: string };
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
@@ -57,6 +57,10 @@ export default function Marketing() {
     try { await api("/api/marketing/log", { method: "POST", json: { channel, n } }); await load(); }
     catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
   }
+  async function hide(email: string) {
+    await api("/api/marketing/inbox", { method: "POST", json: { email } }).catch((e) => setMsg(e.message));
+    load();
+  }
   async function undo(id: string) {
     await api(`/api/marketing/log?id=${id}`, { method: "DELETE" }).catch((e) => setMsg(e.message));
     load();
@@ -64,7 +68,7 @@ export default function Marketing() {
 
   const asks = useMemo(() => (d?.feed ?? []).filter((f) => f.ask && !f.answer), [d]);
   const reports = useMemo(() => (d?.feed ?? []).filter((f) => !f.ask || f.answer), [d]);
-  const waiting = useMemo(() => (d?.inbox?.threads ?? []).filter((t) => t.waiting && Date.now() - t.lastAt > STALE_MS), [d]);
+  const waiting = useMemo(() => (d?.inbox?.threads ?? []).filter((t) => t.waiting && t.kind !== "lead" && Date.now() - t.lastAt > STALE_MS), [d]);
 
   if (!d) return <div className="p-6 text-slate-500 flex gap-2">{msg || <><Loader2 className="animate-spin" /> Loading marketing...</>}</div>;
   const owner = d.role === "owner";
@@ -121,19 +125,26 @@ export default function Marketing() {
               {Object.keys(d.ghl.bySource).length ? Object.entries(d.ghl.bySource).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") : "Every lead, text and reply, with where they came from"}
             </div>
             {d.ghl.pipeline.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {d.ghl.pipeline.map((st) => (
-                  <span key={st.name} className="text-xs rounded bg-slate-100 px-1.5 py-0.5" title={st.value ? `$${Math.round(st.value).toLocaleString()}` : undefined}>
-                    {st.name} <b className="tabular-nums">{st.count}</b>
-                  </span>
+              <div className="mt-2 space-y-1.5">
+                {[...new Set(d.ghl.pipeline.map((st) => st.pipeline ?? ""))].map((pl) => (
+                  <div key={pl}>
+                    {pl && <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{pl}</div>}
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {d.ghl.pipeline.filter((st) => (st.pipeline ?? "") === pl).map((st) => (
+                        <span key={st.name} className="text-xs rounded bg-slate-100 px-1.5 py-0.5" title={st.value ? `$${Math.round(st.value).toLocaleString()}` : undefined}>
+                          {st.name} <b className="tabular-nums">{st.count}</b>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3">
             <div className="flex items-center gap-2"><span className="font-bold flex-1">info@lightdmv.com</span>
-              <span className="text-sm font-semibold tabular-nums">{d.inbox ? `${d.inbox.threads.filter((t) => t.waiting).length} waiting on us` : "Not connected"}</span></div>
-            <div className="text-xs text-slate-500 mt-1">{waiting.length ? `${waiting.length} with no reply after 4 hours` : "Emails that skip GoHighLevel"}</div>
+              <span className="text-sm font-semibold tabular-nums">{d.inbox ? `${d.inbox.threads.filter((t) => t.waiting && t.kind !== "lead").length} customers waiting` : "Not connected"}</span></div>
+            <div className="text-xs text-slate-500 mt-1">{waiting.length ? `${waiting.length} with no reply after 4 hours` : "Customer emails that skip GoHighLevel"}{d.inbox && d.inbox.threads.some((t) => t.kind === "lead") ? ` · ${d.inbox.threads.filter((t) => t.kind === "lead").length} cold email leads` : ""}</div>
           </div>
         </div>
         <a href="/jobs" className="block bg-white rounded-xl border border-slate-200 p-3 hover:shadow">
@@ -194,18 +205,23 @@ export default function Marketing() {
 
           <Card title="Inbox" right={d.inbox ? <span className="text-xs text-slate-400">{ago(d.inbox.at)}</span> : null}>
             {!d.inbox ? <p className="text-sm text-slate-500">Shows info@lightdmv.com here once Google is connected (see Setup below).</p>
-              : d.inbox.threads.length === 0 ? <p className="text-sm text-slate-500">No customer emails in the last 14 days.</p>
+              : d.inbox.threads.length === 0 ? <p className="text-sm text-slate-500">No customer or lead emails in the last 14 days.</p>
               : (
                 <div className="divide-y divide-slate-100 max-h-80 overflow-auto">
                   {d.inbox.threads.map((t) => (
-                    <a key={t.id} href={t.link} target="_blank" rel="noreferrer" className="block py-1.5 text-sm hover:bg-slate-50">
-                      <div className="flex gap-2">
-                        <span className={`flex-1 truncate ${t.waiting ? "font-bold" : ""}`}>{t.from}</span>
-                        <span className={`text-xs ${t.waiting ? "text-red-600 font-semibold" : "text-green-700"}`}>{t.waiting ? "Waiting" : "Replied"}</span>
-                        <span className="text-xs text-slate-400">{ago(t.lastAt)}</span>
-                      </div>
-                      <div className="text-xs text-slate-500 truncate">{t.subject} · {t.snippet}</div>
-                    </a>
+                    <div key={t.id} className="flex items-start gap-1 py-1.5 hover:bg-slate-50">
+                      <a href={t.link} target="_blank" rel="noreferrer" className="block flex-1 min-w-0 text-sm">
+                        <div className="flex gap-2">
+                          <span className={`flex-1 truncate ${t.waiting ? "font-bold" : ""}`}>{t.from}</span>
+                          {t.kind === "lead" && <span className="text-[11px] font-semibold rounded bg-blue-50 text-blue-700 px-1.5">Lead</span>}
+                          <span className={`text-xs ${t.waiting ? "text-red-600 font-semibold" : "text-green-700"}`}>{t.waiting ? "Waiting" : "Replied"}</span>
+                          <span className="text-xs text-slate-400">{ago(t.lastAt)}</span>
+                        </div>
+                        <div className="text-xs text-slate-500 truncate">{t.subject} · {t.snippet}</div>
+                      </a>
+                      <button title="Not a customer: hide this sender from now on" aria-label="Not a customer" onClick={() => hide(t.email)}
+                        className="p-1 text-slate-300 hover:text-slate-700"><EyeOff size={14} /></button>
+                    </div>
                   ))}
                 </div>
               )}
