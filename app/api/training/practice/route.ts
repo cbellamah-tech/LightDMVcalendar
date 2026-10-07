@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ tree: t && { id: t.id, season: t.season, name: t.name, desc: t.desc, qty: t.qty, wrap: t.wrap } });
   }
   const cases = pick(pack.cases, done, mode === "final" ? 5 : 1).map(caseForTrainee);
-  return NextResponse.json({ cases, catalog: pack.catalog, run: mode === "final" ? `${Date.now().toString(36)}` : undefined });
+  return NextResponse.json({ cases, catalog: pack.catalog, real: pack.realPhotos ?? {}, run: mode === "final" ? `${Date.now().toString(36)}` : undefined });
 }
 
 /** Grades a quote (or a tree) against what Light DMV really sent and records the attempt. */

@@ -34,8 +34,10 @@ const CAT_LABEL: Record<string, string> = {
 };
 const num = (s: string) => Number(s) || 0;
 
-export function QuoteSim({ c, catalog, rates, bands, mode, run, label, onDone }: {
-  c: SimCase; catalog: Product[]; rates: Rates; bands: Band[]; mode: "case" | "final"; run?: string; label?: string;
+export type RealPhotos = Record<string, { fileId: string; caption: string; price: number | null }[]>;
+
+export function QuoteSim({ c, catalog, real, rates, bands, mode, run, label, onDone }: {
+  c: SimCase; catalog: Product[]; real?: RealPhotos; rates: Rates; bands: Band[]; mode: "case" | "final"; run?: string; label?: string;
   onDone: (r: SimResult) => void;
 }) {
   const [step, setStep] = useState(0);
@@ -233,6 +235,7 @@ export function QuoteSim({ c, catalog, rates, bands, mode, run, label, onDone }:
             {groups.map(([cat, ps]) => (
               <div key={cat}>
                 <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">{CAT_LABEL[cat] ?? cat}</div>
+                {!!real?.[cat]?.length && <Installs photos={real[cat]} />}
                 <div className="flex flex-col gap-1 mt-1">
                   {ps.map((p) => (
                     <button key={p.key} onClick={() => add(p)} className="text-left text-sm rounded-md border border-slate-200 px-2 py-1.5 hover:border-slate-400 flex gap-2 items-start">
@@ -250,6 +253,30 @@ export function QuoteSim({ c, catalog, rates, bands, mode, run, label, onDone }:
       )}
 
       {step === 4 && res && <Compare res={res} refId={`case:${c.id}`} />}
+    </div>
+  );
+}
+
+/** Finished installs of this kind of line, from Light DMV's Google Drive, with what that line sold for. */
+function Installs({ photos }: { photos: RealPhotos[string] }) {
+  const [open, setOpen] = useState(false);
+  const [bad, setBad] = useState<Record<string, boolean>>({});
+  return (
+    <div className="my-1">
+      <button className="text-xs font-semibold underline" style={{ color: NAVY }} onClick={() => setOpen(!open)}>{open ? "Hide" : "See"} {photos.length} finished install{photos.length > 1 ? "s" : ""}</button>
+      {open && (
+        <div className="flex gap-2 overflow-x-auto mt-1">
+          {photos.map((p, i) => (
+            <a key={i} href={`https://drive.google.com/file/d/${p.fileId}/view`} target="_blank" rel="noreferrer" className="shrink-0 text-center">
+              {bad[p.fileId] ? <div className="h-28 w-36 rounded-lg bg-slate-100 text-xs flex items-center justify-center p-2">Open in Drive</div> : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`https://drive.google.com/thumbnail?id=${p.fileId}&sz=w800`} alt={p.caption} loading="lazy" onError={() => setBad({ ...bad, [p.fileId]: true })} className="h-28 rounded-lg border border-slate-200 object-cover" />
+              )}
+              {p.price != null && <div className="text-[11px] text-slate-600">sold {money(p.price)}</div>}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

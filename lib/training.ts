@@ -32,7 +32,8 @@ export type Pack = {
   kind: "ldmv-training-pack"; version: number; builtAt: string; source: string;
   modules: Module[]; bands: Band[]; rates: Rates; catalog: Product[];
   intake: { routes: string[]; items: Drill[]; note?: string };
-  objections: Drill[]; cases: Case[]; trees: Tree[]; treeGroups: TreeGroup[]; examples?: Example[]; averages: { cat: string; n: number; avg: number }[];
+  objections: Drill[]; cases: Case[]; trees: Tree[]; treeGroups: TreeGroup[]; examples?: Example[];
+  realPhotos?: Record<string, { fileId: string; caption: string; price: number | null }[]>; averages: { cat: string; n: number; avg: number }[];
 };
 
 const PACK = "ldmv:training:pack";

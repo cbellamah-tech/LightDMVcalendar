@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { api, GREEN, NAVY, RED } from "@/components/ui";
 import { Band, Blocks, Btn, Card, H1, LessonCard, money, Rates, Spinner, useBusy } from "../parts";
-import { Product, QuoteSim, SimCase, SimResult } from "../QuoteSim";
+import { Product, QuoteSim, RealPhotos, SimCase, SimResult } from "../QuoteSim";
 
 type Mod = {
   id: string; title: string; goal: string; practice: "read" | "intake" | "blind" | "final" | "objections"; number: number; next: string | null;
@@ -148,7 +148,7 @@ function Drill({ m, onDone }: { m: Mod; onDone: () => void }) {
   );
 }
 
-type CasesResp = { cases: SimCase[]; catalog: Product[]; run?: string };
+type CasesResp = { cases: SimCase[]; catalog: Product[]; real?: RealPhotos; run?: string };
 
 /** Quote a real past request end to end, then compare with what we sent. */
 function Practice({ m, onDone }: { m: Mod; onDone: () => void }) {
@@ -165,7 +165,7 @@ function Practice({ m, onDone }: { m: Mod; onDone: () => void }) {
       </div>
       {!d?.cases[0] ? <Btn disabled={busy} onClick={next}>Start a practice quote</Btn> : (
         <>
-          <QuoteSim key={`${d.cases[0].id}-${n}`} c={d.cases[0]} catalog={d.catalog} rates={m.rates} bands={m.bands} mode="case" onDone={() => { setDone(true); onDone(); }} />
+          <QuoteSim key={`${d.cases[0].id}-${n}`} c={d.cases[0]} catalog={d.catalog} real={d.real} rates={m.rates} bands={m.bands} mode="case" onDone={() => { setDone(true); onDone(); }} />
           {done && <Btn disabled={busy} onClick={next}>Next request</Btn>}
         </>
       )}
@@ -190,7 +190,7 @@ function Final({ m, onDone }: { m: Mod; onDone: () => void }) {
       </div>
       {!d ? <Btn disabled={busy} onClick={start}>Start the final check</Btn> : (
         <>
-          {c && <QuoteSim key={c.id} c={c} catalog={d.catalog} rates={m.rates} bands={m.bands} mode="final" run={d.run} label={`Request ${i + 1} of ${d.cases.length}`}
+          {c && <QuoteSim key={c.id} c={c} catalog={d.catalog} real={d.real} rates={m.rates} bands={m.bands} mode="final" run={d.run} label={`Request ${i + 1} of ${d.cases.length}`}
             onDone={(r) => { setResults([...results, r]); onDone(); }} />}
           {results.length === i + 1 && i < d.cases.length - 1 && <Btn onClick={() => setI(i + 1)}>Next request ({i + 2} of {d.cases.length})</Btn>}
           {fin && (
