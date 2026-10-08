@@ -15,6 +15,12 @@ export function PackUpload({ onDone }: { onDone?: () => void }) {
     setMsg("Reading the file...");
     try {
       const { imageData = {}, ...pack } = JSON.parse(await f.text()) as PackFile;
+      // Downloads often keep an older copy under the same name; say which one was picked.
+      if (Number(pack.version ?? 1) < 3 || !Array.isArray(pack.quotes)) {
+        const built = typeof pack.builtAt === "string" ? new Date(pack.builtAt).toLocaleString() : "an older build";
+        setMsg(`That's an older copy (${f.name}, built ${built}). Pick the newest training_pack.json in Downloads, about 11.9 MB, sometimes named "training_pack (1).json".`);
+        return;
+      }
       const have = new Set((await api<{ ids: string[] }>("/api/training/images")).ids);
       const todo = Object.keys(imageData).filter((id) => !have.has(id));
       for (let i = 0; i < todo.length; i++) {
