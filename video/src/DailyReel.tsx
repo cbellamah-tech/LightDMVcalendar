@@ -1,112 +1,130 @@
-import { AbsoluteFill, Img, interpolate, Sequence, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, interpolate, OffthreadVideo, Sequence, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 
-/* A 9:16 reel for Facebook, Instagram, Google and LinkedIn: title card, each job photo with a slow zoom
-   and crossfade, then a call to action with the phone number. */
+/* A 9:16 reel for Facebook, Instagram, Google, LinkedIn and YouTube Shorts. It opens straight on the best
+   footage with a big hook line, cuts fast between real job clips (and a few photos), runs a short caption
+   per cut (design, install, takedown...), and ends on a quick call to action. */
 
 export const FPS = 30;
-const INTRO = 45;      // 1.5 s
-const PER_PHOTO = 75;  // 2.5 s
-const FADE = 12;
-const OUTRO = 75;      // 2.5 s
+const OUTRO = 66; // 2.2 s
+const PUNCH = 7;  // zoom punch on each cut
+
+export type Shot = { kind: "video" | "photo"; src: string; frames: number; town?: string };
 
 export type ReelProps = {
-  headline: string;
-  photos: string[];     // file names inside public/, e.g. "today/1.jpg"
-  towns: string[];      // optional label per photo ("Potomac, MD")
+  headline: string;     // the hook, shown over the first shot
+  shots: Shot[];        // files inside public/, in order
+  beats: string[];      // one short caption per shot after the first, cycled
   phone: string;
   site: string;
   cta: string;
+  music?: string;       // optional file inside public/
 };
 
-export const reelFrames = (n: number) => INTRO + Math.max(1, n) * PER_PHOTO + OUTRO;
+export const reelFrames = (shots: Shot[]) => shots.reduce((t, s) => t + s.frames, 0) + OUTRO;
 
-const NAVY = "#112E5B";
+const NAVY = "#0d1730";
 const RED = "#F10800";
-const WARM = "#FFD27A";
+const GOLD = "#f59e0b";
+const FONT = "Inter, Helvetica, Arial, sans-serif";
 
-function Glow() {
+function ShotView({ shot, index }: { shot: Shot; index: number }) {
   const f = useCurrentFrame();
-  // A row of soft bulbs along the top edge, twinkling.
+  const punch = interpolate(f, [0, PUNCH], [1.12, 1], { extrapolateRight: "clamp" });
+  const drift = shot.kind === "photo"
+    ? interpolate(f, [0, shot.frames], index % 2 ? [1.0, 1.1] : [1.1, 1.0])
+    : 1;
+  const style = { width: "100%", height: "100%", objectFit: "cover" as const, transform: `scale(${punch * drift})` };
   return (
-    <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {Array.from({ length: 14 }, (_, i) => {
-        const o = 0.55 + 0.45 * Math.sin((f + i * 11) / 6);
-        return (
-          <div key={i} style={{
-            position: "absolute", top: 36, left: 40 + i * 74, width: 26, height: 26, borderRadius: 13,
-            background: i % 3 === 0 ? RED : WARM, opacity: o, boxShadow: `0 0 ${18 + 14 * o}px ${i % 3 === 0 ? RED : WARM}`,
-          }} />
-        );
-      })}
-    </AbsoluteFill>
-  );
-}
-
-function Intro({ headline }: { headline: string }) {
-  const f = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const s = spring({ frame: f, fps, config: { damping: 14 } });
-  return (
-    <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 40%, #1d4a8f, ${NAVY} 70%)`, justifyContent: "center", alignItems: "center" }}>
-      <Glow />
-      <div style={{ transform: `scale(${0.8 + 0.2 * s})`, opacity: s, textAlign: "center", color: "white", fontFamily: "Helvetica, Arial, sans-serif" }}>
-        <div style={{ fontSize: 120, fontWeight: 900, letterSpacing: -2 }}>Light DMV</div>
-        <div style={{ fontSize: 58, fontWeight: 600, marginTop: 24, color: WARM }}>{headline}</div>
-      </div>
-    </AbsoluteFill>
-  );
-}
-
-function Photo({ src, town, last }: { src: string; town?: string; last: boolean }) {
-  const f = useCurrentFrame();
-  const len = PER_PHOTO + FADE;
-  const zoom = interpolate(f, [0, len], [1.05, 1.18]);
-  const fadeIn = interpolate(f, [0, FADE], [0, 1], { extrapolateRight: "clamp" });
-  const fadeOut = last ? 1 : interpolate(f, [len - FADE, len], [1, 0], { extrapolateLeft: "clamp" });
-  return (
-    <AbsoluteFill style={{ opacity: Math.min(fadeIn, fadeOut), background: "black" }}>
-      <Img src={staticFile(src)} style={{ width: "100%", height: "100%", objectFit: "cover", transform: `scale(${zoom})` }} />
-      <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 70%, rgba(0,0,0,0.6) 100%)" }} />
-      {town ? (
-        <div style={{ position: "absolute", bottom: 170, left: 60, color: "white", fontFamily: "Helvetica, Arial, sans-serif", fontSize: 54, fontWeight: 700, textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>
-          {town}
+    <AbsoluteFill style={{ background: "black", overflow: "hidden" }}>
+      {shot.kind === "video"
+        ? <OffthreadVideo src={staticFile(shot.src)} muted style={style} />
+        : <Img src={staticFile(shot.src)} style={style} />}
+      <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 28%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.55) 100%)" }} />
+      {shot.town ? (
+        <div style={{ position: "absolute", bottom: 120, width: "100%", textAlign: "center", color: "white", fontFamily: FONT, fontSize: 40, fontWeight: 700, letterSpacing: 1, textShadow: "0 2px 10px rgba(0,0,0,0.7)" }}>
+          📍 {shot.town}
         </div>
       ) : null}
-      <div style={{ position: "absolute", bottom: 90, left: 60, color: WARM, fontFamily: "Helvetica, Arial, sans-serif", fontSize: 38, fontWeight: 600 }}>Light DMV</div>
     </AbsoluteFill>
   );
 }
 
-function Outro({ phone, site, cta }: { phone: string; site: string; cta: string }) {
+function Hook({ text }: { text: string }) {
+  const f = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const s = spring({ frame: f, fps, config: { damping: 11, stiffness: 160 } });
+  const words = text.split(" ");
+  const last = words.pop();
+  return (
+    <div style={{ position: "absolute", top: 260, left: 60, right: 60, textAlign: "center", transform: `scale(${0.6 + 0.4 * s})`, opacity: s }}>
+      <span style={{ fontFamily: FONT, fontSize: 104, fontWeight: 900, lineHeight: 1.05, color: "white", letterSpacing: -2, textTransform: "uppercase", WebkitTextStroke: "3px black", paintOrder: "stroke fill", textShadow: "0 6px 24px rgba(0,0,0,0.6)" }}>
+        {words.join(" ")} <span style={{ color: GOLD }}>{last}</span>
+      </span>
+    </div>
+  );
+}
+
+function Beat({ text }: { text: string }) {
+  const f = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const s = spring({ frame: f, fps, config: { damping: 13, stiffness: 200 } });
+  return (
+    <div style={{ position: "absolute", bottom: 300, width: "100%", textAlign: "center" }}>
+      <span style={{ display: "inline-block", transform: `translateY(${(1 - s) * 40}px) rotate(-2deg)`, opacity: s, background: "white", color: NAVY, fontFamily: FONT, fontSize: 70, fontWeight: 900, padding: "14px 36px", borderRadius: 18, boxShadow: "0 10px 30px rgba(0,0,0,0.45)" }}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
+function Bug() {
+  return (
+    <div style={{ position: "absolute", top: 70, left: 0, width: "100%", textAlign: "center" }}>
+      <span style={{ fontFamily: FONT, fontSize: 34, fontWeight: 800, color: "white", letterSpacing: 6, background: "rgba(13,23,48,0.75)", padding: "10px 26px", borderRadius: 40, border: `2px solid ${GOLD}` }}>
+        LIGHT DMV
+      </span>
+    </div>
+  );
+}
+
+function Outro({ phone, site, cta, last }: { phone: string; site: string; cta: string; last?: Shot }) {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
   const s = spring({ frame: f, fps, config: { damping: 12 } });
   return (
-    <AbsoluteFill style={{ background: NAVY, justifyContent: "center", alignItems: "center", fontFamily: "Helvetica, Arial, sans-serif", color: "white", textAlign: "center" }}>
-      <Glow />
-      <div style={{ opacity: s, transform: `translateY(${(1 - s) * 60}px)` }}>
-        <div style={{ fontSize: 76, fontWeight: 800 }}>{cta}</div>
-        <div style={{ fontSize: 96, fontWeight: 900, color: WARM, marginTop: 40 }}>{phone}</div>
-        <div style={{ fontSize: 52, marginTop: 30, opacity: 0.9 }}>{site}</div>
-        <div style={{ display: "inline-block", marginTop: 60, background: RED, borderRadius: 60, padding: "22px 54px", fontSize: 44, fontWeight: 800 }}>
-          Christmas lights, installed and taken down
+    <AbsoluteFill style={{ background: NAVY }}>
+      {last?.kind === "photo" ? (
+        <Img src={staticFile(last.src)} style={{ width: "100%", height: "100%", objectFit: "cover", filter: "blur(18px) brightness(0.45)", transform: "scale(1.15)" }} />
+      ) : null}
+      <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", textAlign: "center", fontFamily: FONT, color: "white" }}>
+        <div style={{ opacity: s, transform: `scale(${0.85 + 0.15 * s})` }}>
+          <div style={{ fontSize: 60, fontWeight: 800, letterSpacing: 8, color: GOLD }}>LIGHT DMV</div>
+          <div style={{ fontSize: 92, fontWeight: 900, marginTop: 30, lineHeight: 1.05 }}>{cta}</div>
+          <div style={{ display: "inline-block", marginTop: 50, background: RED, borderRadius: 70, padding: "26px 60px", fontSize: 64, fontWeight: 900 }}>{phone}</div>
+          <div style={{ fontSize: 50, fontWeight: 600, marginTop: 36, opacity: 0.9 }}>{site}</div>
+          <div style={{ fontSize: 36, fontWeight: 500, marginTop: 24, opacity: 0.75 }}>DC · Maryland · Virginia</div>
         </div>
-      </div>
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 }
 
 export const DailyReel = (p: ReelProps) => {
-  const n = p.photos.length;
+  let at = 0;
+  const starts = p.shots.map((s) => { const a = at; at += s.frames; return a; });
+  const first = p.shots[0]?.frames ?? 0;
   return (
     <AbsoluteFill style={{ background: "black" }}>
-      <Sequence durationInFrames={INTRO + FADE}><Intro headline={p.headline} /></Sequence>
-      {p.photos.map((src, i) => (
-        <Sequence key={src} from={INTRO + i * PER_PHOTO} durationInFrames={PER_PHOTO + FADE}>
-          <Photo src={src} town={p.towns[i]} last={i === n - 1} />
+      {p.music ? <Audio src={staticFile(p.music)} volume={(f) => interpolate(f, [at, at + OUTRO], [0.9, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} /> : null}
+      {p.shots.map((s, i) => (
+        <Sequence key={s.src} from={starts[i]} durationInFrames={s.frames}>
+          <ShotView shot={s} index={i} />
+          {i > 0 && p.beats.length ? <Beat text={p.beats[(i - 1) % p.beats.length]} /> : null}
         </Sequence>
       ))}
-      <Sequence from={INTRO + Math.max(1, n) * PER_PHOTO}><Outro phone={p.phone} site={p.site} cta={p.cta} /></Sequence>
+      <Sequence durationInFrames={Math.max(first, 75)}><Hook text={p.headline} /></Sequence>
+      <Sequence from={first} durationInFrames={at - first}><Bug /></Sequence>
+      <Sequence from={at}><Outro phone={p.phone} site={p.site} cta={p.cta} last={p.shots[p.shots.length - 1]} /></Sequence>
     </AbsoluteFill>
   );
 };

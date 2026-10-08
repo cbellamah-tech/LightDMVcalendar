@@ -254,6 +254,33 @@ export async function drivePhotoJpeg(id: string, w = 1600): Promise<Response> {
   return res;
 }
 
+export type DriveClip = { id: string; name: string; createdTime: string; folder?: string; seconds?: number; width?: number; height?: number; bytes?: number };
+
+/** Job videos in Drive from the last `days` days, newest first (for the daily reel). */
+export async function recentDriveVideos(days = 365, limit = 100): Promise<DriveClip[]> {
+  const since = new Date(Date.now() - days * 86400_000).toISOString();
+  const q = encodeURIComponent(`mimeType contains 'video/' and trashed = false and createdTime > '${since}'`);
+  const fields = encodeURIComponent("files(id,name,createdTime,parents,size,videoMediaMetadata(width,height,durationMillis))");
+  const j = await gapi(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=${limit}&fields=${fields}&supportsAllDrives=true&includeItemsFromAllDrives=true&corpora=allDrives`);
+  return (j.files ?? []).map((f: any) => ({
+    id: f.id, name: f.name, createdTime: f.createdTime, folder: f.parents?.[0],
+    seconds: f.videoMediaMetadata?.durationMillis ? Math.round(Number(f.videoMediaMetadata.durationMillis) / 100) / 10 : undefined,
+    width: f.videoMediaMetadata?.width, height: f.videoMediaMetadata?.height, bytes: f.size ? Number(f.size) : undefined,
+  }));
+}
+
+/** The original bytes of a Drive video, streamed (capped at 250 MB). */
+export async function driveVideoStream(id: string): Promise<Response> {
+  const f = await gapi(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=mimeType,size&supportsAllDrives=true`);
+  if (!/^video\//.test(f.mimeType)) throw new Error("Not a video.");
+  if (Number(f.size) > 250 * 1024 * 1024) throw new Error("Video is too big (over 250 MB).");
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, {
+    headers: { authorization: `Bearer ${await googleAccessToken()}` }, cache: "no-store",
+  });
+  if (!res.ok || !res.body) throw new Error(`Drive download failed (${res.status})`);
+  return res;
+}
+
 const RUNNER_FILE = "Light DMV app - daily video key (do not share).txt";
 
 /** Leave the video runner its key in Drive, where it reads it with its own Drive access. Only this app can see files it made. */
