@@ -5,14 +5,16 @@
 
 export type SopCount = { key: "c9Feet" | "c7Bulbs" | "miniStrands"; label: string };
 /** counts: numbers the crew must enter before the box can be checked (materials used, for the ledger). */
-export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; noteLabel?: string; counts?: SopCount[] };
+/** noteRequired: the box can't be checked until the note is filled in. */
+export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; noteLabel?: string; noteRequired?: boolean; counts?: SopCount[] };
 
 export const MATERIAL_COUNTS: SopCount[] = [
   { key: "c9Feet", label: "Feet of C9 roofline (count the bulbs)" },
   { key: "c7Bulbs", label: "C7 bulbs used (0 if none)" },
   { key: "miniStrands", label: "Mini strands used" },
 ];
-export type JobKind = "install" | "takedown";
+/** fix = a service call (Jobber visit or job titled "SERVICE ..."), kept apart from installs and takedowns. */
+export type JobKind = "install" | "takedown" | "fix";
 
 export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
   install: {
@@ -47,6 +49,17 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
       { id: "takedown-photos", text: "Take takedown pictures", required: true, photo: true },
       { id: "cleanup", text: "Clean up after the job" },
       { id: "all-material", text: "Make sure we have all material before leaving" },
+    ],
+  },
+  fix: {
+    title: "Service call (fix)",
+    items: [
+      { id: "arrival-photo", text: "Take a picture of the problem on arrival", required: true, photo: true },
+      { id: "ladder-wind", text: "On windy days, tie the ladder down at the gutter", required: true },
+      { id: "work-done", text: "Write what you fixed", required: true, noteLabel: "What was wrong and what you did", noteRequired: true },
+      { id: "after-photo", text: "Take a picture once it's fixed and lit", required: true, photo: true },
+      { id: "timer", text: "Make sure the timer is set", required: true },
+      { id: "cleanup", text: "Clean up after the job" },
     ],
   },
 };

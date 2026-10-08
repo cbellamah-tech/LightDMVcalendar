@@ -77,16 +77,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const countsMissing = item.counts?.filter((k) => e.counts?.[k.key] == null) ?? [];
     if (typeof b.done === "boolean") {
       if (b.done && item.photo && !e.photos.length) return NextResponse.json({ error: "Add a photo first." }, { status: 400 });
+      if (b.done && item.noteRequired && !e.note) return NextResponse.json({ error: `${item.noteLabel || "Note"}: fill it in first.` }, { status: 400 });
       if (b.done && countsMissing.length) return NextResponse.json({ error: `Fill in: ${countsMissing.map((k) => k.label).join("; ")}` }, { status: 400 });
       e.done = b.done;
     }
     if (item.photo && !e.photos.length) e.done = false;
+    if (item.noteRequired && !e.note) e.done = false;
     if (item.counts) e.done = !countsMissing.length; // the box is the counts: checked once all three are in
     e.by = s.uid; e.byName = s.name; e.at = Date.now();
     if (!e.done && item.required) { c.completedAt = undefined; c.completedBy = undefined; }
   }
   c.rev = (c.rev || 0) + 1;
   await saveChecklist(c);
+  if (b.complete && job.kind === "fix") {
+    const { writeWorkDone } = await import("@/lib/serviceSheet");
+    await writeWorkDone(job, c.items["work-done"]?.note || "").catch(() => {});
+  }
   const m = sop.items.find((i) => i.counts && i.id === b.itemId);
   if (m && c.items[m.id]?.done) await recordMaterials(job, c.items[m.id].counts ?? {}, s.name);
   return NextResponse.json({ checklist: c, progress: checklistProgress(c) });

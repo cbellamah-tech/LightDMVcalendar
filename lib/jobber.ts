@@ -1,5 +1,5 @@
 import { kvDel, kvGet, kvSet } from "./store";
-import { clearSampleJobs, crewFor, Job, kindFor, upsertJobs } from "./jobs";
+import { clearSampleJobs, crewFor, isFixTitle, Job, kindFor, pruneOldFixes, upsertJobs } from "./jobs";
 import { listUsers } from "./users";
 
 /* Jobber GraphQL API with OAuth (authorization code flow).
@@ -120,6 +120,9 @@ query LdmvVisits($after: ISO8601DateTime!, $before: ISO8601DateTime!, $cursor: S
       title
       startAt
       endAt
+      createdAt
+      instructions
+      isComplete
       assignedUsers(first: 10) { nodes { id name { full } } }
       job {
         id
@@ -133,8 +136,14 @@ query LdmvVisits($after: ISO8601DateTime!, $before: ISO8601DateTime!, $cursor: S
   }
 }`;
 
+// Visits Jobber marks late (past their date, not completed). Only the fixes are kept from these, so a
+// service call that was missed stays on the schedule until someone completes it.
+const LATE_VISITS_QUERY = VISITS_QUERY
+  .replace("query LdmvVisits($after: ISO8601DateTime!, $before: ISO8601DateTime!, $cursor: String)", "query LdmvLateVisits($cursor: String)")
+  .replace("filter: { startAt: { after: $after, before: $before } }", "filter: { status: LATE }");
+
 type VisitNode = {
-  id: string; title?: string; startAt: string; endAt?: string;
+  id: string; title?: string; startAt: string; endAt?: string; createdAt?: string; instructions?: string | null; isComplete?: boolean;
   assignedUsers?: { nodes: { id: string; name: { full: string } }[] };
   job?: { id: string; jobNumber?: number; title?: string; client?: { name?: string };
     property?: { address?: { street?: string; city?: string; province?: string; postalCode?: string } } };
@@ -155,10 +164,26 @@ export async function syncJobber(detailLimit = 25): Promise<number> {
       if (!d.visits.pageInfo.hasNextPage) break;
       cursor = d.visits.pageInfo.endCursor;
     }
+    // Late fixes from before the window. If Jobber refuses the filter, the sync still runs without them.
+    let late: VisitNode[] | null = [];
+    try {
+      cursor = null;
+      for (let page = 0; page < 10; page++) {
+        const d: { visits: { nodes: VisitNode[]; pageInfo: { hasNextPage: boolean; endCursor: string } } } = await gql(LATE_VISITS_QUERY, { cursor });
+        late.push(...d.visits.nodes.filter((v) => isFixTitle(v.title) || isFixTitle(v.job?.title)));
+        if (!d.visits.pageInfo.hasNextPage) break;
+        cursor = d.visits.pageInfo.endCursor;
+      }
+    } catch {
+      late = null;
+    }
+    const seen = new Set(nodes.map((v) => v.id));
+    for (const v of late ?? []) if (!seen.has(v.id)) { nodes.push(v); seen.add(v.id); }
     const jobs: Job[] = nodes.map((v) => {
       const names = v.assignedUsers?.nodes.map((u) => u.name.full) ?? [];
       const a = v.job?.property?.address;
       const title = v.title || v.job?.title || "Job";
+      const fix = isFixTitle(v.title) || isFixTitle(v.job?.title);
       return {
         id: `jv_${v.id}`,
         source: "jobber",
@@ -170,14 +195,24 @@ export async function syncJobber(detailLimit = 25): Promise<number> {
         address: [a?.street, a?.city, a?.province, a?.postalCode].filter(Boolean).join(", "),
         start: v.startAt,
         end: v.endAt,
-        kind: kindFor(`${title} ${v.job?.title || ""}`, v.startAt),
+        kind: fix ? "fix" : kindFor(`${title} ${v.job?.title || ""}`, v.startAt),
         crew: crewFor(names, users),
         assignedNames: names,
+        ...(fix ? {
+          request: (v.instructions || title.replace(/^\s*service\s*[-—–:]*\s*/i, "")).trim().slice(0, 500),
+          requestedAt: v.createdAt,
+        } : {}),
+        doneInJobber: !!v.isComplete,
         updatedAt: Date.now(),
       };
     });
     await clearSampleJobs();
     await upsertJobs(jobs, { source: "jobber", from: from.toISOString(), to: to.toISOString() });
+    // Fixes from before the window that are no longer late were completed (or deleted) in Jobber.
+    if (late) await pruneOldFixes(from.toISOString(), new Set(late.map((v) => `jv_${v.id}`)));
+    // Every fix goes to the Service Requested Sheet once. Never let the sheet stop the sync.
+    const { logFixesToSheet } = await import("./serviceSheet");
+    await logFixesToSheet(jobs.filter((j) => j.kind === "fix")).catch(() => {});
     await kvSet<SyncStatus>(STATUS, { ...(await getStatus()), lastSyncAt: Date.now(), lastCount: jobs.length, lastError: undefined });
     // Notes, line items and client history for each job, a batch at a time (oldest first).
     const { refreshStaleDetails } = await import("./jobDetails");

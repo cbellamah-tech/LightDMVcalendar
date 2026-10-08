@@ -17,6 +17,9 @@ export type Job = {
   kind: JobKind;
   crew?: string;            // crew1 / crew2, derived from Jobber assigned users
   assignedNames: string[];
+  request?: string;         // fixes: what the customer asked for (the Jobber visit instructions)
+  requestedAt?: string;     // fixes: when the service visit was created in Jobber
+  doneInJobber?: boolean;   // the visit is marked complete in Jobber
   updatedAt: number;
 };
 
@@ -26,7 +29,10 @@ export type Checklist = { jobId: string; kind: JobKind; items: Record<string, Ch
 const JOBS = "ldmv:jobs";
 const checkKey = (jobId: string) => `ldmv:check:${jobId}`;
 
-/** Takedown if the title says so, otherwise install (Jan to Mar defaults to takedown). */
+/** Fixes (service calls) are the Jobber visits or jobs whose title starts with "Service". */
+export const isFixTitle = (title?: string) => /^\s*service\b/i.test(title || "");
+
+/** Takedown if the title says so, otherwise install (Jan to Mar defaults to takedown). Fixes are decided by the caller. */
 export function kindFor(title: string, start: string): JobKind {
   if (/take ?down|removal|remove|teardown/i.test(title)) return "takedown";
   if (/install/i.test(title)) return "install";
@@ -59,6 +65,13 @@ export async function upsertJobs(jobs: Job[], removeSourceIn?: { source: Job["so
       }
     }
     for (const j of jobs) all[j.id] = j;
+  });
+}
+
+/** Drop fixes dated before the synced window unless Jobber still lists them as late. */
+export async function pruneOldFixes(before: string, stillLate: Set<string>) {
+  await kvUpdate<Record<string, Job>>(JOBS, {}, (all) => {
+    for (const [id, j] of Object.entries(all)) if (j.kind === "fix" && j.source === "jobber" && j.start < before && !stillLate.has(id)) delete all[id];
   });
 }
 

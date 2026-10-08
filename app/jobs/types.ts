@@ -1,6 +1,7 @@
 export type Job = {
   id: string; source: "jobber" | "sample"; jobNumber?: number; title: string; client: string; address: string;
-  start: string; end?: string; kind: "install" | "takedown"; crew?: string; assignedNames: string[];
+  start: string; end?: string; kind: "install" | "takedown" | "fix"; crew?: string; assignedNames: string[];
+  request?: string; requestedAt?: string; doneInJobber?: boolean;
 };
 export type Progress = { done: number; total: number; requiredLeft: string[] };
 export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string; counts?: Record<string, number> };

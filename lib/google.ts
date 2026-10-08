@@ -74,7 +74,7 @@ async function access(): Promise<string> {
   return j.access_token;
 }
 
-async function gapi<T = any>(url: string, init?: { method?: string; body?: unknown }): Promise<T> {
+export async function gapi<T = any>(url: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const res = await fetch(url, {
     method: init?.method ?? "GET",
     headers: { authorization: `Bearer ${await access()}`, ...(init?.body ? { "content-type": "application/json" } : {}) },
