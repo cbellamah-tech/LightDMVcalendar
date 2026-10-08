@@ -5,6 +5,7 @@ import { jobParts, SOPS } from "@/lib/sops";
 import { cachedJobParts, getJobDetail, withDrive } from "@/lib/jobDetails";
 import { isConnected } from "@/lib/jobber";
 import { loadDriveIndex } from "@/lib/drive";
+import { loadLibrary } from "@/lib/mockups";
 import { listUsers } from "@/lib/users";
 import { isOffice, type Session } from "@/lib/session";
 import { getPayOverrides, payFor, setPayOverride } from "@/lib/crewPay";
@@ -36,9 +37,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   // Job details only on the first load. A saved copy shows at once; a stale one is refreshed from Jobber after the answer.
   let detail = null;
   if (job.source === "jobber" && new URL(req.url).searchParams.get("detail") === "1") {
-    const [connected, idx] = await Promise.all([isConnected(), loadDriveIndex()]);
+    const [connected, idx, lib] = await Promise.all([isConnected(), loadDriveIndex(), loadLibrary()]);
     const d = job.jobberJobId && connected ? await getJobDetail(job.jobberJobId, { stale: "background", have: cached }).catch(() => null) : null;
-    detail = withDrive(idx, d, job.client);
+    detail = withDrive(idx, d, job.client, lib);
   }
   const pay = payFor(job, cached, overrides);
   const parts = cached ? jobParts(cached.lines) : [];

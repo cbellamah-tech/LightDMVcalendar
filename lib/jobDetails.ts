@@ -3,6 +3,8 @@ import { gql } from "./jobber";
 import { buildSelection, fieldsMatching, fieldType, rows, Spec } from "./jobberSchema";
 import { driveFor, DriveIndex, DriveMatch } from "./drive";
 import { jobParts, JobPart } from "./sops";
+import { attachMockups, mockupsFor, type Mockup } from "./mockups";
+type MockupLibrary = Record<string, Mockup[]>;
 
 /* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices:
    the job's dollar value is kept server-side only, to work out crew pay (lib/crewPay.ts). */
@@ -28,7 +30,8 @@ export type JobDetail = {
   quotePdf?: string;        // Jobber link to the signed quote PDF, server-side only (its mockups are copied out)
   quoteMockups?: string[];  // mockups copied out of the signed quote that couldn't be tied to one line
   imgv?: number;            // photo import version this detail was pulled with
-  photoInfo?: string;       // where the line photos came from (or why there are none), shown small on the job page
+  photoInfo?: string;
+  quoteLines?: { name: string; description?: string }[]; // the quote's lines in order (Light Design Hero designs follow them)       // where the line photos came from (or why there are none), shown small on the job page
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
 const IMGV = 3;
@@ -135,6 +138,7 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
     quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined,
     lines, notes, clientName: client.name, clientTags: rows(client.tags).map((t: any) => t.label).filter(Boolean),
     otherJobs, repeat, repeatWhy, bins, value: jobValue(j), quotePdf,
+    quoteLines: quoteLines.map((x: any) => ({ name: String(x.name || ""), description: x.description || undefined })),
   };
 }
 
@@ -190,11 +194,23 @@ export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolea
 }
 
 /** Detail plus what Drive knows (bin list, takedown photos), for the job page. */
-export function withDrive(idx: DriveIndex, d: JobDetail | null, clientName: string): JobDetailView | null {
+export function withDrive(idx: DriveIndex, d: JobDetail | null, clientName: string, lib?: MockupLibrary): JobDetailView | null {
   const base = d ?? { fetchedAt: 0, lines: [], notes: [], clientTags: [], otherJobs: [], repeat: false, bins: [] };
   const drive = driveFor(idx, clientName || base.clientName || "", base.bins);
   const repeat = base.repeat || drive.bins.length > 0 || drive.photos.length > 0 || drive.installPhotos.length > 0;
-  const { value: _value, quotePdf: _pdf, ...shown } = base; // never send the job's price (or the signed quote) to the browser
+  const { value: _value, quotePdf: _pdf, quoteLines: _ql, ...shown } = base; // never send the job's price (or the signed quote) to the browser
+  if (lib) {
+    // Light Design Hero mockups from the owners' library, on the lines Jobber gave no photo for.
+    const mine = mockupsFor(lib, clientName || base.clientName || "");
+    if (mine.length) {
+      const { lines, extra } = attachMockups(shown.lines, mine, base.quoteLines);
+      shown.lines = lines;
+      shown.quoteMockups = [...extra, ...(shown.quoteMockups ?? [])];
+      shown.photoInfo = `${mine.length} Light Design Hero mockup${mine.length === 1 ? "" : "s"} for this customer`;
+    } else if (!shown.lines.some((l) => l.images.length)) {
+      shown.photoInfo = `no Light Design Hero mockups found for ${clientName || base.clientName || "this customer"} (add them on the Jobber tab)` + (shown.photoInfo ? `; ${shown.photoInfo}` : "");
+    }
+  }
   return { ...shown, drive, repeat, repeatWhy: base.repeatWhy || (repeat ? "On last season's bin list" : undefined) };
 }
 

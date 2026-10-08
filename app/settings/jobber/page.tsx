@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Download, Loader2, RefreshCw } from "lucide-react";
 import { ago, api, NAVY } from "@/components/ui";
+import MockupDrop from "./MockupDrop";
 
 type Status = { configured: boolean; connected: boolean; redirectUri: string; lastSyncAt?: number; lastError?: string; lastCount?: number; connectedAt?: number };
 
@@ -97,6 +98,7 @@ export default function JobberSettings() {
         {(s.lastError || qErr) && <p className="text-sm text-red-600 break-words">Last error: {qErr || s.lastError}</p>}
         {msg && <p className="text-sm">{msg}</p>}
       </div>
+      <MockupDrop />
       <DriveIndexCard />
       <p className="text-sm text-slate-500">Each job lands on a crew by matching Jobber's assigned team members to the "Name in Jobber" on the People page.</p>
     </div>
