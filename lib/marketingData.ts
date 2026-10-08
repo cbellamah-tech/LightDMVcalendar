@@ -1,4 +1,4 @@
-import { adsSummary } from "./ads";
+import { adsSummary, allAdDays } from "./ads";
 import { getAutoPost } from "./autopost";
 import { kvGet, kvSet } from "./store";
 import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
@@ -59,7 +59,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
   const daysIn = week === thisWeek ? Math.max(1, (Date.parse(today) - Date.parse(week)) / 86400_000 + 1) : 7;
 
   const ghl = ghlConfigured() ? await refreshGhl(opts.refresh ? 0 : undefined).catch(() => getGhlSnap()) : null;
-  const daily = await dailyCounts(ghl?.posts ?? []);
+  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays());
   const totals = weekTotals(daily, week);
   const prev = weekTotals(daily, addDays(week, -7));
 
@@ -91,10 +91,8 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
       at: ghl?.at ?? null,
       errors: ghl?.errors ?? [],
       accounts: ghl?.accounts ?? [],
-      leads: (ghl?.leads ?? []).slice(0, 40).map((l) => ({ ...l, sourceName: leadSource(l) })),
       weekLeads: weekLeads.length,
       bySource,
-      pipeline: ghl?.pipeline ?? [],
     },
     google: { ...(await googleStatus()), sheetUrl: sheetUrl() },
     inbox: mail,
@@ -115,7 +113,7 @@ export type FillResult = { at: number; week: string; by: string; written: { rang
 /** Cells touched by one week: each (month, sheet week) its days fall in, summed over the whole cell. */
 export async function fillSheet(week: string, by: string, dry = false): Promise<FillResult> {
   const ghl = ghlConfigured() ? await refreshGhl().catch(() => getGhlSnap()) : null;
-  const daily = await dailyCounts(ghl?.posts ?? []);
+  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays());
   const cellsTouched = new Set<string>(); // "YYYY-MM|week"
   for (let i = 0; i < 7; i++) {
     const d = addDays(weekOf(week), i);
