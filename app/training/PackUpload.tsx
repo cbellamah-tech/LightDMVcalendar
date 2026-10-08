@@ -8,7 +8,7 @@ type PackFile = { imageData?: Record<string, string>; [k: string]: unknown };
 /** Owner uploads training_pack.json: the course and its install photos. Photos go to photo storage once each,
  *  the rest to the database (it holds real prices, so it stays out of the code). */
 export function PackUpload({ onDone }: { onDone?: () => void }) {
-  const [info, setInfo] = useState<{ builtAt: string | null; modules: number; practice: number } | null>(null);
+  const [info, setInfo] = useState<{ builtAt: string | null; modules: number; practice: number; install?: number } | null>(null);
   const [msg, setMsg] = useState("");
   useEffect(() => { api("/api/training/pack").then(setInfo).catch(() => {}); }, []);
   async function upload(f: File) {
@@ -36,7 +36,9 @@ export function PackUpload({ onDone }: { onDone?: () => void }) {
     <div className="space-y-2">
       <div className="font-bold">Course content</div>
       <p className="text-sm text-slate-600">
-        {info?.builtAt ? `${info.modules} modules and ${info.practice} real jobs to practice on, built ${new Date(info.builtAt).toLocaleDateString()}.` : "Not loaded yet. Upload training_pack.json to turn the course on."}
+        {info?.builtAt
+          ? `Loaded: the file built ${new Date(info.builtAt).toLocaleString()}. Quote course ${info.modules} modules, ${info.practice} real jobs. ${info.install ? `Installer course ${info.install} modules.` : "No installer course in it; upload the newest training_pack.json."}`
+          : "Not loaded yet. Upload training_pack.json to turn the course on."}
       </p>
       <label className="inline-block rounded-lg px-4 py-2 font-semibold border border-slate-300 cursor-pointer text-sm">
         Upload training_pack.json
