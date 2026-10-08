@@ -2,8 +2,10 @@ import { kvGet, kvSet } from "./store";
 import { gql } from "./jobber";
 import { buildSelection, rows, Spec } from "./jobberSchema";
 import { driveFor, DriveIndex, DriveMatch } from "./drive";
+import { jobParts } from "./sops";
 
-/* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices. */
+/* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices:
+   the job's dollar value is kept server-side only, to work out crew pay (lib/crewPay.ts). */
 
 export type DetailFile = { name: string; url: string; image: boolean };
 export type DetailNote = { from: "job" | "quote"; message: string; at?: string; files: DetailFile[] };
@@ -22,6 +24,7 @@ export type JobDetail = {
   repeat: boolean;
   repeatWhy?: string;
   bins: string[];           // bin numbers written in Jobber notes
+  value?: number;           // pre-tax job total, server-side only (crew pay); withDrive drops it
 };
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
@@ -33,8 +36,8 @@ export const LINE: Spec = {
 };
 const NOTES: Spec[string] = { first: 30, sel: { nodes: { sel: { message: true, createdAt: true, fileAttachments: FILES, attachments: FILES } } } };
 const JOB_SPEC: Spec = {
-  id: true, jobNumber: true, createdAt: true, instructions: true,
-  lineItems: { first: 50, sel: { nodes: { sel: LINE } } },
+  id: true, jobNumber: true, createdAt: true, instructions: true, total: true, amounts: { sel: { subtotal: true, total: true } },
+  lineItems: { first: 50, sel: { nodes: { sel: { ...LINE, totalPrice: true } } } },
   notes: NOTES,
   quote: { sel: { id: true, quoteNumber: true, message: true, notes: NOTES, lineItems: { first: 50, sel: { nodes: { sel: LINE } } } } },
   client: { sel: {
@@ -95,8 +98,15 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
     createdAt: j.createdAt, instructions: j.instructions && !isContract(j.instructions) ? j.instructions : undefined,
     quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined,
     lines, notes, clientName: client.name, clientTags: rows(client.tags).map((t: any) => t.label).filter(Boolean),
-    otherJobs, repeat, repeatWhy, bins,
+    otherJobs, repeat, repeatWhy, bins, value: jobValue(j),
   };
+}
+
+/** Pre-tax dollar value of the job: its line items, else the subtotal, else the total. */
+function jobValue(j: any): number | undefined {
+  const sum = rows(j.lineItems).reduce((t: number, li: any) => t + (Number(li.totalPrice) || 0), 0);
+  const v = sum || Number(j.amounts?.subtotal) || Number(j.total) || Number(j.amounts?.total) || 0;
+  return v > 0 ? Math.round(v * 100) / 100 : undefined;
 }
 
 /** Our seasonal lighting agreement / terms pasted into a note: customer paperwork, not crew notes. */
@@ -128,7 +138,8 @@ export function withDrive(idx: DriveIndex, d: JobDetail | null, clientName: stri
   const base = d ?? { fetchedAt: 0, lines: [], notes: [], clientTags: [], otherJobs: [], repeat: false, bins: [] };
   const drive = driveFor(idx, clientName || base.clientName || "", base.bins);
   const repeat = base.repeat || drive.bins.length > 0 || drive.photos.length > 0;
-  return { ...base, drive, repeat, repeatWhy: base.repeatWhy || (repeat ? "On last season's bin list" : undefined) };
+  const { value: _value, ...shown } = base; // never send the job's price to the browser
+  return { ...shown, drive, repeat, repeatWhy: base.repeatWhy || (repeat ? "On last season's bin list" : undefined) };
 }
 
 /** Refresh stale details for synced jobs, a few per call so a sync stays fast. */
@@ -138,4 +149,11 @@ export async function refreshStaleDetails(jobberJobIds: string[], limit = 12) {
   const due = ages.filter((a) => Date.now() - a.at > MAX_AGE).sort((a, b) => a.at - b.at).slice(0, limit);
   for (const a of due) await fetchJobDetail(a.id);
   return due.length;
+}
+
+/** The parts of the job to photograph (from the saved Jobber detail; empty when it hasn't been pulled yet). */
+export async function cachedJobParts(jobberJobId?: string): Promise<string[]> {
+  if (!jobberJobId) return [];
+  const d = await kvGet<JobDetail>(key(jobberJobId));
+  return d ? jobParts(d.lines) : [];
 }

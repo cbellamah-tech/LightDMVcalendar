@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { checklistProgress, ensureSampleJobs, getChecklist, getJobs, jobVisibleTo, recordMaterials, saveChecklist } from "@/lib/jobs";
 import { SOPS } from "@/lib/sops";
-import { getJobDetail, withDrive } from "@/lib/jobDetails";
+import { cachedJobParts, getJobDetail, withDrive } from "@/lib/jobDetails";
 import { loadDriveIndex } from "@/lib/drive";
 import { isConnected } from "@/lib/jobber";
 import { listUsers } from "@/lib/users";
-import type { Session } from "@/lib/session";
+import { isOffice, type Session } from "@/lib/session";
+import { getPayOverrides, payFor, setPayOverride } from "@/lib/crewPay";
+import { kvGet } from "@/lib/store";
+import type { JobDetail } from "@/lib/jobDetails";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,16 +34,28 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const d = job.jobberJobId && (await isConnected()) ? await getJobDetail(job.jobberJobId).catch(() => null) : null;
     detail = withDrive(await loadDriveIndex(), d, job.client);
   }
-  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail });
+  const cached = job.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${job.jobberJobId}`) : null;
+  const pay = payFor(job, cached, await getPayOverrides());
+  const parts = await cachedJobParts(job.jobberJobId);
+  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, pay, parts });
 }
 
-/* Body: { itemId, done?, addPhotos?: string[], removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands } } or { complete: true } or { reopen: true } */
+/* Body: { itemId, done?, addPhotos?: string[], part?: string (which part of the job the photos show), removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands, stakeFeet } } or { complete: true } or { reopen: true } */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const s = await requireRole();
   if (s instanceof NextResponse) return s;
   const job = await load(params.id, s);
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
   const b = await req.json().catch(() => ({}));
+  // Owners and the manager can set what the crew gets for this job (null goes back to the 20% rule).
+  if ("crewPay" in b) {
+    if (!isOffice(s)) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    const v = b.crewPay === null || b.crewPay === "" ? null : Number(b.crewPay);
+    if (v !== null && (!Number.isFinite(v) || v < 0 || v > 100000)) return NextResponse.json({ error: "Enter a dollar amount." }, { status: 400 });
+    await setPayOverride(job.id, v === null ? null : Math.round(v), s.name);
+    const cached = job.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${job.jobberJobId}`) : null;
+    return NextResponse.json({ pay: payFor(job, cached, await getPayOverrides()) });
+  }
   const c = await getChecklist(job);
   const sop = SOPS[job.kind];
 
@@ -59,8 +74,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const item = sop.items.find((i) => i.id === b.itemId);
     if (!item) return NextResponse.json({ error: "Unknown checklist item" }, { status: 400 });
     const e = (c.items[item.id] ??= { done: false, photos: [] });
-    if (Array.isArray(b.addPhotos)) e.photos.push(...b.addPhotos.filter((u: unknown) => typeof u === "string").slice(0, 20));
-    if (typeof b.removePhoto === "string") e.photos = e.photos.filter((u) => u !== b.removePhoto);
+    if (Array.isArray(b.addPhotos)) {
+      const urls: string[] = b.addPhotos.filter((u: unknown) => typeof u === "string").slice(0, 20);
+      e.photos.push(...urls);
+      for (const u of urls) {
+        (e.photoBy ??= {})[u] = s.name;
+        if (typeof b.part === "string" && b.part.trim()) (e.parts ??= {})[u] = b.part.trim().slice(0, 120);
+      }
+    }
+    if (typeof b.removePhoto === "string") {
+      e.photos = e.photos.filter((u) => u !== b.removePhoto);
+      if (e.parts) delete e.parts[b.removePhoto];
+      if (e.photoBy) delete e.photoBy[b.removePhoto];
+    }
+    // Per-part photos: one for each part of the job Jobber lists (roofline, trees, wreaths...).
+    const parts = item.perPart ? await cachedJobParts(job.jobberJobId) : [];
+    const partsMissing = parts.filter((p) => !Object.values(e.parts ?? {}).some((x) => x.toLowerCase() === p.toLowerCase()));
     if (typeof b.note === "string") e.note = b.note.slice(0, 500) || undefined;
     if (item.counts && b.counts && typeof b.counts === "object") {
       e.counts ??= {};
@@ -74,19 +103,33 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         }
       }
     }
-    const countsMissing = item.counts?.filter((k) => e.counts?.[k.key] == null) ?? [];
+    const countsEntered = !!item.counts?.some((k) => e.counts?.[k.key] != null);
     if (typeof b.done === "boolean") {
       if (b.done && item.photo && !e.photos.length) return NextResponse.json({ error: "Add a photo first." }, { status: 400 });
-      if (b.done && countsMissing.length) return NextResponse.json({ error: `Fill in: ${countsMissing.map((k) => k.label).join("; ")}` }, { status: 400 });
+      if (b.done && item.noteRequired && !e.note) return NextResponse.json({ error: `${item.noteLabel || "Note"}: fill it in first.` }, { status: 400 });
+      if (b.done && partsMissing.length) return NextResponse.json({ error: `Still need a photo of: ${partsMissing.join("; ")}` }, { status: 400 });
       e.done = b.done;
     }
     if (item.photo && !e.photos.length) e.done = false;
-    if (item.counts) e.done = !countsMissing.length; // the box is the counts: checked once all three are in
+    if (item.noteRequired && !e.note) e.done = false;
+    if (item.perPart) e.done = e.photos.length > 0 && !partsMissing.length; // checks itself once every part has a photo
+    // Materials are "if any": the box checks itself once a number is in, and ticking it with all blank means none used.
+    if (item.counts) {
+      if (b.done === false) e.done = false;
+      else if (b.done === true || countsEntered) { e.done = true; for (const k of item.counts) (e.counts ??= {})[k.key] ??= 0; }
+    }
     e.by = s.uid; e.byName = s.name; e.at = Date.now();
+    // Time on site: arrival is the arrival photo, or the first box touched on a checklist without one.
+    const arrivalItem = sop.items.find((i) => i.id === "arrival-photo");
+    if (!c.arrivedAt && (arrivalItem ? item.id === arrivalItem.id && e.photos.length > 0 : true)) c.arrivedAt = Date.now();
     if (!e.done && item.required) { c.completedAt = undefined; c.completedBy = undefined; }
   }
   c.rev = (c.rev || 0) + 1;
   await saveChecklist(c);
+  if (b.complete && job.kind === "fix") {
+    const { writeWorkDone } = await import("@/lib/serviceSheet");
+    await writeWorkDone(job, c.items["work-done"]?.note || "").catch(() => {});
+  }
   const m = sop.items.find((i) => i.counts && i.id === b.itemId);
   if (m && c.items[m.id]?.done) await recordMaterials(job, c.items[m.id].counts ?? {}, s.name);
   return NextResponse.json({ checklist: c, progress: checklistProgress(c) });

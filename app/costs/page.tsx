@@ -13,7 +13,7 @@ type Settings = { bulbsPerFt: number; clipsPerBulb: number; runFt: number; extFt
 type Unit = { perUnit: number; bought: number; landed: number; cf: number };
 type Row = {
   id: string; jobNumber?: number; title: string; client: string; start: string; kind: string; crew?: string; repeat?: boolean;
-  logged: { rooflineFt: number; c7Bulbs: number; miniStrands: number } | null;
+  logged: { rooflineFt: number; c7Bulbs: number; miniStrands: number; stakeFt?: number } | null;
   materials: number; fromBin: boolean; missing: Key[]; sold?: { amount: number; source: string }; crewPay: number; left?: number; marginPct?: number;
 };
 type Stock = { key: Key; name: string; unit: string; bought: number; used: number; onHand: number; value: number };
@@ -134,7 +134,7 @@ export default function CostsPage() {
                       <>
                         <td className="pr-2 text-right">{n0(r.logged.rooflineFt)}</td>
                         <td className="pr-2 text-right">{r.logged.c7Bulbs ? n0(r.logged.c7Bulbs) : ""}</td>
-                        <td className="pr-2 text-right">{r.logged.miniStrands ? n0(r.logged.miniStrands) : ""}</td>
+                        <td className="pr-2 text-right">{r.logged.miniStrands ? n0(r.logged.miniStrands) : ""}{r.logged.stakeFt ? <div className="text-xs text-slate-500">{n0(r.logged.stakeFt)} ft stakes</div> : null}</td>
                         <td className="pr-2 text-right">{$(r.materials, true)}{r.fromBin && <div className="text-xs text-slate-500">bin + {s.repeatNewPct}% new</div>}</td>
                       </>
                     ) : <td colSpan={4} className="pr-2 text-right text-slate-400">not counted yet</td>}
