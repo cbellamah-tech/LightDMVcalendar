@@ -3,7 +3,7 @@ import { etDay } from "./marketing";
 
 /* GoHighLevel (LeadConnector API v2) with a Private Integration token for the Light DMV sub-account.
    Env: GHL_API_KEY (the token), GHL_LOCATION_ID (the sub-account / location id).
-   Read only: connected social accounts, Social Planner posts, and new contacts with their source. */
+   Reads social accounts, Social Planner posts, contacts and deals; writes posts and the "instagram" tag on Instagram leads. */
 
 const BASE = "https://services.leadconnectorhq.com";
 const SNAP = "ldmv:ghl:snap";
@@ -39,7 +39,7 @@ export type GhlAccount = { id: string; platform: string; name: string; expired?:
 export type GhlPost = { platform: string; day: string; text: string; status: string };
 export type GhlLead = { id: string; name: string; source: string; tags: string[]; day: string; at: number; phone?: string; email?: string; attr?: string };
 /** One deal, slimmed down for attribution: where it came from, how far it got, what it's worth. */
-export type GhlOpp = { id: string; contactId: string; source: string; status: string; stage: string; pipeline: string; value: number; day: string; closedDay?: string };
+export type GhlOpp = { id: string; name: string; contactId: string; source: string; status: string; stage: string; pipeline: string; value: number; day: string; closedDay?: string };
 export type GhlStage = { name: string; count: number; value: number; pipeline?: string };
 export type GhlSnap = { at: number; accounts: GhlAccount[]; posts: GhlPost[]; leads: GhlLead[]; pipeline: GhlStage[]; opps?: GhlOpp[]; errors: string[] };
 
@@ -130,7 +130,7 @@ async function pipeline(opps: GhlOpp[] = []): Promise<GhlStage[]> {
       const created = Date.parse(o.createdAt ?? o.dateAdded ?? "") || 0;
       const closed = Date.parse(o.lastStatusChangeAt ?? o.updatedAt ?? "") || 0;
       if (created) opps.push({
-        id: String(o.id), contactId: String(o.contactId ?? o.contact?.id ?? ""),
+        id: String(o.id), name: String(o.contact?.name || o.name || "").slice(0, 80), contactId: String(o.contactId ?? o.contact?.id ?? ""),
         source: [o.source, ...(o.contact?.tags ?? [])].filter(Boolean).join(" ").slice(0, 200),
         status: String(o.status ?? "open").toLowerCase(), stage: st.name, pipeline: st.pipeline, value: Number(o.monetaryValue) || 0,
         day: etDay(created), closedDay: closed ? etDay(closed) : undefined,
@@ -148,6 +148,27 @@ async function pipeline(opps: GhlOpp[] = []): Promise<GhlStage[]> {
 
 export const getGhlSnap = () => kvGet<GhlSnap>(SNAP);
 
+/** chris (2026-10-08): every lead from Instagram carries the "instagram" tag in GoHighLevel.
+   Instagram DMs (conversations) plus contacts whose source says Instagram; adds the tag where it's missing. */
+async function tagInstagram(ls: GhlLead[]): Promise<string | null> {
+  const want = new Set(ls.filter((l) => /instagram/i.test(`${l.source} ${l.attr ?? ""}`)).map((l) => l.id));
+  try {
+    const j = await ghl(`/conversations/search?locationId=${encodeURIComponent(loc())}&lastMessageType=TYPE_INSTAGRAM&limit=100`);
+    for (const c of listIn(j, ["conversations"])) if (c.contactId) want.add(String(c.contactId));
+  } catch { /* no conversations scope: the source text still works */ }
+  const byId = new Map(ls.map((l) => [l.id, l]));
+  const todo = [...want].filter((id) => !byId.get(id)?.tags.some((t) => t.toLowerCase() === "instagram")).slice(0, 60);
+  for (const id of todo) {
+    try {
+      await ghl(`/contacts/${encodeURIComponent(id)}/tags`, { method: "POST", body: { tags: ["instagram"] } });
+      byId.get(id)?.tags.push("instagram");
+    } catch (e: any) {
+      return `Couldn't tag Instagram leads in GoHighLevel: ${e.message}. The GoHighLevel key needs the "Edit Contacts" scope.`;
+    }
+  }
+  return null;
+}
+
 /** Refresh from GoHighLevel if the copy is older than `maxAgeMs`. Each part fails on its own. */
 export async function refreshGhl(maxAgeMs = 10 * 60_000): Promise<GhlSnap | null> {
   if (!ghlConfigured()) return null;
@@ -158,6 +179,8 @@ export async function refreshGhl(maxAgeMs = 10 * 60_000): Promise<GhlSnap | null
   const accts = await accounts().catch((e) => { errors.push(e.message); return cur?.accounts ?? []; });
   const ps = await posts(accts, since).catch((e) => { errors.push(e.message); return cur?.posts ?? []; });
   const ls = await leads(since).catch((e) => { errors.push(e.message); return cur?.leads ?? []; });
+  const tagErr = await tagInstagram(ls).catch((e) => e.message as string);
+  if (tagErr) errors.push(tagErr);
   const opps: GhlOpp[] = [];
   const pl = await pipeline(opps).catch((e) => { errors.push(e.message); return cur?.pipeline ?? []; });
   const snap: GhlSnap = { at: Date.now(), accounts: accts, posts: ps, leads: ls, pipeline: pl, opps: opps.length ? opps : cur?.opps ?? [], errors };
@@ -171,7 +194,7 @@ export function leadSource(l: GhlLead): string {
   const rules: [RegExp, string][] = [
     [/yard|sign/, "Yard sign"], [/craigslist/, "Craigslist"], [/marketplace/, "Marketplace"], [/nextdoor/, "Nextdoor"],
     [/lsa|local service/, "Google LSA"], [/google|gbp|gmb/, "Google"], [/facebook|meta|fb|instagram|ig\b/, "Facebook / Instagram"],
-    [/linkedin/, "LinkedIn"], [/smartlead|cold/, "Cold email"], [/referr/, "Referral"], [/website|form|site/, "Website"],
+    [/linkedin/, "LinkedIn"], [/smartlead|cold ?email|headline theory/, "Cold email"], [/cold .*leads?|re-?engage/, "Old leads texted again"], [/referr/, "Referral"], [/website|form|site/, "Website"],
     [/door/, "Door hanger"], [/mail|eddm/, "Direct mail"], [/repeat|return|previous/, "Returning customer"],
   ];
   for (const [re, name] of rules) if (re.test(all)) return name;

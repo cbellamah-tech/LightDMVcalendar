@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ChevronDown, X } from "lucide-react";
 import { ago, NAVY } from "@/components/ui";
 
 /* Organic vs paid: leads, quotes and sales by where they came from (GoHighLevel), against ad spend. */
@@ -14,7 +15,11 @@ export type Attribution = {
   rows: Row[];
   weeks: { week: string; organic: number; paid: number }[];
   untagged: string[];
+  items: Item[];
 };
+type Type = "lead" | "quote" | "sale";
+type Item = { type: Type; kind: Kind; source: string; name: string; day: string; value?: number; stage?: string; why?: string };
+type Pick = { type: Type; kind?: Kind; source?: string; title: string };
 
 // Categorical slots 1 and 2 of the validated chart palette (adjacent-pair CVD safe on white).
 const COLOR: Record<Kind, string> = { organic: "#2a78d6", paid: "#eb6834" };
@@ -23,15 +28,20 @@ const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 const per = (spend: number, n: number) => (spend && n ? money(spend / n) : "–");
 const shortDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-export function OrganicPaid({ a, at, days, setDays, connected }: {
-  a: Attribution | null; at: number | null; days: number; setDays: (n: number) => void; connected: boolean;
+export function OrganicPaid({ a, at, days, setDays, connected, errors = [] }: {
+  a: Attribution | null; at: number | null; days: number; setDays: (n: number) => void; connected: boolean; errors?: string[];
 }) {
+  const [pick, setPick] = useState<Pick | null>(null);
+  const [charts, setCharts] = useState(false);
+  useEffect(() => { try { setCharts(localStorage.getItem("mkt:charts") === "1"); } catch {} }, []);
+  const toggleCharts = () => { setCharts(!charts); try { localStorage.setItem("mkt:charts", charts ? "0" : "1"); } catch {} };
+  const open = (p: Pick) => setPick(pick && pick.title === p.title ? null : p);
   return (
     <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-5">
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-extrabold" style={{ color: NAVY }}>Organic vs paid</h2>
-          <p className="text-xs text-slate-500">Leads, quotes and sales by where they came from, from GoHighLevel{at ? `, updated ${ago(at)}` : ""}</p>
+          <p className="text-xs text-slate-500">Each person's source and deal stage, read from GoHighLevel contacts and pipelines. Tap any number to see who{at ? `, updated ${ago(at)}` : ""}</p>
         </div>
         <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm font-semibold" role="group" aria-label="Date range">
           {[7, 30, 90].map((n) => (
@@ -46,46 +56,94 @@ export function OrganicPaid({ a, at, days, setDays, connected }: {
         : (
           <>
             <div className="grid sm:grid-cols-2 gap-3">
-              <Side kind="organic" n={a.totals.organic} />
-              <Side kind="paid" n={a.totals.paid} />
+              <Side kind="organic" n={a.totals.organic} open={open} pick={pick} />
+              <Side kind="paid" n={a.totals.paid} open={open} pick={pick} />
             </div>
-            <Share a={a} />
-            <Trend weeks={a.weeks} />
-            <Sources rows={a.rows} />
+            {pick && !pick.source && <Detail a={a} pick={pick} close={() => setPick(null)} />}
+            <Sources rows={a.rows} open={open} pick={pick} />
+            {pick?.source && <Detail a={a} pick={pick} close={() => setPick(null)} />}
+            <button onClick={toggleCharts} className="text-xs font-semibold text-slate-600 inline-flex items-center gap-1">
+              <ChevronDown size={14} className={charts ? "rotate-180" : ""} /> {charts ? "Hide charts" : "Show charts"}
+            </button>
+            {charts && <><Share a={a} /><Trend weeks={a.weeks} /></>}
             {a.untagged.length > 0 && (
               <p className="text-xs text-slate-500">Not tagged with a source in GoHighLevel: {a.untagged.join(", ")}. Tag them there and they move into the right row.</p>
             )}
+            {errors.map((e) => <p key={e} className="text-xs text-red-600 break-words">{e}</p>)}
           </>
         )}
     </section>
   );
 }
 
-function Side({ kind, n }: { kind: Kind; n: Nums }) {
-  const stats: [string, string][] = [
-    ["Quotes", n.quotes.toLocaleString()],
-    ["Sold", n.sales.toLocaleString()],
-    ["Sales", money(n.revenue)],
-  ];
-  if (kind === "paid") stats.push(["Spent", money(n.spend)], ["Per lead", per(n.spend, n.leads)], ["Per sale", per(n.spend, n.sales)]);
+const TITLE: Record<Type, string> = { lead: "Leads", quote: "Quotes", sale: "Sold" };
+
+function Side({ kind, n, open, pick }: { kind: Kind; n: Nums; open: (p: Pick) => void; pick: Pick | null }) {
+  const tap = (type: Type, label: string, value: string) => {
+    const title = `${NAME[kind]} ${label.toLowerCase()}`;
+    const on = pick?.title === title;
+    return (
+      <button key={label} onClick={() => open({ type, kind, title })} aria-pressed={on}
+        className={`text-left rounded-lg px-2 py-1 -mx-2 hover:bg-white ${on ? "bg-white ring-1 ring-slate-300" : ""}`}>
+        <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+        <div className="text-base font-bold tabular-nums text-slate-900 underline decoration-dotted decoration-slate-300 underline-offset-4">{value}</div>
+      </button>
+    );
+  };
+  const fixed = (label: string, value: string) => (
+    <div key={label} className="px-2 py-1 -mx-2">
+      <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-base font-bold tabular-nums text-slate-900">{value}</div>
+    </div>
+  );
+  const leadsTitle = `${NAME[kind]} leads`;
   return (
     <div className="rounded-xl bg-slate-50 p-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
         <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLOR[kind] }} />{NAME[kind]}
         <span className="text-xs font-normal text-slate-400">{kind === "paid" ? "Google ads, Meta ads, cold email" : "Google Business, website, calls, email, signs, referrals"}</span>
       </div>
-      <div className="mt-1 flex items-baseline gap-2">
+      <button onClick={() => open({ type: "lead", kind, title: leadsTitle })} aria-pressed={pick?.title === leadsTitle}
+        className={`mt-1 flex items-baseline gap-2 rounded-lg px-2 -mx-2 hover:bg-white ${pick?.title === leadsTitle ? "bg-white ring-1 ring-slate-300" : ""}`}>
         <span className="text-4xl font-extrabold tabular-nums text-slate-900">{n.leads.toLocaleString()}</span>
-        <span className="text-sm text-slate-500">leads</span>
+        <span className="text-sm text-slate-500 underline decoration-dotted underline-offset-4">leads</span>
+      </button>
+      <div className="mt-2 grid grid-cols-3 gap-x-3 gap-y-1">
+        {tap("quote", "Quotes", n.quotes.toLocaleString())}
+        {tap("sale", "Sold", n.sales.toLocaleString())}
+        {tap("sale", "Sales", money(n.revenue))}
+        {kind === "paid" && <>{fixed("Spent", money(n.spend))}{fixed("Per lead", per(n.spend, n.leads))}{fixed("Per sale", per(n.spend, n.sales))}</>}
       </div>
-      <dl className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2">
-        {stats.map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-[11px] uppercase tracking-wide text-slate-500">{k}</dt>
-            <dd className="text-base font-bold tabular-nums text-slate-900">{v}</dd>
-          </div>
-        ))}
-      </dl>
+    </div>
+  );
+}
+
+/** Who's behind a number: name, date, stage and price. */
+function Detail({ a, pick, close }: { a: Attribution; pick: Pick; close: () => void }) {
+  const label = new Map(a.rows.map((r) => [r.id, r.label]));
+  const list = a.items.filter((i) => i.type === pick.type && (!pick.kind || i.kind === pick.kind) && (!pick.source || i.source === pick.source));
+  const total = list.reduce((s, i) => s + (i.value ?? 0), 0);
+  return (
+    <div className="rounded-xl border border-slate-200">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100">
+        <span className="font-bold text-sm flex-1">{pick.title} <span className="font-normal text-slate-500">· {list.length}{pick.type !== "lead" && total ? ` · ${money(total)}` : ""}</span></span>
+        <button onClick={close} aria-label="Close" className="p-1 text-slate-400 hover:text-slate-700"><X size={16} /></button>
+      </div>
+      {!list.length ? <p className="text-sm text-slate-500 px-3 py-2">None in this range.</p> : (
+        <div className="max-h-80 overflow-auto divide-y divide-slate-100">
+          {list.map((i, k) => (
+            <div key={k} className="flex items-center gap-3 px-3 py-1.5 text-sm">
+              <span className="flex-1 min-w-0 truncate font-medium text-slate-800">{i.name}</span>
+              <span className="text-xs text-slate-500 truncate hidden sm:inline max-w-[260px]" title={i.why ? `GoHighLevel says: ${i.why}` : undefined}>
+                {pick.source ? "" : label.get(i.source as any) ?? i.source}{i.why ? `${pick.source ? "" : " · "}${i.why}` : ""}
+              </span>
+              {i.stage && <span className="text-xs text-slate-400 truncate hidden md:inline max-w-[160px]">{i.stage}</span>}
+              <span className="text-xs text-slate-400 w-14 text-right">{shortDay(i.day)}</span>
+              {pick.type !== "lead" && <span className="tabular-nums font-semibold w-20 text-right">{i.value ? money(i.value) : "–"}</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -181,7 +239,14 @@ function Trend({ weeks }: { weeks: Attribution["weeks"] }) {
   );
 }
 
-function Sources({ rows }: { rows: Row[] }) {
+function Sources({ rows, open, pick }: { rows: Row[]; open: (p: Pick) => void; pick: Pick | null }) {
+  const cell = (r: Row, type: Type, text: string | number, title: string) => {
+    const t = `${r.label}: ${title}`;
+    return (
+      <button onClick={() => open({ type, source: r.id, title: t })} disabled={text === "–"}
+        className={`tabular-nums hover:underline disabled:no-underline ${pick?.title === t ? "font-bold underline" : ""}`}>{text}</button>
+    );
+  };
   const max = Math.max(1, ...rows.map((r) => r.leads));
   if (!rows.length) return <p className="text-sm text-slate-500">No leads in this range.</p>;
   return (
@@ -211,12 +276,12 @@ function Sources({ rows }: { rows: Row[] }) {
               <td className="px-1">
                 <span className="flex items-center gap-2">
                   <span className="h-1.5 rounded" style={{ width: `${Math.max(4, (r.leads / max) * 96)}px`, background: COLOR[r.kind] }} />
-                  <span className="tabular-nums font-semibold text-slate-900">{r.leads}</span>
+                  <span className="font-semibold text-slate-900">{cell(r, "lead", r.leads, "leads")}</span>
                 </span>
               </td>
-              <td className="text-right tabular-nums px-1">{r.quotes || "–"}</td>
-              <td className="text-right tabular-nums px-1">{r.sales || "–"}</td>
-              <td className="text-right tabular-nums px-1">{r.revenue ? money(r.revenue) : "–"}</td>
+              <td className="text-right px-1">{cell(r, "quote", r.quotes || "–", "quotes")}</td>
+              <td className="text-right px-1">{cell(r, "sale", r.sales || "–", "sold")}</td>
+              <td className="text-right px-1">{cell(r, "sale", r.revenue ? money(r.revenue) : "–", "sold")}</td>
               <td className="text-right tabular-nums px-1">{r.spend ? money(r.spend) : "–"}</td>
               <td className="text-right tabular-nums px-1">{per(r.spend, r.leads)}</td>
             </tr>
