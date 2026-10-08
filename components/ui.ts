@@ -30,3 +30,7 @@ export const ago = (t: number) => {
   const h = Math.round(m / 60);
   return h < 24 ? `${h} hr ago` : fmtDay(t);
 };
+
+/** Who's signed in, asked once per page load and shared by the Shell and the page. */
+let mePromise: Promise<Me> | null = null;
+export const getMe = () => (mePromise ??= api<Me>("/api/me").catch((e) => { mePromise = null; throw e; }));
