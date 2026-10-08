@@ -110,7 +110,11 @@ function RatesEditor() {
         <p className="text-sm text-slate-500">The lessons' price helper and tree trainer use these. Owners only.</p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {n("rooflinePerFt", "Roofline $ per foot")}
+        {n("rooflinePerFt", "Roofline $ per foot (standard)")}
+        {n("roofline1StoryLow", "Short 1-story or flat, from $")}
+        {n("roofline1StoryHigh", "Short 1-story or flat, to $")}
+        {n("roofline2Story", "2 stories $ per foot")}
+        {n("rooflineSteep", "Steep or 3 stories $ per foot")}
         {n("perStrand", "Minis $ per strand")}
         {n("pillar", "Pillar $ each")}
         {Object.keys(r.wreath).map((s) => (
@@ -123,6 +127,8 @@ function RatesEditor() {
         {n("taxPct", "Sales tax %")}
         {n("cashDiscountPct", "Cash discount %")}
         {n("returningDiscountPct", "Returning customer %")}
+        {n("earlyDiscountPct", "Early install %")}
+        {n("startingPrice", "Typical starting price $")}
         {n("returningBefore", "Returning discount before")}
         {n("passPct", "Pass bar (% off)")}
       </div>

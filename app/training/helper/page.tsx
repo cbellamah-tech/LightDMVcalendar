@@ -22,7 +22,14 @@ export default function PriceHelper() {
 
   type Row = { label: string; rule: number | null; how: string; band: Band | null; count: number };
   const rows: Row[] = [];
-  if (num(f.roof)) rows.push({ label: `Roofline, ${num(f.roof)} ft`, rule: num(f.roof) * r.rooflinePerFt, how: `${num(f.roof)} ft × ${money(r.rooflinePerFt)}`, band: band("roofline"), count: 1 });
+  const HOUSE: Record<string, { label: string; perFt: number }> = {
+    short: { label: "short 1-story or flat", perFt: (r.roofline1StoryLow + r.roofline1StoryHigh) / 2 },
+    std: { label: "standard", perFt: r.rooflinePerFt },
+    two: { label: "2 stories", perFt: r.roofline2Story },
+    steep: { label: "steep or 3 stories", perFt: r.rooflineSteep },
+  };
+  const house = HOUSE[f.house ?? "std"] ?? HOUSE.std;
+  if (num(f.roof)) rows.push({ label: `Roofline, ${num(f.roof)} ft (${house.label})`, rule: num(f.roof) * house.perFt, how: `${num(f.roof)} ft × $${house.perFt}`, band: band("roofline"), count: 1 });
   if (num(f.pillars)) rows.push({ label: `Pillars × ${num(f.pillars)}`, rule: num(f.pillars) * r.pillar, how: `${num(f.pillars)} × ${money(r.pillar)}`, band: band("pillars"), count: num(f.pillars) });
   trees.forEach((t, i) => { if (num(t)) rows.push({ label: `Tree ${i + 1}, ${num(t)} strands`, rule: num(t) * r.perStrand, how: `${num(t)} × ${money(r.perStrand)}`, band: band("tree"), count: 1 }); });
   if (num(f.bushStrands)) rows.push({ label: `Bushes, ${num(f.bushStrands)} strands`, rule: num(f.bushStrands) * r.perStrand, how: `${num(f.bushStrands)} × ${money(r.perStrand)}`, band: band("bushes"), count: 1 });
@@ -48,6 +55,12 @@ export default function PriceHelper() {
       <H1 sub="Enter what you measured. The rule price uses the owners' rates; the range is what past sold quotes charged.">Price helper</H1>
       <Card className="grid sm:grid-cols-2 gap-3">
         {field("roof", "Roofline feet (all runs and peaks)", "e.g. 120")}
+        <label className="block">
+          <span className="text-sm font-semibold">The house</span>
+          <select value={f.house ?? "std"} onChange={(e) => setF({ ...f, house: e.target.value })} className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 bg-white">
+            {Object.entries(HOUSE).map(([k, h]) => <option key={k} value={k}>{h.label} (${h.perFt} a foot)</option>)}
+          </select>
+        </label>
         {field("pillars", "Pillars (9 to 10 ft each)", "count")}
         {field("bushStrands", "Bushes: total strands", "strands of minis")}
         {field("railStrands", "Railing: strands", "strands of minis")}
@@ -87,7 +100,7 @@ export default function PriceHelper() {
           <div className="flex justify-between font-extrabold text-lg" style={{ color: NAVY }}><span>Total before tax</span><span>{money(total)}</span></div>
           <div className="text-sm text-slate-600">
             Tax {r.taxPct}%: {money(total * r.taxPct / 100)} · Deposit {r.depositPct}%: {money(total * (1 + r.taxPct / 100) * r.depositPct / 100)} ·
-            Returning customers: last year's price, {r.returningDiscountPct}% off if booked before {r.returningBefore} · Cash: {r.cashDiscountPct}% off.
+            Returning customers: last year's price, {r.returningDiscountPct}% off if booked before {r.returningBefore} · Early installs: {r.earlyDiscountPct}% off · Cash: {r.cashDiscountPct}% off · Most jobs start around {money(r.startingPrice)} (a starting point, not a minimum).
           </div>
           <p className="text-xs text-slate-400">Takedown, maintenance, storage, timers and hidden cords always go on their own $0 line. Check every line against the range, then use judgment (height, pitch, stories).</p>
         </Card>
