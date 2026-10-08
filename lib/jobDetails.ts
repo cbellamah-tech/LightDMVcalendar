@@ -31,7 +31,7 @@ export type JobDetail = {
   photoInfo?: string;       // where the line photos came from (or why there are none), shown small on the job page
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
-const IMGV = 2;
+const IMGV = 3;
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
 export const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
@@ -163,7 +163,8 @@ export async function fetchJobDetail(jobberJobId: string): Promise<JobDetail> {
     d = { fetchedAt: Date.now(), imgv: IMGV, ...parse(r.job || {}) };
     // Copy line item photos and the signed quote's mockups into our photo storage (Jobber's links expire).
     const { importJobImages } = await import("./jobImages");
-    d = await importJobImages(d, await kvGet<JobDetail>(key(jobberJobId))).catch(() => d);
+    const base = d;
+    d = await importJobImages(d, await kvGet<JobDetail>(key(jobberJobId))).catch((e) => ({ ...base, photoInfo: `photo import failed: ${e?.message || e}` }));
   } catch (e: any) {
     selCache = null;
     const prev = await kvGet<JobDetail>(key(jobberJobId));

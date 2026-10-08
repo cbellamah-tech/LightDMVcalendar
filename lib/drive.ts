@@ -76,9 +76,11 @@ export function driveFor(idx: DriveIndex, clientName: string, notesBins: string[
   }
   photos.sort((a, b) => Number(b.sure) - Number(a.sure) || b.year - a.year);
 
-  // Finished-install photos are filed by customer name ("Copy of Jane Doe.heic"): whole-name matches only.
-  const installPhotos: DrivePhoto[] = name.includes(" ")
-    ? (idx.installPhotos ?? []).filter((p) => loose(p.label) === name)
+  // Finished-install photos are filed by customer name ("Jane Doe.heic", "Copy of jane doe - 2.HEIC"): first and last name both in it.
+  const words = name.split(" ");
+  const first = words[0], lastW = words[words.length - 1];
+  const installPhotos: DrivePhoto[] = words.length > 1
+    ? (idx.installPhotos ?? []).filter((p) => { const w = loose(p.label.replace(/^copy of\s+/i, "")).split(" "); return w.includes(first) && w.includes(lastW); })
       .map((p) => ({ fileId: p.fileId, title: p.title, year: p.year, bin: null, sure: true, thumb: viewUrl(p.fileId), link: viewUrl(p.fileId) }))
       .sort((a, b) => b.year - a.year)
     : [];
