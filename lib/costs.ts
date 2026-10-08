@@ -45,7 +45,7 @@ export type Settings = {
 };
 export const DEFAULT_SETTINGS: Settings = { bulbsPerFt: 1, clipsPerBulb: 1, runFt: 50, extFtPerJob: 50, crewPct: 20, repeatNewPct: 7.5, chargePerFt: 10, chargePerStrand: 35 };
 
-export type Logged = { rooflineFt: number; c7Bulbs: number; miniStrands: number; byName?: string; at?: number };
+export type Logged = { rooflineFt: number; c7Bulbs: number; miniStrands: number; stakeFt?: number; byName?: string; at?: number };
 export type Sold = { amount: number; source: "jobber" | "owner"; at: number };
 
 const ORDERS = "ldmv:costs:orders";
@@ -114,7 +114,7 @@ export function costOf(use: Partial<Record<MaterialKey, number>>, uc: UnitCosts)
 }
 
 const toLogged = (m: MaterialRecord): Logged =>
-  ({ rooflineFt: m.c9Feet || 0, c7Bulbs: m.c7Bulbs || 0, miniStrands: m.miniStrands || 0, byName: m.by, at: m.at });
+  ({ rooflineFt: m.c9Feet || 0, c7Bulbs: m.c7Bulbs || 0, miniStrands: m.miniStrands || 0, stakeFt: m.stakeFeet || 0, byName: m.by, at: m.at });
 
 /** Sold price for Jobber jobs we haven't priced yet, a few per call so a page load stays quick. */
 export async function fetchSoldFromJobber(jobs: Job[], limit = 15) {

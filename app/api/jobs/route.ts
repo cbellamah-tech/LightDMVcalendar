@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     const d = j.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${j.jobberJobId}`) : null;
     const v = j.source === "jobber" ? withDrive(idx, d, j.client) : null;
     const info = v ? { repeat: v.repeat, bins: v.drive.bins.map((b) => b.bin), known: !!d } : undefined;
-    return { ...j, progress: checklistProgress(c), completedAt: c.completedAt, info, pay: payFor(j, d, overrides) };
+    return { ...j, progress: checklistProgress(c), arrivedAt: c.arrivedAt, completedAt: c.completedAt, info, pay: payFor(j, d, overrides) };
   };
   const fixes = (await Promise.all(fixList.map(withProgress)))
     // An old fix finished in the app drops off once its day has passed.

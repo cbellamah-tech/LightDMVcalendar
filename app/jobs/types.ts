@@ -8,7 +8,7 @@ export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: num
   parts?: Record<string, string>;   // photo url -> part of the job it shows (per-part photos)
   photoBy?: Record<string, string>; // photo url -> who took it
 };
-export type Checklist = { jobId: string; kind: string; items: Record<string, CheckEntry>; completedAt?: number; completedBy?: string; rev: number };
+export type Checklist = { jobId: string; kind: string; items: Record<string, CheckEntry>; arrivedAt?: number; completedAt?: number; completedBy?: string; rev: number };
 export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; perPart?: boolean; noteLabel?: string; counts?: { key: string; label: string }[] };
 export type DetailFile = { name: string; url: string; image: boolean };
 export type JobDetail = {
@@ -24,3 +24,6 @@ export type JobDetail = {
   };
 };
 export type CrewPay = { amount: number | null; how: "set" | "rule" | "unknown" };
+
+/** "3 h 28 m" */
+export const dur = (ms: number) => { const m = Math.max(0, Math.round(ms / 60000)); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} m` : `${m} m`; };

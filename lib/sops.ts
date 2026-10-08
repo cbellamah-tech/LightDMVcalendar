@@ -3,16 +3,18 @@
    photo: the box needs at least one photo before it can be checked.
    Items marked REQUIRED, and items that ask for a picture, are required. Edit here to change. */
 
-export type SopCount = { key: "c9Feet" | "c7Bulbs" | "miniStrands"; label: string };
+export type SopCount = { key: "c9Feet" | "c7Bulbs" | "miniStrands" | "stakeFeet"; label: string };
 /** counts: numbers the crew must enter before the box can be checked (materials used, for the ledger). */
 /** noteRequired: the box can't be checked until the note is filled in. */
 /** perPart: one photo for each part of the job (the Jobber line items: roofline, trees, wreaths...); the box checks itself. */
 export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; perPart?: boolean; noteLabel?: string; noteRequired?: boolean; counts?: SopCount[] };
 
 export const MATERIAL_COUNTS: SopCount[] = [
-  { key: "c9Feet", label: "Feet of C9 roofline (count the bulbs)" },
-  { key: "c7Bulbs", label: "C7 bulbs used (0 if none)" },
-  { key: "miniStrands", label: "Mini strands used" },
+  // chris 2026-10-08: each one "if any"; a blank counts as none.
+  { key: "miniStrands", label: "Mini light strands, if any" },
+  { key: "c7Bulbs", label: "C7 bulbs, if any" },
+  { key: "c9Feet", label: "Feet of C9 bulbs, if any (count the bulbs)" },
+  { key: "stakeFeet", label: "Feet of stake lighting, if any" },
 ];
 /** fix = a service call (Jobber visit or job titled "SERVICE ..."), kept apart from installs and takedowns. */
 export type JobKind = "install" | "takedown" | "fix";
@@ -36,7 +38,7 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
       { id: "finished-photos", text: "Take pictures of the entire finished job", required: true, photo: true },
       { id: "goodie-bag", text: "Leave a goodie bag at the front door and take a picture of it", required: true, photo: true },
       { id: "yard-sign", text: "Put our yard sign in front and take a picture of it", required: true, photo: true },
-      { id: "materials", text: "Enter the material used on this job", required: true, counts: MATERIAL_COUNTS },
+      { id: "materials", text: "Enter the material used on this job (leave blank what you didn't use)", required: true, counts: MATERIAL_COUNTS },
       { id: "review", text: "Ask for a Google review while wearing the review tag ($50)", noteLabel: "Customer said" },
       { id: "cross-sell", text: "Offer cross-sells (crew member gets 15% of the upsell price)", noteLabel: "Upsell sold and price" },
     ],
