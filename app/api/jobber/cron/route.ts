@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isConnected, jobberConfigured, syncJobber } from "@/lib/jobber";
+import { scanReviews } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,7 +11,9 @@ export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
   const fromCron = secret ? auth === `Bearer ${secret}` : /vercel-cron/i.test(req.headers.get("user-agent") || "");
   if (!fromCron) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
-  if (!jobberConfigured() || !(await isConnected())) return NextResponse.json({ skipped: "Jobber not connected" });
+  // New Google reviews: credit the installer whose review card was tapped (needs only Google).
+  const reviews = await scanReviews().catch((e) => ({ error: e.message }));
+  if (!jobberConfigured() || !(await isConnected())) return NextResponse.json({ skipped: "Jobber not connected", reviews });
   try {
     return NextResponse.json({ count: await syncJobber(40) });
   } catch (e: any) {

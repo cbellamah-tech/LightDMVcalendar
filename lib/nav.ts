@@ -1,6 +1,6 @@
 // Who sees which tab, in what order, and how the tabs group. The Shell (top bar, phone bar, More menu) and the
 // home page both read this, so a tab only has to be added here once. The middleware still does the real gating.
-import { CalendarDays, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, Receipt, Settings, ShieldCheck, UserCheck, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, Receipt, Settings, ShieldCheck, Star, UserCheck, Users } from "lucide-react";
 import type { Me } from "@/components/ui";
 
 export type Role = Me["role"];
@@ -23,6 +23,7 @@ export const TABS: Record<string, Tab> = {
   people: { href: "/people", label: "People", text: "Add workers, set PINs, put people on crews.", icon: Users, roles: OFFICE },
   install: { href: "/install", label: "Installer Training", short: "Training", text: "Every step of an install and a takedown.", icon: Hammer, roles: EVERYONE },
   crewTraining: { href: "/install/team", label: "Crew training", short: "My crew", text: "Where each person is in Installer Training; sign them off.", icon: UserCheck, roles: ["owner", "manager", "lead"] },
+  reviews: { href: "/reviews", label: "Review cards", short: "Reviews", text: "Who collected each Google review, and their $50.", icon: Star, roles: OFFICE },
   jobber: { href: "/settings/jobber", label: "Jobber", text: "Jobber connection, sync and the Drive read.", icon: Settings, roles: OFFICE },
 };
 
@@ -39,7 +40,7 @@ const GROUPS: { title: string; tabs: (keyof typeof TABS)[] }[] = [
   { title: "Run the day", tabs: ["jobs", "calendar", "signs"] },
   { title: "Bring in work", tabs: ["marketing", "briefing", "training"] },
   { title: "Money and papers", tabs: ["costs", "insurance"] },
-  { title: "Team", tabs: ["people", "install", "crewTraining", "jobber"] },
+  { title: "Team", tabs: ["people", "reviews", "install", "crewTraining", "jobber"] },
 ];
 
 export const primaryTabs = (role: Role) => PRIMARY[role].map((k) => TABS[k]);

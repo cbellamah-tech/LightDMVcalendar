@@ -6,13 +6,14 @@ import { ArrowLeft, Camera, Check, CheckCircle2, Loader2, Navigation, X } from "
 import PhotoButton from "@/components/PhotoButton";
 import { ago, api, fmtDay, fmtTime, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../../signs/types";
-import type { Checklist, CrewPay, Job, JobDetail, Progress, SopItem } from "../types";
+import type { Checklist, CrewPay, Job, JobDetail, Progress, ReviewBonus as Bonus, SopItem } from "../types";
 import { dur } from "../types";
 import JobInfo from "./JobInfo";
 import PayLine from "./PayLine";
 import Expenses from "./Expenses";
+import ReviewBonus from "./ReviewBonus";
 
-type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress; pay?: CrewPay; parts?: { name: string; images: { url: string; name: string }[] }[] };
+type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress; pay?: CrewPay; reviews?: Bonus[]; parts?: { name: string; images: { url: string; name: string }[] }[] };
 
 export default function JobPage({ params }: { params: { id: string } }) {
   const [d, setD] = useState<Data | null>(null);
@@ -73,6 +74,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
           </a>
         )}
         <PayLine jobId={job.id} kind={job.kind} pay={d.pay} onChange={(pay) => setD((cur) => (cur ? { ...cur, pay } : cur))} />
+        <ReviewBonus items={d.reviews} onChange={load} />
       </div>
 
       {(c.arrivedAt || c.completedAt) && (

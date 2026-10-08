@@ -9,6 +9,7 @@ import { loadDriveIndex } from "@/lib/drive";
 import { fixSheetStatus, fixSheetUrl } from "@/lib/serviceSheet";
 import { getPayOverrides, payFor } from "@/lib/crewPay";
 import { expenseTotal, getAllExpenses } from "@/lib/expenses";
+import { bonusesByJob, bonusTotal, scanIfStale } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
@@ -36,10 +37,12 @@ export async function GET(req: Request) {
   fixList.sort((a, b) => a.start.localeCompare(b.start));
   // Checklists and cached Jobber details for every row in two queries instead of two per job.
   const rows = [...jobs, ...fixList];
-  const [lists, details, expenses] = await Promise.all([
+  const [lists, details, expenses, bonuses] = await Promise.all([
     getChecklists(rows),
     kvGetMany<JobDetail>(rows.map((j) => (j.jobberJobId ? `ldmv:jobdetail:${j.jobberJobId}` : "ldmv:none"))),
     getAllExpenses(),
+    bonusesByJob(users),
+    scanIfStale().catch(() => {}), // new Google reviews: credit the installer whose card was tapped
   ]);
   const withProgress = (j: Job, i: number) => {
     const c = lists[i];
@@ -47,7 +50,7 @@ export async function GET(req: Request) {
     const d = j.jobberJobId ? details[i] : null;
     const v = j.source === "jobber" ? withDrive(idx, d, j.client) : null;
     const info = v ? { repeat: v.repeat, bins: v.drive.bins.map((b) => b.bin), known: !!d } : undefined;
-    return { ...j, progress: checklistProgress(c), arrivedAt: c.arrivedAt, completedAt: c.completedAt, info, pay: payFor(j, d, overrides), expenses: expenseTotal(expenses[j.id]) };
+    return { ...j, progress: checklistProgress(c), arrivedAt: c.arrivedAt, completedAt: c.completedAt, info, pay: payFor(j, d, overrides), expenses: expenseTotal(expenses[j.id]), reviews: bonusTotal(bonuses[j.id]) };
   };
   const out = rows.map(withProgress);
   const fixes = out.slice(jobs.length)

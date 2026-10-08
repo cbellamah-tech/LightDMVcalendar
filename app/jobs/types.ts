@@ -26,6 +26,7 @@ export type JobDetail = {
   };
 };
 export type CrewPay = { amount: number | null; how: "set" | "rule" | "unknown" };
+export type ReviewBonus = { reviewId: string; personId: string; person: string; amount: number; reviewer: string; at: number; how?: string };
 export type DrivePhoto = { fileId: string; title: string; year: number; bin: string | null; thumb: string; link: string; sure: boolean };
 
 /** "3 h 28 m" */
