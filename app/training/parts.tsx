@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { createContext, Fragment, useContext, useState } from "react";
 import { Lightbulb, Loader2, Play, X } from "lucide-react";
 import { api, GREEN, NAVY, RED } from "@/components/ui";
 
@@ -89,9 +89,14 @@ export function Photo({ id, caption, big, wide, className = "" }: { id: string; 
   );
 }
 
+/** Lets a course page hear which videos were played. */
+export const VideoPlayed = createContext<((yt: string) => void) | null>(null);
+
 /** YouTube videos: tap a thumbnail to play it right here. */
 export function Videos({ title, items }: { title: string; items: { yt: string; title: string; by: string }[] }) {
-  const [playing, setPlaying] = useState<string | null>(null);
+  const [playing, setPlay] = useState<string | null>(null);
+  const played = useContext(VideoPlayed);
+  const setPlaying = (yt: string) => { setPlay(yt); played?.(yt); };
   return (
     <div className="space-y-2">
       <div className="font-semibold text-sm text-slate-800">{title}</div>

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Users } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Lock, Users } from "lucide-react";
 import { api, Me, NAVY } from "@/components/ui";
-import { CourseModule, fmtTime, InstallProgress, toCourse, totalSecs } from "@/lib/installCourse";
-import { Block, Blocks, Btn, Card, H1, Spinner } from "../training/parts";
+import { BASICS, CourseModule, fmtTime, InstallProgress, toCourse, totalSecs, unlocked } from "@/lib/installCourse";
+import { Block, Blocks, Btn, Card, H1, Spinner, VideoPlayed } from "../training/parts";
 import { PackUpload } from "../training/PackUpload";
 
 type Mod = { title: string; blocks: Block[] };
@@ -23,6 +23,7 @@ export default function InstallCourse() {
   const course = useMemo(() => toCourse(g?.modules ?? []), [g]);
   if (!g) return <Spinner />;
   const office = me?.role === "owner" || me?.role === "manager";
+  const canSee = (i: number) => office || unlocked(i, course, prog);
 
   if (!g.loaded || !g.modules) {
     return (
@@ -46,7 +47,7 @@ export default function InstallCourse() {
       <Card className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <div className="font-bold" style={{ color: NAVY }}>{done} of {course.length} modules done</div>
-          {office && <Link href="/install/team" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><Users size={16} /> Team progress</Link>}
+          {(office || me?.role === "lead") && <Link href="/install/team" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><Users size={16} /> Team progress</Link>}
         </div>
         <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${(done / Math.max(1, course.length)) * 100}%` }} /></div>
         {next >= 0 && <Btn onClick={() => setOpen(next)}>{done || prog.modules[course[next].key] ? "Continue" : "Start"}: {course[next].title}</Btn>}
@@ -55,13 +56,14 @@ export default function InstallCourse() {
       <div className="space-y-2">
         {course.map((m, i) => {
           const p = prog.modules[m.key];
+          const ok = canSee(i);
           return (
-            <button key={m.key} onClick={() => setOpen(i)} className="w-full text-left bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-              {p?.done ? <CheckCircle2 className="text-emerald-500 shrink-0" /> : <Circle className={`shrink-0 ${p ? "text-amber-400" : "text-slate-300"}`} />}
+            <button key={m.key} disabled={!ok} onClick={() => setOpen(i)} className={`w-full text-left bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3 ${ok ? "" : "opacity-60"}`}>
+              {p?.done ? <CheckCircle2 className="text-emerald-500 shrink-0" /> : !ok ? <Lock className="text-slate-300 shrink-0" /> : <Circle className={`shrink-0 ${p ? "text-amber-400" : "text-slate-300"}`} />}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold">{m.title}</div>
                 <div className="text-xs text-slate-500">
-                  {m.lessons.length} lessons{m.quiz ? " + quiz" : ""}{p ? ` · ${p.done ? "done" : `${p.seen.length} seen`}${p.quiz ? ` · quiz best ${p.quiz.best}%` : ""} · ${fmtTime(totalSecs(p))}` : ""}
+                  {!ok && `Opens after modules 1 to ${BASICS} · `}{p?.signedOff ? `Signed off by ${p.signedOff.by} · ` : ""}{m.lessons.length} lesson{m.lessons.length === 1 ? "" : "s"}{m.quiz ? " + quiz" : ""}{p ? ` · ${p.done ? "done" : `${p.seen.length} seen`}${p.quiz ? ` · quiz best ${p.quiz.best}%` : ""} · ${fmtTime(totalSecs(p))}` : ""}
                 </div>
               </div>
               <ChevronRight className="text-slate-300 shrink-0" />
@@ -82,16 +84,19 @@ function ModuleView({ m, n, of, prog, setProg, onExit, onNext }: {
   const [page, setPage] = useState(() => (mp && !mp.done ? Math.min(Math.max(...mp.seen, 0), pages - 1) : 0));
   const [finished, setFinished] = useState(false);
   const tick = useRef(Date.now());
+  const active = useRef(Date.now());
   const last = page === pages - 1;
   const onQuiz = !!m.quiz && page === m.lessons.length;
   const quizPassed = !m.quiz || !!prog.modules[m.key]?.quiz?.passed;
 
   // Time on page: a beat every 15 s while the page is on screen, and one when leaving the page.
-  async function beat(p: number, done = false) {
+  // Idle (no touch, scroll or key for 2 minutes, unless a video is playing) or hidden tabs don't count.
+  async function beat(p: number, done = false, video?: string) {
     const now = Date.now();
-    const secs = document.visibilityState === "visible" ? (now - tick.current) / 1000 : 0;
+    const idle = now - active.current > 120_000;
+    const secs = document.visibilityState === "visible" && !idle ? (now - tick.current) / 1000 : 0;
     tick.current = now;
-    const r = await api<InstallProgress>("/api/install/progress", { method: "POST", json: { module: m.key, page: p, secs, done } }).catch(() => null);
+    const r = await api<InstallProgress>("/api/install/progress", { method: "POST", json: { module: m.key, page: p, secs, done, video } }).catch(() => null);
     if (r) setProg(r);
   }
   useEffect(() => {
@@ -99,8 +104,11 @@ function ModuleView({ m, n, of, prog, setProg, onExit, onNext }: {
     beat(page);
     const t = setInterval(() => beat(page), 15_000);
     const vis = () => { if (document.visibilityState === "visible") tick.current = Date.now(); };
+    const poke = () => { if (Date.now() - active.current > 120_000) tick.current = Date.now(); active.current = Date.now(); };
     document.addEventListener("visibilitychange", vis);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", vis); beat(page); };
+    const evs = ["pointerdown", "scroll", "keydown", "touchstart"] as const;
+    evs.forEach((e) => window.addEventListener(e, poke, { passive: true }));
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", vis); evs.forEach((e) => window.removeEventListener(e, poke)); beat(page); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, m.key]);
 
@@ -132,7 +140,9 @@ function ModuleView({ m, n, of, prog, setProg, onExit, onNext }: {
       {onQuiz ? <Quiz m={m} onGraded={setProg} /> : (
         <Card className="space-y-3">
           <h2 className="font-bold text-lg">{lesson.title}</h2>
-          <Blocks blocks={lesson.blocks} />
+          <VideoPlayed.Provider value={(yt) => { active.current = Date.now() + 15 * 60_000; beat(page, false, yt); }}>
+            <Blocks blocks={lesson.blocks} />
+          </VideoPlayed.Provider>
         </Card>
       )}
       <div className="flex items-center justify-between gap-2">
