@@ -59,8 +59,15 @@ export const allAdDays = async () => Object.values((await kvGet<Record<string, A
 
 export async function adsSummary() {
   let error: string | undefined;
-  await syncMetaAds().catch((e) => { error = e.message; });
-  const all = Object.values((await kvGet<Record<string, AdDay>>(DAYS)) ?? {});
+  let all = Object.values((await kvGet<Record<string, AdDay>>(DAYS)) ?? {});
+  if (!all.length) {
+    await syncMetaAds().catch((e) => { error = e.message; });
+    all = Object.values((await kvGet<Record<string, AdDay>>(DAYS)) ?? {});
+  } else if (metaConfigured() && Date.now() - ((await kvGet<number>(META_AT)) ?? 0) >= 60 * 60_000) {
+    // Saved numbers show at once; Facebook is re-read (at most hourly) after the page has its answer.
+    const { laterOnce } = await import("./background");
+    await laterOnce("meta-ads", () => syncMetaAds(), 60_000);
+  }
   const today = etDay(Date.now()), weekAgo = addDays(today, -7), month = today.slice(0, 7);
   const by = (s: AdSource) => {
     const rows = all.filter((r) => r.source === s);

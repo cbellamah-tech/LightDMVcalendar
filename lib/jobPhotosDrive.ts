@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { kvGet, kvSet, kvUpdate } from "./store";
+import { kvGet, kvGetMany, kvSet, kvUpdate } from "./store";
 import { gapi, googleAccessToken, googleStatus } from "./google";
 import { SOPS } from "./sops";
 import type { Checklist, Job } from "./jobs";
@@ -148,21 +148,26 @@ export async function copyJobPhotos(job: Job, c: Checklist, origin: string, limi
 
 /** For the Jobs page: where the photos go, and how many are still waiting to be copied. */
 export async function driveCopyStatus(jobs: Job[], checklists: Checklist[]) {
-  const g = await googleStatus();
-  const folders = (await kvGet<Record<string, string>>(FOLDERS)) ?? {};
-  const rootId = folders[`root/${ROOT_NAME}`];
-  const sheetId = await kvGet<string>(SHEET);
+  const byId = new Map(jobs.map((j) => [j.id, j]));
+  const shown = checklists.filter((c) => byId.has(c.jobId));
+  const [g, folders, sheetId, lastError, copiedLists] = await Promise.all([
+    googleStatus(),
+    kvGet<Record<string, string>>(FOLDERS),
+    kvGet<string>(SHEET),
+    kvGet<{ at: number; jobId: string; message: string }>(FAILS),
+    kvGetMany<Record<string, string>>(shown.map((c) => copiedKey(c.jobId))),
+  ]);
+  const rootId = (folders ?? {})[`root/${ROOT_NAME}`];
   let pending = 0, copied = 0;
-  for (const c of checklists) {
-    const job = jobs.find((j) => j.id === c.jobId);
-    if (!job) continue;
-    const done = (await kvGet<Record<string, string>>(copiedKey(job.id))) ?? {};
+  shown.forEach((c, i) => {
+    const job = byId.get(c.jobId)!;
+    const done = copiedLists[i] ?? {};
     for (const item of SOPS[job.kind].items) for (const u of c.items[item.id]?.photos ?? []) done[u] ? copied++ : pending++;
-  }
+  });
   return {
     connected: g.connected, email: g.email, inDrive: copied, pending,
     folder: rootId ? `https://drive.google.com/drive/folders/${rootId}` : null,
     sheet: sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : null,
-    lastError: await kvGet<{ at: number; jobId: string; message: string }>(FAILS),
+    lastError,
   };
 }

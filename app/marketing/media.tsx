@@ -142,7 +142,7 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner,
           <div className="flex gap-2 overflow-x-auto pb-1">
             {media.map((x) => (
               <button key={x.id} onClick={() => setPick(x.id)} className={`shrink-0 w-20 rounded-lg overflow-hidden border-2 ${x.id === m.id ? "border-slate-700" : "border-transparent"}`}>
-                {x.kind === "video" ? <video src={`${x.url}#t=2`} muted preload="metadata" className="w-20 aspect-[9/16] object-cover bg-black" /> : <img src={x.url} alt="" className="w-20 aspect-[9/16] object-cover" />}
+                {x.kind === "video" ? <video src={`${x.url}#t=2`} muted preload="metadata" className="w-20 aspect-[9/16] object-cover bg-black" /> : <img src={x.url} alt="" loading="lazy" className="w-20 aspect-[9/16] object-cover" />}
                 <div className="text-[10px] py-0.5 bg-slate-100 flex items-center justify-center gap-1">
                   {x.day.slice(5).replace("-", "/")}{x.posts?.some((p) => p.ok) && <Check size={10} className="text-green-700" />}
                 </div>
@@ -208,7 +208,7 @@ function Listings({ m, reload }: { m: Media; reload: () => void }) {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {m.stills!.map((u, i) => (
             <a key={u} href={u} download={`light-dmv-${i + 1}.jpg`} title="Download this photo" className="shrink-0">
-              <img src={u} alt={`Listing photo ${i + 1}`} className="h-20 w-28 object-cover rounded-lg" />
+              <img src={u} alt={`Listing photo ${i + 1}`} loading="lazy" className="h-20 w-28 object-cover rounded-lg" />
             </a>
           ))}
         </div>

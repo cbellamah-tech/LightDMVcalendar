@@ -227,12 +227,14 @@ export async function syncJobber(detailLimit = 25): Promise<number> {
   }
 }
 
-/** Sync at most every 5 minutes when someone opens the jobs list. */
+/** Sync at most every 5 minutes when someone opens the jobs list. The sync runs after the list is sent
+    (it can take many seconds against Jobber), so the page shows what's saved and picks up the new jobs on its next poll. */
 export async function syncIfStale() {
-  if (!jobberConfigured() || !(await isConnected())) return;
-  const s = await getStatus();
-  if (s.lastSyncAt && Date.now() - s.lastSyncAt < 5 * 60_000) return;
-  await syncJobber(4).catch(() => {});
+  if (!jobberConfigured()) return;
+  const [connected, s] = await Promise.all([isConnected(), getStatus()]);
+  if (!connected || (s.lastSyncAt && Date.now() - s.lastSyncAt < 5 * 60_000)) return;
+  const { laterOnce } = await import("./background");
+  await laterOnce("jobber-sync", () => syncJobber(4));
 }
 
 // Quotes with line items, one page per call so a long history never hits the function time limit.

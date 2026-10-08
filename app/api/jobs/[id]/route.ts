@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { checklistProgress, ensureSampleJobs, getChecklist, getJobs, jobVisibleTo, recordMaterials, saveChecklist } from "@/lib/jobs";
-import { SOPS } from "@/lib/sops";
+import { checklistProgress, ensureSampleJobs, getChecklist, jobVisibleTo, recordMaterials, saveChecklist } from "@/lib/jobs";
+import { jobParts, SOPS } from "@/lib/sops";
 import { cachedJobParts, getJobDetail, withDrive } from "@/lib/jobDetails";
-import { loadDriveIndex } from "@/lib/drive";
 import { isConnected } from "@/lib/jobber";
+import { loadDriveIndex } from "@/lib/drive";
 import { listUsers } from "@/lib/users";
 import { isOffice, type Session } from "@/lib/session";
 import { getPayOverrides, payFor, setPayOverride } from "@/lib/crewPay";
@@ -15,10 +15,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 async function load(id: string, s: Session) {
-  await ensureSampleJobs();
-  const job = (await getJobs())[id];
+  const [all, users] = await Promise.all([ensureSampleJobs(), listUsers()]);
+  const job = all[id];
   if (!job) return null;
-  const me = (await listUsers()).find((u) => u.id === s.uid);
+  const me = users.find((u) => u.id === s.uid);
   return jobVisibleTo(job, s, me) ? job : null;
 }
 
@@ -27,16 +27,21 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   if (s instanceof NextResponse) return s;
   const job = await load(params.id, s);
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
-  const checklist = await getChecklist(job);
-  // Job details only on the first load (the page re-polls every 5 s for checklist changes).
+  // The checklist, the saved Jobber detail and pay overrides side by side (the page re-polls every 5 s).
+  const [checklist, cached, overrides] = await Promise.all([
+    getChecklist(job),
+    job.jobberJobId ? kvGet<JobDetail>(`ldmv:jobdetail:${job.jobberJobId}`) : null,
+    getPayOverrides(),
+  ]);
+  // Job details only on the first load. A saved copy shows at once; a stale one is refreshed from Jobber after the answer.
   let detail = null;
   if (job.source === "jobber" && new URL(req.url).searchParams.get("detail") === "1") {
-    const d = job.jobberJobId && (await isConnected()) ? await getJobDetail(job.jobberJobId).catch(() => null) : null;
-    detail = withDrive(await loadDriveIndex(), d, job.client);
+    const [connected, idx] = await Promise.all([isConnected(), loadDriveIndex()]);
+    const d = job.jobberJobId && connected ? await getJobDetail(job.jobberJobId, { stale: "background", have: cached }).catch(() => null) : null;
+    detail = withDrive(idx, d, job.client);
   }
-  const cached = job.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${job.jobberJobId}`) : null;
-  const pay = payFor(job, cached, await getPayOverrides());
-  const parts = await cachedJobParts(job.jobberJobId);
+  const pay = payFor(job, cached, overrides);
+  const parts = cached ? jobParts(cached.lines) : [];
   return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, pay, parts });
 }
 
