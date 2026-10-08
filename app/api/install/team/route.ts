@@ -1,0 +1,32 @@
+import { NextResponse } from "next/server";
+import { OFFICE, requireRole } from "@/lib/auth";
+import { loadPack } from "@/lib/training";
+import { toCourse, totalSecs } from "@/lib/installCourse";
+import { getInstallProgress, installPeople } from "@/lib/installProgress";
+import { listUsers } from "@/lib/users";
+
+export const dynamic = "force-dynamic";
+
+/** Owner view: each person's installer course, page by page, with time spent. */
+export async function GET() {
+  const s = await requireRole(...OFFICE);
+  if (s instanceof NextResponse) return s;
+  const course = toCourse((await loadPack())?.install?.modules ?? []);
+  const users = await listUsers();
+  const people = [];
+  for (const uid of await installPeople()) {
+    const p = await getInstallProgress(uid);
+    const u = users.find((x) => x.id === uid);
+    people.push({
+      uid, name: u?.name ?? uid, role: u?.role, last: p.last ?? null,
+      secs: Object.values(p.modules).reduce((t, m) => t + totalSecs(m), 0),
+      modules: course.map((m) => {
+        const mp = p.modules[m.key];
+        return { key: m.key, title: m.title, pages: m.lessons.length, seen: mp?.seen.length ?? 0, secs: totalSecs(mp), done: mp?.done ?? null,
+          lessons: m.lessons.map((l, i) => ({ title: l.title, secs: mp?.secs[i] ?? 0, seen: !!mp?.seen.includes(i) })) };
+      }),
+    });
+  }
+  people.sort((a, b) => (b.last ?? 0) - (a.last ?? 0));
+  return NextResponse.json({ modules: course.map((m) => ({ key: m.key, title: m.title, pages: m.lessons.length })), people });
+}
