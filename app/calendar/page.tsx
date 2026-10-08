@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Plus, X, Check, Trash2, Pencil, ChevronLeft, ChevronRight,
-  Repeat, Loader2, Cloud, CloudOff,
+  Repeat, Loader2, Cloud, CloudOff, Wrench,
 } from "lucide-react";
 import autoPostData from "../data/autoposts.json";
 
@@ -235,6 +235,27 @@ export default function OpsCalendar() {
     return Array.from({ length: 7 }, (_, i) => { const d = new Date(s); d.setDate(s.getDate() + i); return d; });
   }, [cursor]);
 
+  /* Fixes (Jobber service calls) for the shown weeks, kept in their own box, never mixed with the tasks.
+     A fix still open from an earlier day shows on today. */
+  const [fixes, setFixes] = useState<Fix[]>([]);
+  useEffect(() => {
+    const from = new Date(grid[0]); const to = new Date(grid[41]); to.setDate(to.getDate() + 1);
+    const ws = weekDays[0] < from ? weekDays[0] : from, we = weekDays[6] > to ? weekDays[6] : to;
+    const load = () => fetch(`/api/jobs?only=fixes&from=${ws.toISOString()}&to=${we.toISOString()}`, { cache: "no-store" })
+      .then(r => r.ok ? r.json() : null).then(d => d && setFixes(d.fixes || [])).catch(() => {});
+    load();
+    const iv = setInterval(load, 60000);
+    return () => clearInterval(iv);
+  }, [grid, weekDays]);
+  const fixesForDate = useCallback((date: Date) => {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return fixes.filter(f => {
+      const d = new Date(f.start);
+      if (sameDay(d, date)) return true;
+      return sameDay(date, t) && d < t && !f.completedAt && !f.doneInJobber;
+    });
+  }, [fixes]);
+
   if (!ready || tasks === null) {
     return (
       <div className="flex items-center justify-center gap-2 py-32 text-slate-500" style={{ minHeight: "100vh" }}>
@@ -330,8 +351,9 @@ export default function OpsCalendar() {
             const regularTasks = dayTasks.filter(t => t.category !== "Auto");
             const autoTasks = dayTasks.filter(t => t.category === "Auto");
             const dayAuto = autoPostsForDate(d);
+            const dayFixes = fixesForDate(d);
             const allDone = dayTasks.length > 0 && dayTasks.every(t => isDone(t.id, d));
-            const empty = dayTasks.length === 0 && dayAuto.length === 0;
+            const empty = dayTasks.length === 0 && dayAuto.length === 0 && dayFixes.length === 0;
             return (
               <button key={i} onClick={() => setDayPanel(d)}
                 style={{ background: "white", borderColor: isT ? RED : LINE, borderWidth: isT ? 2 : 1 }}
@@ -352,6 +374,7 @@ export default function OpsCalendar() {
                             className="text-sm leading-snug">{t.title}</span>
                         </div>
                       ))}
+                      {dayFixes.length > 0 && <FixBox fixes={dayFixes} />}
                       {(autoTasks.length > 0 || dayAuto.length > 0) && (
                         <div style={{ background: "#F1F5F9", borderColor: LINE }} className="mt-0.5 rounded-lg border px-2 py-1.5 flex flex-col gap-1">
                           {autoTasks.map(t => (
@@ -395,6 +418,7 @@ export default function OpsCalendar() {
             const regularTasks = dayTasks.filter(t => t.category !== "Auto");
             const autoTasks = dayTasks.filter(t => t.category === "Auto");
             const dayAuto = autoPostsForDate(d);
+            const dayFixes = fixesForDate(d);
             return (
               <button key={i} onClick={() => setDayPanel(d)}
                 style={{
@@ -416,6 +440,14 @@ export default function OpsCalendar() {
                     </div>
                   ))}
                   {regularTasks.length > 3 && <span className="text-[10px] text-slate-400 font-semibold">+{regularTasks.length - 3} more</span>}
+                  {dayFixes.length > 0 && (
+                    <div className="mt-0.5 rounded-md border px-1 py-0.5 flex items-center gap-1" style={{ background: FIX_BG, borderColor: FIX_LINE }}>
+                      <Wrench size={10} color={FIX_INK} className="shrink-0" />
+                      <span className="text-[10px] font-bold truncate leading-tight" style={{ color: FIX_INK }}>
+                        {dayFixes.length} fix{dayFixes.length > 1 ? "es" : ""}
+                      </span>
+                    </div>
+                  )}
 
                   {(autoTasks.length > 0 || dayAuto.length > 0) && (
                     <div style={{ background: "#F1F5F9", borderColor: LINE }}
@@ -461,12 +493,15 @@ export default function OpsCalendar() {
         <span className="flex items-center gap-1.5 text-xs text-slate-600 ml-1">
           <span style={{ background: "#94A3B8" }} className="w-2.5 h-2.5 rounded-full inline-block" />Auto-posts
         </span>
+        <span className="flex items-center gap-1.5 text-xs text-slate-600 ml-1">
+          <Wrench size={12} color={FIX_INK} />Fixes (service calls from Jobber)
+        </span>
       </div>
 
       {/* Day panel */}
       {dayPanel && (
         <DayPanel
-          date={dayPanel} today={today} tasks={tasksForDate(dayPanel)}
+          date={dayPanel} today={today} tasks={tasksForDate(dayPanel)} fixes={fixesForDate(dayPanel)}
           isDone={isDone} toggleDone={toggleDone}
           onClose={() => setDayPanel(null)} onEdit={(t) => { setEditing(t); }}
         />
@@ -489,6 +524,34 @@ export default function OpsCalendar() {
   );
 }
 
+/* ---------------- Fixes ---------------- */
+type Fix = { id: string; start: string; client: string; title: string; request?: string; address: string; assignedNames: string[]; completedAt?: number; doneInJobber?: boolean };
+const FIX_BG = "#FFFBEB", FIX_LINE = "#FCD34D", FIX_INK = "#92400E";
+
+function FixBox({ fixes, large }: { fixes: Fix[]; large?: boolean }) {
+  const Row: any = large ? "a" : "div";
+  return (
+    <div style={{ background: FIX_BG, borderColor: FIX_LINE }} className={`rounded-lg border ${large ? "p-3" : "px-2 py-1.5"} flex flex-col gap-1`}>
+      <div className={`${large ? "text-xs" : "text-[11px]"} font-bold uppercase tracking-wide flex items-center gap-1`} style={{ color: FIX_INK }}>
+        <Wrench size={12} /> Fixes
+      </div>
+      {fixes.map(f => {
+        const done = !!(f.completedAt || f.doneInJobber);
+        return (
+          // Inside a day button (week view) a link isn't allowed, so only the day panel links to the job.
+          <Row key={f.id} {...(large ? { href: `/jobs/${f.id}` } : {})} className={`flex items-start gap-2 ${large ? "hover:underline" : ""}`}>
+            <span style={{ background: done ? GREEN : FIX_INK }} className="w-2 h-2 rounded-full shrink-0 mt-1.5" />
+            <span className={`${large ? "text-sm" : "text-xs"} leading-snug`} style={{ color: done ? "#94A3B8" : "#78350F", textDecoration: done ? "line-through" : "none" }}>
+              <span className="font-semibold">{f.client || "Fix"}</span>{f.request ? `: ${f.request}` : ""}
+              {large && f.address && <span className="block text-xs" style={{ color: "#A16207" }}>{f.address}{f.assignedNames.length ? ` · ${f.assignedNames.join(", ")}` : ""}</span>}
+            </span>
+          </Row>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ---------------- Sync badge ---------------- */
 function SyncBadge({ state }: { state: "idle"|"saving"|"error" }) {
   if (state === "saving")
@@ -499,7 +562,7 @@ function SyncBadge({ state }: { state: "idle"|"saving"|"error" }) {
 }
 
 /* ---------------- Day panel (slide-over) ---------------- */
-function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: any) {
+function DayPanel({ date, today, tasks, fixes, isDone, toggleDone, onClose, onEdit }: any) {
   const isToday = sameDay(date, today);
   const doneCount = tasks.filter((t: Task) => isDone(t.id, date)).length;
   const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
@@ -532,7 +595,9 @@ function DayPanel({ date, today, tasks, isDone, toggleDone, onClose, onEdit }: a
             </div>
           )}
 
-          {tasks.length === 0 && dayAuto.length === 0 ? (
+          {fixes.length > 0 && <div className="mb-4"><FixBox fixes={fixes} large /></div>}
+
+          {tasks.length === 0 && dayAuto.length === 0 && fixes.length === 0 ? (
             <div style={{ borderColor: LINE }} className="border-2 border-dashed rounded-xl py-12 text-center">
               <div className="text-slate-600 font-semibold">Nothing scheduled.</div>
               <div className="text-slate-400 text-sm mt-1">Add a recurring task with the button up top.</div>
