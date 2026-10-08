@@ -174,10 +174,6 @@ export default function JobPage({ params }: { params: { id: string } }) {
                     onUploaded={(urls) => update({ itemId: item.id, addPhotos: urls, ...(item.photo ? { done: true } : {}) })} />
                 </div>
               )}
-              {!item.photo && !e.photos.length && (
-                <PhotoButton folder={`jobs/${job.id}/${item.id}`} label="Photo" className="text-xs !py-1 !px-2" color="#64748B"
-                  onUploaded={(urls) => update({ itemId: item.id, addPhotos: urls })} />
-              )}
             </li>
           );
         })}
