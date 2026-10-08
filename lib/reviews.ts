@@ -166,7 +166,7 @@ export function matchReview(r: { name: string; at: number }, jobs: Job[], taps: 
     const tap = there.find((t) => onJob(user(t.personId), job)) ?? there.find((t) => !user(t.personId)?.crew);
     if (tap) return { status: "credited", jobId: job.id, personId: tap.personId, how: `${user(tap.personId)?.name ?? "Someone"}'s card was tapped ${fmt(tap.at)}; the review name matches this job's client.` };
     const asked = askedBy[job.id];
-    if (asked && user(asked)) return { status: "credited", jobId: job.id, personId: asked, how: `${user(asked)!.name} checked "Ask for a Google review" on this job; the review name matches its client.` };
+    if (asked && user(asked)) return { status: "credited", jobId: job.id, personId: asked, how: `${user(asked)!.name} checked "Ask for Google review" on this job; the review name matches its client.` };
     const lead = users.find((u) => u.active && u.role === "lead" && u.crew && u.crew === job.crew);
     return { status: "open", suggest: { jobId: job.id, personId: lead?.id, why: "The name matches this job's client, but no review card was tapped there." } };
   }
