@@ -24,9 +24,19 @@ export function CourseView({ id, base, title, sub, teamHref, teamRoles, signoffN
   const [prog, setProg] = useState<InstallProgress>({ modules: {} });
   const [open, setOpen] = useState<number | null>(null);
   const load = () => api<Guide>(base).then(setG).catch(() => setG({ loaded: false }));
-  const loadProg = () => api<InstallProgress>(`${base}/progress`).then(setProg).catch(() => {});
+  const [progReady, setProgReady] = useState(false);
+  const loadProg = () => api<InstallProgress>(`${base}/progress`).then(setProg).catch(() => {}).finally(() => setProgReady(true));
   useEffect(() => { load(); loadProg(); api<Me>("/api/me").then(setMe).catch(() => {}); }, []);
   const course = useMemo(() => toCourse(g?.modules ?? []), [g]);
+  // The home page's "Continue" button lands here with ?go=next and opens the next module straight away.
+  const went = useRef(false);
+  useEffect(() => {
+    if (went.current || !course.length || !me || !progReady || new URLSearchParams(window.location.search).get("go") !== "next") return;
+    went.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    const i = course.findIndex((m) => !prog.modules[m.key]?.done);
+    if (i >= 0 && (me.role === "owner" || me.role === "manager" || unlocked(i, course, prog, id))) setOpen(i);
+  }, [course, me, prog, progReady, id]);
   if (!g) return <Spinner />;
   const office = me?.role === "owner" || me?.role === "manager";
   const canSee = (i: number) => office || unlocked(i, course, prog, id);

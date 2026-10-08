@@ -26,11 +26,18 @@ export default function JobsPage() {
     .then((d) => { setRows(d.jobs); setFixes(d.fixes || []); setFixSheet(d.fixSheet); setSample(d.sample); })
     .catch((e) => setErr(e.message)), []);
   useEffect(() => {
+    // The home page links straight to one crew's day with ?crew=crew1.
+    const c = new URLSearchParams(window.location.search).get("crew");
+    if (c) setCrew(c);
     api<Me>("/api/me").then(setMe).catch(() => {});
     load();
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [load]);
+
+  // #fixes from the home page: jump to the fixes box once the list has drawn.
+  const loaded = !!rows;
+  useEffect(() => { if (loaded && window.location.hash === "#fixes") document.getElementById("fixes")?.scrollIntoView(); }, [loaded]);
 
   const office = me?.role === "owner" || me?.role === "manager";
   const days = useMemo(() => byDay(rows || [], crew), [rows, crew]);
@@ -57,7 +64,7 @@ export default function JobsPage() {
         </div>
       )}
       {office && <DrivePhotos />}
-      <section className="rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-3 space-y-3">
+      <section id="fixes" className="scroll-mt-16 rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="font-extrabold text-amber-900 flex items-center gap-2"><Wrench size={18} /> Fixes (service calls){openFixes ? ` · ${openFixes} open` : ""}</h2>
           {fixSheet?.url && (
