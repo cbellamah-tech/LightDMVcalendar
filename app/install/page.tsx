@@ -61,7 +61,7 @@ export default function InstallCourse() {
               <div className="flex-1 min-w-0">
                 <div className="font-semibold">{m.title}</div>
                 <div className="text-xs text-slate-500">
-                  {m.lessons.length} lessons{p ? ` · ${p.done ? "done" : `${p.seen.length} seen`} · ${fmtTime(totalSecs(p))}` : ""}
+                  {m.lessons.length} lessons{m.quiz ? " + quiz" : ""}{p ? ` · ${p.done ? "done" : `${p.seen.length} seen`}${p.quiz ? ` · quiz best ${p.quiz.best}%` : ""} · ${fmtTime(totalSecs(p))}` : ""}
                 </div>
               </div>
               <ChevronRight className="text-slate-300 shrink-0" />
@@ -78,10 +78,13 @@ function ModuleView({ m, n, of, prog, setProg, onExit, onNext }: {
   m: CourseModule; n: number; of: number; prog: InstallProgress; setProg: (p: InstallProgress) => void; onExit: () => void; onNext?: () => void;
 }) {
   const mp = prog.modules[m.key];
-  const [page, setPage] = useState(() => (mp && !mp.done ? Math.min(Math.max(...mp.seen, 0), m.lessons.length - 1) : 0));
+  const pages = m.lessons.length + (m.quiz ? 1 : 0);
+  const [page, setPage] = useState(() => (mp && !mp.done ? Math.min(Math.max(...mp.seen, 0), pages - 1) : 0));
   const [finished, setFinished] = useState(false);
   const tick = useRef(Date.now());
-  const last = page === m.lessons.length - 1;
+  const last = page === pages - 1;
+  const onQuiz = !!m.quiz && page === m.lessons.length;
+  const quizPassed = !m.quiz || !!prog.modules[m.key]?.quiz?.passed;
 
   // Time on page: a beat every 15 s while the page is on screen, and one when leaving the page.
   async function beat(p: number, done = false) {
@@ -117,26 +120,72 @@ function ModuleView({ m, n, of, prog, setProg, onExit, onNext }: {
       </div>
     );
   }
-  const lesson = m.lessons[page];
+  const lesson = onQuiz ? { title: "Quiz", blocks: [] } : m.lessons[page];
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <button onClick={onExit} className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> All modules</button>
       <div>
-        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Module {n} of {of} · Lesson {page + 1} of {m.lessons.length}</div>
+        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Module {n} of {of} · {onQuiz ? "Quiz" : `Lesson ${page + 1} of ${m.lessons.length}`}</div>
         <h1 className="text-xl font-extrabold" style={{ color: NAVY }}>{m.title.replace(/^Module\s*\d+\.?\s*/i, "")}</h1>
       </div>
-      <div className="flex gap-1">{m.lessons.map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= page ? "bg-emerald-500" : "bg-slate-200"}`} />)}</div>
-      <Card className="space-y-3">
-        <h2 className="font-bold text-lg">{lesson.title}</h2>
-        <Blocks blocks={lesson.blocks} />
-      </Card>
+      <div className="flex gap-1">{Array.from({ length: pages }).map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= page ? "bg-emerald-500" : "bg-slate-200"}`} />)}</div>
+      {onQuiz ? <Quiz m={m} onGraded={setProg} /> : (
+        <Card className="space-y-3">
+          <h2 className="font-bold text-lg">{lesson.title}</h2>
+          <Blocks blocks={lesson.blocks} />
+        </Card>
+      )}
       <div className="flex items-center justify-between gap-2">
         {page > 0 ? <Btn ghost onClick={() => go(page - 1)}>Back</Btn> : <span />}
         <span className="text-xs text-slate-400 flex items-center gap-1"><Clock size={12} /> {fmtTime(totalSecs(prog.modules[m.key]))}</span>
         {last
-          ? <Btn onClick={async () => { await beat(page, true); setFinished(true); window.scrollTo(0, 0); }}>Finish module</Btn>
-          : <Btn onClick={() => go(page + 1)}>Next lesson</Btn>}
+          ? <Btn disabled={!quizPassed} onClick={async () => { await beat(page, true); setFinished(true); window.scrollTo(0, 0); }}>{quizPassed ? "Finish module" : "Pass the quiz to finish"}</Btn>
+          : <Btn onClick={() => go(page + 1)}>{m.quiz && page === m.lessons.length - 1 ? "Take the quiz" : "Next lesson"}</Btn>}
       </div>
     </div>
+  );
+}
+
+type Graded = { score: number; of: number; pct: number; pass: boolean; passPct: number; results: { correct: boolean; answer: number; why: string }[]; progress: InstallProgress };
+
+/** The module's graded quiz: answers are checked on the server; retry as often as needed. */
+function Quiz({ m, onGraded }: { m: CourseModule; onGraded: (p: InstallProgress) => void }) {
+  const qs = m.quiz ?? [];
+  const [ans, setAns] = useState<(number | null)[]>(() => qs.map(() => null));
+  const [res, setRes] = useState<Graded | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function check() {
+    setBusy(true);
+    try {
+      const r = await api<Graded>("/api/install/quiz", { method: "POST", json: { module: m.key, answers: ans } });
+      setRes(r); onGraded(r.progress);
+    } finally { setBusy(false); }
+  }
+  return (
+    <Card className="space-y-4">
+      <h2 className="font-bold text-lg">Quiz</h2>
+      {qs.map((q, i) => (
+        <div key={i} className="space-y-1.5">
+          <div className="font-semibold">{i + 1}. {q.q}</div>
+          {q.choices.map((c, j) => {
+            const picked = ans[i] === j, right = res && res.results[i].answer === j;
+            const tone = res ? (right ? "border-emerald-500 bg-emerald-50" : picked ? "border-red-400 bg-red-50" : "border-slate-200") : picked ? "border-slate-800 bg-slate-50" : "border-slate-200";
+            return (
+              <button key={j} disabled={!!res} onClick={() => setAns(ans.map((a, k) => (k === i ? j : a)))}
+                className={`w-full text-left rounded-lg border px-3 py-2 text-sm ${tone}`}>{c}</button>
+            );
+          })}
+          {res && <div className={`text-sm ${res.results[i].correct ? "text-emerald-700" : "text-red-700"}`}>{res.results[i].correct ? "Right." : "Not quite."} {res.results[i].why}</div>}
+        </div>
+      ))}
+      {!res ? (
+        <Btn disabled={busy || ans.some((a) => a === null)} onClick={check}>{ans.some((a) => a === null) ? "Answer every question" : "Check my answers"}</Btn>
+      ) : (
+        <div className={`rounded-lg p-3 space-y-2 ${res.pass ? "bg-emerald-50" : "bg-amber-50"}`}>
+          <div className="font-bold">{res.score} of {res.of} right ({res.pct}%). {res.pass ? "Passed." : `You need ${res.passPct}% to pass.`}</div>
+          {!res.pass && <Btn ghost onClick={() => { setRes(null); setAns(qs.map(() => null)); }}>Try again</Btn>}
+        </div>
+      )}
+    </Card>
   );
 }

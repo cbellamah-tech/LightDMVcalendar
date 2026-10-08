@@ -22,11 +22,12 @@ export async function GET() {
       secs: Object.values(p.modules).reduce((t, m) => t + totalSecs(m), 0),
       modules: course.map((m) => {
         const mp = p.modules[m.key];
-        return { key: m.key, title: m.title, pages: m.lessons.length, seen: mp?.seen.length ?? 0, secs: totalSecs(mp), done: mp?.done ?? null,
-          lessons: m.lessons.map((l, i) => ({ title: l.title, secs: mp?.secs[i] ?? 0, seen: !!mp?.seen.includes(i) })) };
+        const titles = [...m.lessons.map((l) => l.title), ...(m.quiz ? ["Quiz"] : [])];
+        return { key: m.key, title: m.title, pages: titles.length, seen: mp?.seen.length ?? 0, secs: totalSecs(mp), done: mp?.done ?? null, quiz: m.quiz ? (mp?.quiz ?? { tries: 0, best: 0 }) : null,
+          lessons: titles.map((title, i) => ({ title, secs: mp?.secs[i] ?? 0, seen: !!mp?.seen.includes(i) })) };
       }),
     });
   }
   people.sort((a, b) => (b.last ?? 0) - (a.last ?? 0));
-  return NextResponse.json({ modules: course.map((m) => ({ key: m.key, title: m.title, pages: m.lessons.length })), people });
+  return NextResponse.json({ modules: course.map((m) => ({ key: m.key, title: m.title, pages: m.lessons.length + (m.quiz ? 1 : 0) })), people });
 }

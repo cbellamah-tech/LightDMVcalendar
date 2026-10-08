@@ -2,7 +2,7 @@
 import type { Block } from "./training";
 
 export type Lesson = { title: string; blocks: Block[] };
-export type CourseModule = { key: string; title: string; lessons: Lesson[] };
+export type CourseModule = { key: string; title: string; lessons: Lesson[]; quiz?: { q: string; choices: string[] }[] };
 
 export const moduleKey = (title: string) => title.toLowerCase().replace(/^module\s*\d+\.?\s*/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "module";
 
@@ -11,7 +11,7 @@ const isCheck = (b: Block) => b.t === "tip" && /^\*\*(Quiz|Mistakes|Sign-off)/.t
 /** Splits a module into lesson pages. "###" subheadings start a page; without them the module becomes
  *  Learn it (everything up to the step list), Watch (the videos), Real jobs (what follows the steps). Mistakes, quiz and
  *  sign-off always end the module on a Check yourself page. */
-export function toCourse(mods: { title: string; blocks: Block[] }[]): CourseModule[] {
+export function toCourse(mods: { title: string; blocks: Block[]; quiz?: { q: string; choices: string[] }[] }[]): CourseModule[] {
   return mods.map((m) => {
     const check = m.blocks.filter(isCheck), body = m.blocks.filter((b) => !isCheck(b));
     const lessons: Lesson[] = [];
@@ -32,11 +32,12 @@ export function toCourse(mods: { title: string; blocks: Block[] }[]): CourseModu
     }
     if (check.length) lessons.push({ title: "Check yourself", blocks: check });
     if (!lessons.length) lessons.push({ title: "Start here", blocks: [] });
-    return { key: moduleKey(m.title), title: m.title, lessons };
+    return { key: moduleKey(m.title), title: m.title, lessons, quiz: m.quiz?.length ? m.quiz.map(({ q, choices }) => ({ q, choices })) : undefined };
   });
 }
 
-export type ModuleProgress = { seen: number[]; secs: Record<number, number>; started: number; done?: number };
+export type QuizResult = { tries: number; best: number; passed?: number };
+export type ModuleProgress = { seen: number[]; secs: Record<number, number>; started: number; done?: number; quiz?: QuizResult };
 export type InstallProgress = { modules: Record<string, ModuleProgress>; last?: number };
 
 export const totalSecs = (p?: ModuleProgress) => Object.values(p?.secs ?? {}).reduce((t, s) => t + s, 0);

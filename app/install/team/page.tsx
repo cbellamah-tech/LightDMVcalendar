@@ -7,7 +7,7 @@ import { api, NAVY } from "@/components/ui";
 import { fmtTime } from "@/lib/installCourse";
 import { Card, H1, Spinner } from "../../training/parts";
 
-type Row = { key: string; title: string; pages: number; seen: number; secs: number; done: number | null; lessons: { title: string; secs: number; seen: boolean }[] };
+type Row = { key: string; title: string; pages: number; seen: number; secs: number; done: number | null; quiz: { tries: number; best: number; passed?: number } | null; lessons: { title: string; secs: number; seen: boolean }[] };
 type Person = { uid: string; name: string; role?: string; last: number | null; secs: number; modules: Row[] };
 
 /** Owners: who has gone through the installer course, lesson by lesson, and how long they spent on each page. */
@@ -40,7 +40,7 @@ export default function InstallTeam() {
                   <div className="flex items-center gap-2 text-sm">
                     {m.done ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0" /> : <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${m.seen ? "border-amber-400" : "border-slate-300"}`} />}
                     <span className="flex-1 min-w-0 truncate">{m.title}</span>
-                    <span className="text-slate-500 shrink-0">{m.done ? `done ${new Date(m.done).toLocaleDateString()}` : `${m.seen} of ${m.pages}`} · {fmtTime(m.secs)}</span>
+                    <span className="text-slate-500 shrink-0">{m.done ? `done ${new Date(m.done).toLocaleDateString()}` : `${m.seen} of ${m.pages}`}{m.quiz && m.quiz.tries ? ` · quiz ${m.quiz.best}%${m.quiz.tries > 1 ? ` (${m.quiz.tries} tries)` : ""}` : ""} · {fmtTime(m.secs)}</span>
                   </div>
                   {open === p.uid && m.seen > 0 && (
                     <div className="pl-6 text-xs text-slate-500 space-y-0.5 mt-1">

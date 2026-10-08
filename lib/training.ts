@@ -29,9 +29,11 @@ export type TreeGroup = { size: string; n: number; avg: number; low: number; hig
 /** The crews' install and takedown guide (Install tab), written by the Installer thread. */
 export type InstallGuide = {
   intro: Block[];
-  modules: { title: string; blocks: Block[] }[];
+  modules: { title: string; blocks: Block[]; quiz?: QuizQ[] }[];
   ownerTodo: { title: string; blocks: Block[] } | null;
+  passPct?: number;
 };
+export type QuizQ = { q: string; choices: string[]; answer: number; why: string };
 export type Pack = {
   kind: "ldmv-training-pack"; version: number; builtAt: string; source: string;
   modules: Module[]; bands: Band[]; rates: Rates; catalog: Product[]; treeGroups: TreeGroup[]; quotes: PQuote[];
