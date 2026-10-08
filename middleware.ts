@@ -5,6 +5,11 @@ import { COOKIE, verifySession } from "./lib/session";
 const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/marketing/runner/", "/api/google/callback", "/manifest.webmanifest", "/icon"];
 const OWNER_ONLY = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/people", "/api/people", "/settings", "/api/jobber", "/marketing", "/api/marketing", "/api/google", "/briefing"];
 
+// Crew leads and crew see their own jobs and the install course, nothing else.
+const CREW_OK = ["/jobs", "/api/jobs", "/install", "/api/install", "/api/me", "/api/upload", "/api/photos", "/api/training/img"];
+// Crew leads also see their crew's course progress and sign people off.
+const CREW_NEVER = ["/install/team", "/api/install/team", "/api/install/signoff"];
+
 // Owners only, not the manager either.
 const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs"];
 
@@ -21,6 +26,13 @@ export async function middleware(req: NextRequest) {
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+  if (s.role === "lead" || s.role === "crew") {
+    const asset = !pathname.startsWith("/api/") && /\.(png|jpe?g|webp|svg|gif|ico)$/i.test(pathname); // course drawings and icons
+    const ok = asset || CREW_OK.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && (s.role === "lead" || !CREW_NEVER.some((p) => pathname.startsWith(p)));
+    if (ok) return NextResponse.next();
+    if (isApi) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    return NextResponse.redirect(new URL("/jobs", req.url));
   }
   // The owners' Briefing and the Google connection stay with owners, managers included.
   if (["/briefing", "/api/google"].some((p) => pathname.startsWith(p)) && s.role !== "owner") {

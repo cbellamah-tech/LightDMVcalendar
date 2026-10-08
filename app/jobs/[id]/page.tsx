@@ -6,10 +6,11 @@ import { ArrowLeft, Camera, Check, CheckCircle2, Loader2, Navigation, X } from "
 import PhotoButton from "@/components/PhotoButton";
 import { ago, api, fmtDay, fmtTime, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../../signs/types";
-import type { Checklist, Job, JobDetail, Progress, SopItem } from "../types";
+import type { Checklist, CrewPay, Job, JobDetail, Progress, SopItem } from "../types";
 import JobInfo from "./JobInfo";
+import PayLine from "./PayLine";
 
-type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress };
+type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress; pay?: CrewPay };
 
 export default function JobPage({ params }: { params: { id: string } }) {
   const [d, setD] = useState<Data | null>(null);
@@ -58,6 +59,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
             <Navigation size={14} /> {job.address}
           </a>
         )}
+        <PayLine jobId={job.id} kind={job.kind} pay={d.pay} onChange={(pay) => setD((cur) => (cur ? { ...cur, pay } : cur))} />
       </div>
 
       {detail && <JobInfo d={detail} onView={setViewer} />}

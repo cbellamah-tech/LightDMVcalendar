@@ -6,7 +6,7 @@ import { CalendarDays, ClipboardCheck, MapPin, Receipt, Settings, ShieldCheck, U
 import { api, Me, NAVY } from "@/components/ui";
 
 const TILES = [
-  { href: "/signs", title: "Yard sign routes", text: "14 routes around the DMV. Start a route, drive, and the app asks for a photo at each sign.", icon: MapPin, roles: ["owner", "manager", "lead", "crew"] },
+  { href: "/signs", title: "Yard sign routes", text: "14 routes around the DMV. Start a route, drive, and the app asks for a photo at each sign.", icon: MapPin, roles: ["owner", "manager"] },
   { href: "/jobs", title: "Today's jobs", text: "Jobs from Jobber for your crew, with the install or takedown SOP checklist.", icon: ClipboardCheck, roles: ["owner", "manager", "lead", "crew"] },
   { href: "/calendar", title: "Owner calendar", text: "Chris and Liam's recurring task board.", icon: CalendarDays, roles: ["owner"] },
   { href: "/insurance", title: "Insurance", text: "Every policy, what is and isn't covered, renewals and certificates.", icon: ShieldCheck, roles: ["owner"] },
