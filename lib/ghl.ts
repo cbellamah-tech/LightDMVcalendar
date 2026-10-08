@@ -230,3 +230,29 @@ export const expireGhlSnap = async () => {
   const cur = await getGhlSnap();
   if (cur) await kvSet(SNAP, { ...cur, at: 0 });
 };
+
+/* ---------- Texting a customer ---------- */
+
+/** GoHighLevel answers 401/403 when the Private Integration key is missing a scope. */
+const scopeHint = (e: any, what: string) =>
+  /\((401|403)\)/.test(e.message) ? new Error(`GoHighLevel refused to ${what}. In GoHighLevel, Settings > Private Integrations, edit the app's key and tick "Edit Contacts" and "Edit Conversation Messages".`) : e;
+
+/** The GoHighLevel contact with this phone, created if there isn't one (upsert matches on phone). */
+export async function ghlContactId(c: { phone: string; firstName?: string; name?: string }): Promise<string> {
+  const [first, ...rest] = (c.name ?? "").trim().split(/\s+/);
+  const j = await ghl(`/contacts/upsert`, {
+    method: "POST",
+    body: { locationId: loc(), phone: c.phone, firstName: c.firstName || first || undefined, lastName: rest.join(" ") || undefined, source: "Light DMV app" },
+  }).catch((e) => { throw scopeHint(e, "find or add the customer"); });
+  const id = j?.contact?.id ?? j?.id;
+  if (!id) throw new Error("GoHighLevel didn't return a contact for the customer's phone.");
+  return String(id);
+}
+
+/** Text a customer from the GoHighLevel number, in the same conversation as their other texts. */
+export async function ghlSendSms(c: { phone: string; firstName?: string; name?: string }, message: string) {
+  if (!ghlConfigured()) throw new Error("GoHighLevel isn't connected, so the app can't send texts.");
+  const contactId = await ghlContactId(c);
+  return ghl(`/conversations/messages`, { method: "POST", body: { type: "SMS", contactId, message } })
+    .catch((e) => { throw scopeHint(e, "send the text"); });
+}

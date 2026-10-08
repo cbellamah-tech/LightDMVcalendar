@@ -12,6 +12,7 @@ import JobInfo from "./JobInfo";
 import PayLine from "./PayLine";
 import Expenses from "./Expenses";
 import ReviewBonus from "./ReviewBonus";
+import OnMyWay from "./OnMyWay";
 
 type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress; pay?: CrewPay; reviews?: Bonus[]; parts?: { name: string; images: { url: string; name: string }[] }[] };
 
@@ -76,6 +77,8 @@ export default function JobPage({ params }: { params: { id: string } }) {
         <PayLine jobId={job.id} kind={job.kind} pay={d.pay} onChange={(pay) => setD((cur) => (cur ? { ...cur, pay } : cur))} />
         <ReviewBonus items={d.reviews} onChange={load} />
       </div>
+
+      {job.source === "jobber" && <OnMyWay jobId={job.id} open={!c.arrivedAt && !c.completedAt} />}
 
       {(c.arrivedAt || c.completedAt) && (
         <div className="text-sm text-slate-600 bg-white rounded-xl border border-slate-200 px-4 py-2">
