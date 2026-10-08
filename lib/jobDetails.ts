@@ -185,7 +185,8 @@ export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolea
     await laterOnce(`jobdetail:${jobberJobId}`, () => fetchJobDetail(jobberJobId), 60_000);
     return d;
   }
-  return opts.refresh || !d ? fetchJobDetail(jobberJobId) : d;
+  // Saved before the current photo import (or never pulled): pull it now, so the line photos show on this load.
+  return opts.refresh || !d || d.imgv !== IMGV ? fetchJobDetail(jobberJobId) : d;
 }
 
 /** Detail plus what Drive knows (bin list, takedown photos), for the job page. */
