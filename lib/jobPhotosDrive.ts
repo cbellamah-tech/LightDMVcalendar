@@ -3,6 +3,7 @@ import { kvGet, kvSet, kvUpdate } from "./store";
 import { gapi, googleAccessToken, googleStatus } from "./google";
 import { SOPS } from "./sops";
 import type { Checklist, Job } from "./jobs";
+import { getJobExpenses } from "./expenses";
 
 /* Every photo taken on a job checklist is copied to Light DMV's Google Drive (info@lightdmv.com), organized by customer:
      Light DMV Job Photos / <Customer - street> / <2026-27 season> / 2026-11-12 Install - Arrival (whole house) 1.jpg
@@ -27,6 +28,7 @@ const PHOTO_LABEL: Record<string, string> = {
   "yard-sign": "Yard sign",
   "takedown-photos": "Takedown",
   "after-photo": "Fixed and lit",
+  receipt: "Expense receipt",
 };
 const KIND_LABEL = { install: "Install", takedown: "Takedown", fix: "Service" } as const;
 
@@ -116,6 +118,10 @@ export async function copyJobPhotos(job: Job, c: Checklist, origin: string, limi
     const e = c.items[item.id];
     e?.photos.forEach((url, i) => { if (!done[url]) todo.push({ itemId: item.id, url, n: i + 1, part: e.parts?.[url], by: e.photoBy?.[url] || e.byName }); });
   }
+  // Receipts the crew snapped for their expenses at close-out.
+  (await getJobExpenses(job.id)).items.forEach((x, i) => {
+    if (x.photo && !done[x.photo]) todo.push({ itemId: "receipt", url: x.photo, n: i + 1, part: `$${x.amount}${x.note ? ` ${x.note}` : ""}`, by: x.byName });
+  });
   if (!todo.length) return { copied: 0, pending: 0 };
 
   let copied = 0;
@@ -158,6 +164,7 @@ export async function driveCopyStatus(jobs: Job[], checklists: Checklist[]) {
     if (!job) continue;
     const done = (await kvGet<Record<string, string>>(copiedKey(job.id))) ?? {};
     for (const item of SOPS[job.kind].items) for (const u of c.items[item.id]?.photos ?? []) done[u] ? copied++ : pending++;
+    for (const x of (await getJobExpenses(job.id)).items) if (x.photo) done[x.photo] ? copied++ : pending++;
   }
   return {
     connected: g.connected, email: g.email, inDrive: copied, pending,

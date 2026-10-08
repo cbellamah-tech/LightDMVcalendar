@@ -10,6 +10,7 @@ import type { Checklist, CrewPay, Job, JobDetail, Progress, SopItem } from "../t
 import { dur } from "../types";
 import JobInfo from "./JobInfo";
 import PayLine from "./PayLine";
+import Expenses from "./Expenses";
 
 type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress; pay?: CrewPay; parts?: { name: string; images: { url: string; name: string }[] }[] };
 
@@ -195,6 +196,8 @@ export default function JobPage({ params }: { params: { id: string } }) {
           {progress.requiredLeft.length ? `${progress.requiredLeft.length} required box${progress.requiredLeft.length > 1 ? "es" : ""} left` : "Mark job done"}
         </button>
       )}
+
+      <Expenses jobId={job.id} done={!!c.completedAt} onView={setViewer} />
 
       {viewer && (
         <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center p-4" onClick={() => setViewer("")}>
