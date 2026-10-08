@@ -103,28 +103,49 @@ export default function JobberSettings() {
   );
 }
 
-/** Bin lists and takedown photo names from Google Drive, uploaded as one file (it has customer names, so it stays out of the code). */
+/** Bin lists, takedown photos and finished-install photos, read from Google Drive with the app's Google connection. */
 function DriveIndexCard() {
-  const [info, setInfo] = useState<{ generatedAt: string | null; bins: number; photos: number } | null>(null);
+  type Info = { generatedAt: string | null; auto: boolean; bins: number; photos: number; installPhotos: number; google: boolean; sync: { at?: number; error?: string; sheets?: string[] } };
+  const [info, setInfo] = useState<Info | null>(null);
   const [msg, setMsg] = useState("");
-  useEffect(() => { api("/api/drive-index").then(setInfo).catch(() => {}); }, []);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api<Info>("/api/drive-index").then(setInfo).catch(() => {}); }, []);
+  async function readNow() {
+    setMsg(""); setBusy(true);
+    try { const r = await api<Info>("/api/drive-index?sync=1", { method: "POST" }); setInfo(r); setMsg("Read from Drive."); }
+    catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
   async function upload(f: File) {
     setMsg("");
     try {
-      const r = await api("/api/drive-index", { method: "POST", json: JSON.parse(await f.text()) });
-      setInfo(r); setMsg("Loaded. Jobs now show bin numbers and last takedown photos.");
+      const r = await api<Info>("/api/drive-index", { method: "POST", json: JSON.parse(await f.text()) });
+      setInfo(r); setMsg("Loaded.");
     } catch (e: any) { setMsg(e instanceof SyntaxError ? "That file isn't the Drive index." : e.message); }
   }
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
-      <div className="font-bold">Bins and takedown photos (Google Drive)</div>
+      <div className="font-bold">Bins and photos (Google Drive)</div>
       <p className="text-sm text-slate-600">
-        {info?.generatedAt ? `${info.bins} bin rows and ${info.photos} takedown photos, from Drive on ${new Date(info.generatedAt).toLocaleDateString()}.` : "Not loaded yet."}
+        {info?.generatedAt
+          ? `${info.bins} bin rows, ${info.photos} takedown photos and ${info.installPhotos} install photos, ${info.auto ? "read from Drive" : "from an uploaded file"} on ${new Date(info.generatedAt).toLocaleString()}.`
+          : "Not read yet."}
+        {info?.google ? " Read again automatically every 6 hours with each Jobber sync." : ""}
       </p>
-      <label className="inline-block rounded-lg px-4 py-2 font-semibold border border-slate-300 cursor-pointer text-sm">
-        Upload drive_index.json
-        <input type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f); }} />
-      </label>
+      {info?.sync?.sheets?.length ? <p className="text-xs text-slate-500">Bin sheets: {info.sync.sheets.join(", ")}.</p> : null}
+      {info?.sync?.error && <p className="text-sm text-red-600">Last read from Drive failed: {info.sync.error}</p>}
+      {info?.google ? (
+        <button onClick={readNow} disabled={busy} className="rounded-lg px-4 py-2 font-semibold border border-slate-300 text-sm disabled:opacity-60">
+          {busy ? "Reading Drive…" : "Read from Drive now"}
+        </button>
+      ) : (
+        <>
+          <p className="text-sm text-amber-800">Connect Google on the Marketing tab and this fills itself from Drive. Until then you can upload drive_index.json.</p>
+          <label className="inline-block rounded-lg px-4 py-2 font-semibold border border-slate-300 cursor-pointer text-sm">
+            Upload drive_index.json
+            <input type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f); }} />
+          </label>
+        </>
+      )}
       {msg && <p className="text-sm">{msg}</p>}
     </div>
   );

@@ -17,10 +17,13 @@ export type JobDetail = {
   notes: { from: "job" | "quote"; message: string; at?: string; files: DetailFile[] }[];
   clientTags: string[]; otherJobs: { jobNumber?: number; title?: string; createdAt?: string }[];
   repeat: boolean; repeatWhy?: string; bins: string[];
+  quoteMockups?: string[];
   drive: {
     bins: { bin: string; status: string; source: string }[];
-    photos: { fileId: string; title: string; year: number; bin: string | null; thumb: string; link: string; sure: boolean }[];
+    photos: DrivePhoto[];
+    installPhotos?: DrivePhoto[];
     indexedAt: string | null;
   };
 };
 export type CrewPay = { amount: number | null; how: "set" | "rule" | "unknown" };
+export type DrivePhoto = { fileId: string; title: string; year: number; bin: string | null; thumb: string; link: string; sure: boolean };
