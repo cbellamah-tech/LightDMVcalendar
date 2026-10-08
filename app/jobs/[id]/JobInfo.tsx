@@ -107,7 +107,7 @@ function Files({ files, onView }: { files: DetailFile[]; onView: (url: string) =
     <div className="flex gap-2 flex-wrap mt-1.5">
       {files.map((f, i) => f.image ? (
         <button key={i} onClick={() => onView(f.url)} className="w-20 h-20 rounded-md overflow-hidden bg-slate-100">
-          <img src={f.url} alt={f.name} className="w-full h-full object-cover" />
+          <img src={f.url} alt={f.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         </button>
       ) : (
         <a key={i} href={f.url} target="_blank" rel="noreferrer" className="text-xs underline flex items-center gap-1">

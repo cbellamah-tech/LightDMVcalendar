@@ -105,11 +105,12 @@ export async function undoCount(id: string) {
 }
 
 /** Per channel, per day: everything the app knows about. GHL posts and ad spend are passed in by the caller. */
-export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = [], adSpend: { source: string; day: string; spend: number }[] = []) {
+export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = [], adSpend: { source: string; day: string; spend: number }[] = [], events?: CountEvent[]) {
   const out = new Map<string, number>(); // `${channel}|${day}`
   const add = (c: ChannelId, day: string, n: number) => out.set(`${c}|${day}`, (out.get(`${c}|${day}`) ?? 0) + n);
-  for (const e of await getEvents()) add(e.channel, e.day, e.n);
-  for (const list of Object.values(await getVisits()))
+  const [evs, visits] = await Promise.all([events ?? getEvents(), getVisits()]);
+  for (const e of evs) add(e.channel, e.day, e.n);
+  for (const list of Object.values(visits))
     for (const v of list) if (v.status === "placed" || v.status === "replaced") add("yard_signs", etDay(v.at), 1);
   for (const p of ghlPosts) {
     const c = CHANNELS.find((x) => x.ghlPlatform && p.platform.toLowerCase().includes(x.ghlPlatform));

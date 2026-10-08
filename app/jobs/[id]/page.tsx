@@ -50,7 +50,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
 
   const thumb = (itemId: string, u: string) => (
     <div key={u} className="relative">
-      <img src={u} alt="" onClick={() => setViewer(u)} className="w-16 h-16 object-cover rounded-md cursor-pointer" />
+      <img src={u} alt="" loading="lazy" decoding="async" onClick={() => setViewer(u)} className="w-16 h-16 object-cover rounded-md cursor-pointer" />
       <button onClick={() => update({ itemId, removePhoto: u })} aria-label="Remove photo"
         className="absolute -top-1.5 -right-1.5 bg-white rounded-full shadow p-0.5"><X size={12} /></button>
     </div>

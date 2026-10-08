@@ -174,10 +174,17 @@ export async function fetchJobDetail(jobberJobId: string): Promise<JobDetail> {
   return d;
 }
 
-export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolean } = {}): Promise<JobDetail | null> {
-  const d = await kvGet<JobDetail>(key(jobberJobId));
+/** stale: "background" returns a saved but out-of-date detail at once and refreshes it from Jobber after the answer.
+    have: the saved detail when the caller already read it. */
+export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolean; stale?: "wait" | "background"; have?: JobDetail | null } = {}): Promise<JobDetail | null> {
+  const d = opts.have !== undefined ? (opts.have ? structuredClone(opts.have) : null) : await kvGet<JobDetail>(key(jobberJobId));
   if (d) { delete (d as any).quoteMessage; if (isContract(d.instructions)) d.instructions = undefined; d.notes = d.notes.map(crewNote).filter((n) => n.message.trim() || n.files.length); } // saved before these notes were left out
   if (d && !opts.refresh && Date.now() - d.fetchedAt < MAX_AGE && d.imgv === IMGV) return d;
+  if (d && !opts.refresh && opts.stale === "background" && d.imgv === IMGV) {
+    const { laterOnce } = await import("./background");
+    await laterOnce(`jobdetail:${jobberJobId}`, () => fetchJobDetail(jobberJobId), 60_000);
+    return d;
+  }
   return opts.refresh || !d ? fetchJobDetail(jobberJobId) : d;
 }
 

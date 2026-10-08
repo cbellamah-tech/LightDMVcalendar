@@ -23,7 +23,7 @@ const g = globalThis as unknown as {
 const mem = (g.__ldmvMem ??= new Map<string, unknown>());
 
 // prepare:false so it works through Supabase's connection pooler.
-const sql = pgUrl ? (g.__ldmvSql ??= postgres(pgUrl, { prepare: false, max: 3, ssl: /@(localhost|127\.0\.0\.1)[:/]/.test(pgUrl) ? false : "require", idle_timeout: 20 })) : null;
+const sql = pgUrl ? (g.__ldmvSql ??= postgres(pgUrl, { prepare: false, max: 10, ssl: /@(localhost|127\.0\.0\.1)[:/]/.test(pgUrl) ? false : "require", idle_timeout: 20 })) : null;
 const redis = !sql && hasRedis ? Redis.fromEnv() : null;
 
 function ready() {
@@ -47,6 +47,19 @@ export async function kvGet<T>(key: string): Promise<T | null> {
   }
   if (redis) return ((await redis.get<T>(key)) ?? null) as T | null;
   return (mem.has(key) ? structuredClone(mem.get(key)) : null) as T | null;
+}
+
+/** Many keys in one round trip (missing keys come back null), so a list page doesn't pay one query per row. */
+export async function kvGetMany<T>(keys: string[]): Promise<(T | null)[]> {
+  if (!keys.length) return [];
+  if (sql) {
+    await ready();
+    const rows = await sql`select key, value from ldmv_kv where key = any(${keys})`;
+    const by = new Map(rows.map((r) => [r.key as string, r.value as T]));
+    return keys.map((k) => by.get(k) ?? null);
+  }
+  if (redis) return ((await redis.mget<(T | null)[]>(...keys)) ?? []).map((v) => v ?? null);
+  return keys.map((k) => (mem.has(k) ? structuredClone(mem.get(k)) : null) as T | null);
 }
 
 export async function kvSet<T>(key: string, value: T): Promise<void> {
