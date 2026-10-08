@@ -23,3 +23,4 @@ export type JobDetail = {
     indexedAt: string | null;
   };
 };
+export type CrewPay = { amount: number | null; how: "set" | "rule" | "unknown" };

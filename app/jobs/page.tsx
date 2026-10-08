@@ -5,10 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ExternalLink, Loader2, Wrench } from "lucide-react";
 import { api, fmtDay, fmtTime, Me, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../signs/types";
-import type { Job, Progress } from "./types";
+import type { CrewPay, Job, Progress } from "./types";
 import DrivePhotos from "./DrivePhotos";
 
-type Row = Job & { progress: Progress; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean } };
+type Row = Job & { progress: Progress; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay };
+
+const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
 export default function JobsPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -68,7 +70,7 @@ export default function JobsPage() {
         {fixDays.map(([day, list]) => (
           <div key={day} className="space-y-2">
             <h3 className="font-bold text-amber-900/70 text-xs uppercase">{isPast(list[0].start) && list.some((f) => !f.completedAt && !f.doneInJobber) ? `Overdue · ${fmtDay(list[0].start)}` : fmtDay(list[0].start)}</h3>
-            {list.map((j) => <JobCard key={j.id} j={j} fix />)}
+            {list.map((j) => <JobCard key={j.id} j={j} fix office={office} />)}
           </div>
         ))}
       </section>
@@ -77,8 +79,11 @@ export default function JobsPage() {
       {!days.length && <p className="text-slate-500">No jobs scheduled for your crew this week.</p>}
       {days.map(([day, jobs]) => (
         <section key={day} className="space-y-2">
-          <h3 className="font-bold text-slate-500 text-sm uppercase">{fmtDay(jobs[0].start)}</h3>
-          {jobs.map((j) => <JobCard key={j.id} j={j} />)}
+          <h3 className="font-bold text-slate-500 text-sm uppercase flex justify-between gap-2">
+            <span>{fmtDay(jobs[0].start)}</span>
+            <DayPay jobs={jobs} office={office} />
+          </h3>
+          {jobs.map((j) => <JobCard key={j.id} j={j} office={office} />)}
         </section>
       ))}
     </div>
@@ -99,7 +104,7 @@ function byDay(list: Row[], crew: string) {
   return [...out.entries()];
 }
 
-function JobCard({ j, fix }: { j: Row; fix?: boolean }) {
+function JobCard({ j, fix, office }: { j: Row; fix?: boolean; office?: boolean }) {
   return (
     <Link href={`/jobs/${j.id}`} className={`block bg-white rounded-xl border p-4 hover:shadow-md ${fix ? "border-amber-300" : "border-slate-200"}`}>
       <div className="flex justify-between gap-2">
@@ -117,6 +122,9 @@ function JobCard({ j, fix }: { j: Row; fix?: boolean }) {
           </div>
           {fix && j.request && <div className="text-sm font-semibold text-amber-900">{j.request}</div>}
           <div className="text-sm text-slate-500 truncate">{j.address}</div>
+          {j.pay?.amount != null && (
+            <div className="text-sm font-bold text-green-700">{office ? "Crew pay" : "Your crew's pay"} {money(j.pay.amount)}</div>
+          )}
         </div>
         {j.completedAt || (fix && j.doneInJobber) ? <CheckCircle2 className="text-green-600 shrink-0" /> : <span className="text-sm font-semibold text-slate-500 shrink-0">{j.progress.done}/{j.progress.total}</span>}
       </div>
@@ -124,5 +132,18 @@ function JobCard({ j, fix }: { j: Row; fix?: boolean }) {
         <div className="h-full bg-green-600" style={{ width: `${(j.progress.done / Math.max(1, j.progress.total)) * 100}%` }} />
       </div>
     </Link>
+  );
+}
+
+/** What the crew makes that day, from the jobs that have a pay figure. */
+function DayPay({ jobs, office }: { jobs: Row[]; office: boolean }) {
+  const known = jobs.filter((j) => j.pay?.amount != null);
+  if (!known.length) return null;
+  const total = known.reduce((t, j) => t + (j.pay!.amount as number), 0);
+  const missing = jobs.length - known.length;
+  return (
+    <span className="normal-case text-green-700">
+      {office ? "Crew pay" : "Day pay"} {money(total)}{missing ? ` (+${missing} not set)` : ""}
+    </span>
   );
 }

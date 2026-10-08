@@ -7,10 +7,10 @@ import { CalendarDays, ClipboardCheck, GraduationCap, Hammer, Home, LogOut, MapP
 import { api, Me, NAVY } from "./ui";
 
 const TABS = [
-  { href: "/", label: "Home", icon: Home, roles: ["owner", "manager", "lead", "crew"] },
-  { href: "/signs", label: "Yard signs", icon: MapPin, roles: ["owner", "manager", "lead", "crew"] },
+  { href: "/", label: "Home", icon: Home, roles: ["owner", "manager"] },
+  { href: "/signs", label: "Yard signs", icon: MapPin, roles: ["owner", "manager"] },
   { href: "/jobs", label: "Jobs", icon: ClipboardCheck, roles: ["owner", "manager", "lead", "crew"] },
-  { href: "/training", label: "Training", icon: GraduationCap, roles: ["owner", "manager", "lead", "crew"] },
+  { href: "/training", label: "Training", icon: GraduationCap, roles: ["owner", "manager"] },
   { href: "/install", label: "Install", icon: Hammer, roles: ["owner", "manager", "lead", "crew"] },
   { href: "/marketing", label: "Marketing", icon: Megaphone, roles: ["owner", "manager"] },
   { href: "/briefing", label: "Briefing", icon: Newspaper, roles: ["owner"] },
@@ -31,7 +31,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   }, [bare]);
 
   if (bare) return <>{children}</>;
-  const tabs = TABS.filter((t) => !me || t.roles.includes(me.role));
+  // Until we know who this is, show only what everyone gets, so a crew phone never flashes owner tabs.
+  const tabs = TABS.filter((t) => t.roles.includes(me?.role ?? "crew"));
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
   return (

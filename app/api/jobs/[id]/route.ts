@@ -6,7 +6,10 @@ import { cachedJobParts, getJobDetail, withDrive } from "@/lib/jobDetails";
 import { loadDriveIndex } from "@/lib/drive";
 import { isConnected } from "@/lib/jobber";
 import { listUsers } from "@/lib/users";
-import type { Session } from "@/lib/session";
+import { isOffice, type Session } from "@/lib/session";
+import { getPayOverrides, payFor, setPayOverride } from "@/lib/crewPay";
+import { kvGet } from "@/lib/store";
+import type { JobDetail } from "@/lib/jobDetails";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,8 +34,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const d = job.jobberJobId && (await isConnected()) ? await getJobDetail(job.jobberJobId).catch(() => null) : null;
     detail = withDrive(await loadDriveIndex(), d, job.client);
   }
+  const cached = job.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${job.jobberJobId}`) : null;
+  const pay = payFor(job, cached, await getPayOverrides());
   const parts = await cachedJobParts(job.jobberJobId);
-  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, parts });
+  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, pay, parts });
 }
 
 /* Body: { itemId, done?, addPhotos?: string[], part?: string (which part of the job the photos show), removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands } } or { complete: true } or { reopen: true } */
@@ -42,6 +47,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const job = await load(params.id, s);
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
   const b = await req.json().catch(() => ({}));
+  // Owners and the manager can set what the crew gets for this job (null goes back to the 20% rule).
+  if ("crewPay" in b) {
+    if (!isOffice(s)) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    const v = b.crewPay === null || b.crewPay === "" ? null : Number(b.crewPay);
+    if (v !== null && (!Number.isFinite(v) || v < 0 || v > 100000)) return NextResponse.json({ error: "Enter a dollar amount." }, { status: 400 });
+    await setPayOverride(job.id, v === null ? null : Math.round(v), s.name);
+    const cached = job.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${job.jobberJobId}`) : null;
+    return NextResponse.json({ pay: payFor(job, cached, await getPayOverrides()) });
+  }
   const c = await getChecklist(job);
   const sop = SOPS[job.kind];
 

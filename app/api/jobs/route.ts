@@ -7,6 +7,7 @@ import { kvGet } from "@/lib/store";
 import { JobDetail, withDrive } from "@/lib/jobDetails";
 import { loadDriveIndex } from "@/lib/drive";
 import { fixSheetStatus, fixSheetUrl } from "@/lib/serviceSheet";
+import { getPayOverrides, payFor } from "@/lib/crewPay";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
@@ -30,13 +31,14 @@ export async function GET(req: Request) {
   jobs.sort((a, b) => a.start.localeCompare(b.start));
   fixList.sort((a, b) => a.start.localeCompare(b.start));
   const idx = await loadDriveIndex();
+  const overrides = await getPayOverrides();
   const withProgress = async (j: (typeof jobs)[number]) => {
     const c = await getChecklist(j);
     // Repeat / new and bin from what's already cached; the job page fetches fresh details.
     const d = j.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${j.jobberJobId}`) : null;
     const v = j.source === "jobber" ? withDrive(idx, d, j.client) : null;
     const info = v ? { repeat: v.repeat, bins: v.drive.bins.map((b) => b.bin), known: !!d } : undefined;
-    return { ...j, progress: checklistProgress(c), completedAt: c.completedAt, info };
+    return { ...j, progress: checklistProgress(c), completedAt: c.completedAt, info, pay: payFor(j, d, overrides) };
   };
   const fixes = (await Promise.all(fixList.map(withProgress)))
     // An old fix finished in the app drops off once its day has passed.
