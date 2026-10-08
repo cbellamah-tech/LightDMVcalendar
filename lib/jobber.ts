@@ -104,6 +104,15 @@ async function gqlOnce<T>(query: string, variables: Record<string, unknown>): Pr
   return j.data as T;
 }
 
+/** Download a Jobber file (some file links need the app's sign-in, some refuse it). */
+export async function jobberFile(url: string): Promise<Response> {
+  const plain = await fetch(url, { cache: "no-store" }).catch(() => null);
+  if (plain?.ok) return plain;
+  const authed = await fetch(url, { cache: "no-store", headers: { authorization: `Bearer ${await accessToken()}` } }).catch(() => null);
+  if (authed?.ok) return authed;
+  throw new Error(`Jobber file download failed (${plain?.status ?? "no answer"}${authed ? `/${authed.status}` : ""})`);
+}
+
 export const isConnected = async () => !!(await kvGet(TOKENS));
 export const getStatus = async () => (await kvGet<SyncStatus>(STATUS)) ?? {};
 export async function disconnect() {

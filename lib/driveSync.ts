@@ -65,10 +65,16 @@ async function readPhotos() {
   for (const f of folders) {
     const isTakedown = /takedown|take down/i.test(f.name);
     if (!isTakedown && !/^\s*20\d\d holiday lighting\s*$/i.test(f.name)) continue;
-    for (const p of await list(`'${f.id}' in parents and mimeType contains 'image/' and trashed = false`, "id,name")) {
-      if (isTakedown) takedown.push({ fileId: p.id, title: p.name, year: year(f.name), ...parseTakedown(p.name) });
-      else install.push({ fileId: p.id, title: p.name, year: year(f.name), bin: null, label: base(p.name) });
-    }
+    const y = year(f.name);
+    const add = (p: any, folderLabel?: string) => {
+      // A photo inside a customer's own subfolder ("418-Haney/IMG_1234.heic") takes the folder's name.
+      const named = folderLabel && /^(img|photo|image|dsc|pxl)[-_ ]?\d|^photo-output|^\d+$/i.test(base(p.name)) ? folderLabel : base(p.name);
+      if (isTakedown) takedown.push({ fileId: p.id, title: p.name, year: y, ...parseTakedown(named) });
+      else install.push({ fileId: p.id, title: p.name, year: y, bin: null, label: named });
+    };
+    for (const p of await list(`'${f.id}' in parents and mimeType contains 'image/' and trashed = false`, "id,name")) add(p);
+    for (const sub of await list(`'${f.id}' in parents and mimeType = '${FOLDER}' and trashed = false`))
+      for (const p of await list(`'${sub.id}' in parents and mimeType contains 'image/' and trashed = false`, "id,name")) add(p, sub.name.trim());
   }
   return { takedown, install, folders: folders.length };
 }

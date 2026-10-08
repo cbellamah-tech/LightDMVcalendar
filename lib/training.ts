@@ -19,6 +19,9 @@ export type Module = { id: string; title: string; goal: string; practice: Practi
 export type Band = { cat: string; n: number; p25: number; median: number; p75: number; avg?: number };
 export type Rates = {
   rooflinePerFt: number; perStrand: number; pillar: number; wreath: Record<string, number>;
+  /** Roofline $ a foot by house: short 1-story or flat (low to high), 2 stories, steep or 3 stories. Standard is rooflinePerFt. */
+  roofline1StoryLow: number; roofline1StoryHigh: number; roofline2Story: number; rooflineSteep: number;
+  earlyDiscountPct: number; startingPrice: number;
   depositPct: number; taxPct: number; cashDiscountPct: number; returningDiscountPct: number; returningBefore: string; passPct: number;
 };
 export type Product = { key: string; name: string; desc: string; cat: string; price: number; textOnly?: boolean };
@@ -68,7 +71,8 @@ const PROG = (uid: string) => `ldmv:training:progress:${uid}`;
 const PROG_INDEX = "ldmv:training:trainees";
 
 const DEFAULT_RATES: Rates = {
-  rooflinePerFt: 10, perStrand: 35, pillar: 70, wreath: { "36": 225, "48": 350, "60": 550 },
+  rooflinePerFt: 10, roofline1StoryLow: 8, roofline1StoryHigh: 9, roofline2Story: 11, rooflineSteep: 12, earlyDiscountPct: 10, startingPrice: 800,
+  perStrand: 35, pillar: 70, wreath: { "36": 225, "48": 350, "60": 550 },
   depositPct: 50, taxPct: 6, cashDiscountPct: 5, returningDiscountPct: 10, returningBefore: "Oct 15", passPct: 10,
 };
 
@@ -110,7 +114,7 @@ export async function getRates(pack?: Pack | null): Promise<Rates> {
 
 export async function saveRates(r: Partial<Rates>): Promise<Rates> {
   const clean: Partial<Rates> = {};
-  for (const k of ["rooflinePerFt", "perStrand", "pillar", "depositPct", "taxPct", "cashDiscountPct", "returningDiscountPct", "passPct"] as const) {
+  for (const k of ["rooflinePerFt", "roofline1StoryLow", "roofline1StoryHigh", "roofline2Story", "rooflineSteep", "earlyDiscountPct", "startingPrice", "perStrand", "pillar", "depositPct", "taxPct", "cashDiscountPct", "returningDiscountPct", "passPct"] as const) {
     const v = Number(r[k]);
     if (Number.isFinite(v) && v >= 0) clean[k] = v;
   }

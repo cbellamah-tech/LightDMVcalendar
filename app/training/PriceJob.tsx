@@ -22,7 +22,7 @@ const CAT: Record<string, string> = {
 /** The pricing rules for the line types on this job (hidden in the final check). */
 function Rules({ cats, rates, bands, trees }: { cats: string[]; rates: Rates; bands: Band[]; trees: TreeGroup[] }) {
   const rule: Record<string, string> = {
-    roofline: `$${rates.rooflinePerFt} a foot, more for 2+ stories, steep roofs, peaks and dormers.`,
+    roofline: `$${rates.rooflinePerFt} a foot standard; $${rates.roofline1StoryLow} to $${rates.roofline1StoryHigh} for a short 1-story or flat roof, $${rates.roofline2Story} for 2 stories, $${rates.rooflineSteep} for steep or 3 stories.`,
     "roofline+pillars": `Roofline at $${rates.rooflinePerFt} a foot plus $${rates.pillar} a pillar (and stakes if they're on the line).`,
     pillars: `$${rates.pillar} for a standard 9 to 10 ft pillar (2 strands); less for short posts.`,
     tree: `Strands of mini lights × $${rates.perStrand}. ${trees.filter((t) => /ft/.test(t.size)).map((t) => `${t.size}: avg ${money(t.avg)}`).join(", ")}.`,

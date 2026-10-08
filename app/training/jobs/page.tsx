@@ -22,7 +22,7 @@ export default function PhotoLibrary() {
   const shown = jobs.filter((j) => has(j, cat));
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <Link href="/training" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> Training</Link>
+      <Link href="/training" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> Quote Creation Training</Link>
       <H1 sub="Houses we lit in 2025: what it looks like finished, each line on the quote and what we charged.">Photo library</H1>
       <div className="flex flex-wrap gap-2">
         {CATS.map(([k, label]) => (
