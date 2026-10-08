@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, Film, Loader2, Plus, RefreshCw, Send } from "lucide-react";
+import { Check, ExternalLink, Film, Loader2, Plus, RefreshCw, Send, X } from "lucide-react";
 import { ago, api, NAVY } from "@/components/ui";
 import { Card } from "./parts";
 
@@ -340,7 +340,7 @@ export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: loggi
                               <span className="font-medium"><ChannelName c={c ?? { label: r[0] }} /></span>
                               {c?.auto && <span className="text-[10px] rounded bg-green-50 text-green-700 px-1">auto</span>}
                               {c && drafts.text[c.id] && month === thisMonth && (
-                                <button onClick={() => setDoing(doing === c.id ? null : c.id)}
+                                <button type="button" onClick={(e) => { e.stopPropagation(); setDoing((cur) => (cur === c.id ? null : c.id)); }}
                                   className="ml-auto rounded-md px-2.5 text-xs font-bold leading-6 text-white" style={{ background: "#1F9D55" }}>{doing === c.id ? "Close" : "Post"}</button>
                               )}
                               {canTap && (
@@ -364,7 +364,7 @@ export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: loggi
                         </tr>
                         {c && doing === c.id && drafts.text[c.id] && (
                           <tr><td colSpan={7} className="pb-3">
-                            <PostDrawer label={c.label} draft={drafts.text[c.id]} url={drafts.urls[c.id]}
+                            <PostDrawer label={c.label} draft={drafts.text[c.id]} url={drafts.urls[c.id]} onClose={() => setDoing(null)}
                               onPosted={async () => { await onLog(c.id); if (owner) await sync(); setDoing(null); }} />
                           </td></tr>
                         )}
@@ -384,12 +384,14 @@ export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: loggi
 }
 
 /** No API for these sites: copy the ready text, open the site, paste, post, then tap Posted to count it. */
-function PostDrawer({ label, draft, url, onPosted }: { label: string; draft: { title?: string; body: string }; url: string; onPosted: () => Promise<void> }) {
+function PostDrawer({ label, draft, url, onPosted, onClose }: { label: string; draft: { title?: string; body: string }; url: string; onPosted: () => Promise<void>; onClose: () => void }) {
   const [title, setTitle] = useState(draft.title ?? "");
   const [body, setBody] = useState(draft.body);
   const [step, setStep] = useState<"start" | "opened" | "busy">("start");
   return (
-    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+    <div className="relative rounded-xl bg-slate-50 border border-slate-200 p-3 pt-9 space-y-2">
+      <button type="button" onClick={onClose} aria-label="Close" title="Close"
+        className="absolute top-1.5 right-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-200 inline-flex items-center gap-1"><X size={14} /> Close</button>
       {draft.title !== undefined && <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm font-semibold bg-white" />}
       <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} className="w-full rounded-lg border border-slate-300 p-2 text-sm bg-white" />
       <div className="flex gap-2 flex-wrap items-center">
