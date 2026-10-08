@@ -90,6 +90,19 @@ export async function reviewUrl(): Promise<string> {
         return url;
       }
     } catch { /* fall through */ }
+    // Keys made before the new Places API only have the classic one.
+    try {
+      const u = new URL("https://maps.googleapis.com/maps/api/place/findplacefromtext/json");
+      u.searchParams.set("input", "Light DMV"); u.searchParams.set("inputtype", "textquery");
+      u.searchParams.set("fields", "place_id,name"); u.searchParams.set("locationbias", "circle:50000@38.9,-77.1"); u.searchParams.set("key", key);
+      const j = await (await fetch(u, { signal: AbortSignal.timeout(4000) })).json().catch(() => ({}));
+      const hit = (j.candidates ?? []).find((p: any) => /light\s*dmv/i.test(p.name || ""));
+      if (hit?.place_id) {
+        const url = `https://search.google.com/local/writereview?placeid=${hit.place_id}`;
+        await saveSettings((x) => { x.foundUrl = url; });
+        return url;
+      }
+    } catch { /* fall through */ }
   }
   return "https://www.google.com/search?q=Light+DMV+reviews";
 }
