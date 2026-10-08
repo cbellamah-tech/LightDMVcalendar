@@ -31,7 +31,8 @@ export async function postMedia(m: MediaItem, want: Platform[], by: string, capt
 
 const AUTO = "ldmv:mkt:autopost";
 export type AutoPost = { on: boolean; by?: string; at?: number };
-export const getAutoPost = async (): Promise<AutoPost> => (await kvGet<AutoPost>(AUTO)) ?? { on: false };
+// On unless an owner turns it off (chris, 2026-10-08: "you do that").
+export const getAutoPost = async (): Promise<AutoPost> => (await kvGet<AutoPost>(AUTO)) ?? { on: true };
 export const setAutoPost = (on: boolean, by: string) => kvSet(AUTO, { on, by, at: Date.now() });
 
 /** With Auto-post on: the newest ready, never-posted, not-hidden item goes to every connected platform. */
