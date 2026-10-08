@@ -4,6 +4,7 @@ import { gql, isConnected } from "./jobber";
 import { buildSelection } from "./jobberSchema";
 import type { JobDetail } from "./jobDetails";
 import { expenseTotal, getAllExpenses } from "./expenses";
+import { bonusesByJob, bonusTotal } from "./reviews";
 
 /* Owners' cost ledger. Supplier prices, sold prices and stock live only in the database (ldmv_kv):
    the repo is public, so nothing here carries a dollar figure. An owner uploads the supplier cost
@@ -141,7 +142,7 @@ export async function fetchSoldFromJobber(jobs: Job[], limit = 15) {
 export type LedgerRow = {
   id: string; jobNumber?: number; title: string; client: string; start: string; kind: Job["kind"]; crew?: string;
   repeat?: boolean; logged: Logged | null; use: Partial<Record<MaterialKey, number>>; materials: number; fromBin: boolean;
-  missing: MaterialKey[]; sold?: Sold; crewPay: number; expenses: number; left?: number; marginPct?: number;
+  missing: MaterialKey[]; sold?: Sold; crewPay: number; reviews: number; expenses: number; left?: number; marginPct?: number;
 };
 
 export async function ledger(opts: { from?: string; to?: string; refreshSold?: boolean } = {}) {
@@ -151,8 +152,9 @@ export async function ledger(opts: { from?: string; to?: string; refreshSold?: b
   const jobs = await getJobs();
   const mats = new Map((await listMaterials()).map((m) => [m.jobId, m]));
   const spent = await getAllExpenses(); // crews' out-of-pocket expenses (receipts) per visit
-  // Every install visit and any visit with crew expenses, plus any counted job that has since dropped out of the synced window.
-  const all: Job[] = Object.values(jobs).filter((j) => (j.kind === "install" || mats.has(j.id) || spent[j.id]?.items.length) && inRange(j.start));
+  const bonuses = await bonusesByJob(); // $50 Google review bonuses, paid on top of crew pay
+  // Every install visit and any visit with crew expenses or a review bonus, plus any counted job that has since dropped out of the synced window.
+  const all: Job[] = Object.values(jobs).filter((j) => (j.kind === "install" || mats.has(j.id) || spent[j.id]?.items.length || bonuses[j.id]?.length) && inRange(j.start));
   for (const m of mats.values()) if (!jobs[m.jobId] && inRange(m.date)) all.push({
     id: m.jobId, source: "jobber", jobberJobId: m.jobberJobId, jobberVisitId: m.jobberVisitId, jobNumber: m.jobNumber,
     title: m.jobNumber ? `Job #${m.jobNumber}` : "Job", client: "", address: "", start: m.date, kind: m.kind, crew: m.crew, assignedNames: [], updatedAt: m.at,
@@ -175,10 +177,11 @@ export async function ledger(opts: { from?: string; to?: string; refreshSold?: b
     const s = sold[j.id];
     const crewPay = s ? (s.amount * settings.crewPct) / 100 : 0;
     const expenses = expenseTotal(spent[j.id]);
-    const left = s ? s.amount - materials - crewPay - expenses : undefined;
+    const reviews = bonusTotal(bonuses[j.id]);
+    const left = s ? s.amount - materials - crewPay - reviews - expenses : undefined;
     return {
       id: j.id, jobNumber: j.jobNumber, title: j.title, client: j.client, start: j.start, kind: j.kind, crew: j.crew,
-      repeat, logged, use, materials, fromBin, missing, sold: s, crewPay, expenses, left,
+      repeat, logged, use, materials, fromBin, missing, sold: s, crewPay, reviews, expenses, left,
       marginPct: s && s.amount ? ((left ?? 0) / s.amount) * 100 : undefined,
     };
   }));

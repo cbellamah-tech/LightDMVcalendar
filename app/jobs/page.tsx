@@ -9,7 +9,7 @@ import type { CrewPay, Job, Progress } from "./types";
 import { dur } from "./types";
 import DrivePhotos from "./DrivePhotos";
 
-type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay; expenses?: number };
+type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay; expenses?: number; reviews?: number };
 
 const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
@@ -137,10 +137,11 @@ function JobCard({ j, fix, office, gap }: { j: Row; fix?: boolean; office?: bool
               {j.arrivedAt && j.completedAt ? ` · ${dur(j.completedAt - j.arrivedAt)} on site` : ""}
             </div>
           )}
-          {(j.pay?.amount != null || !!j.expenses) && (
+          {(j.pay?.amount != null || !!j.expenses || !!j.reviews) && (
             <div className="text-sm font-bold text-green-700">
               {j.pay?.amount != null && <>{office ? "Crew pay" : "Your crew's pay"} {money(j.pay.amount)}</>}
               {!!j.expenses && <>{j.pay?.amount != null ? " + " : ""}{money(j.expenses)} expenses</>}
+              {!!j.reviews && <>{j.pay?.amount != null || j.expenses ? " + " : ""}{money(j.reviews)} review bonus</>}
             </div>
           )}
         </div>
@@ -164,12 +165,14 @@ function gapBefore(j: Row, dayJobs: Row[]) {
   return prev ? j.arrivedAt - prev.completedAt! : undefined;
 }
 
-/** What the crew makes that day: pay for the jobs that have a figure, plus the expenses they paid out of pocket. */
+/** What the crew makes that day: pay for the jobs that have a figure, plus the expenses they paid out of pocket
+ *  and any Google review bonuses. */
 function DayPay({ jobs, office }: { jobs: Row[]; office: boolean }) {
   const known = jobs.filter((j) => j.pay?.amount != null);
   const spent = jobs.reduce((t, j) => t + (j.expenses || 0), 0);
-  if (!known.length && !spent) return null;
-  const pay = known.reduce((t, j) => t + (j.pay!.amount as number), 0);
+  const bonus = jobs.reduce((t, j) => t + (j.reviews || 0), 0);
+  if (!known.length && !spent && !bonus) return null;
+  const pay = known.reduce((t, j) => t + (j.pay!.amount as number), 0) + bonus;
   const missing = jobs.length - known.length;
   return (
     <span className="normal-case text-green-700 text-right">

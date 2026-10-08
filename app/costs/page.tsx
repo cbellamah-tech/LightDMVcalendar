@@ -14,7 +14,7 @@ type Unit = { perUnit: number; bought: number; landed: number; cf: number };
 type Row = {
   id: string; jobNumber?: number; title: string; client: string; start: string; kind: string; crew?: string; repeat?: boolean;
   logged: { rooflineFt: number; c7Bulbs: number; miniStrands: number; stakeFt?: number } | null;
-  materials: number; fromBin: boolean; missing: Key[]; sold?: { amount: number; source: string }; crewPay: number; expenses: number; left?: number; marginPct?: number;
+  materials: number; fromBin: boolean; missing: Key[]; sold?: { amount: number; source: string }; crewPay: number; reviews: number; expenses: number; left?: number; marginPct?: number;
 };
 type Stock = { key: Key; name: string; unit: string; bought: number; used: number; onHand: number; value: number };
 type Data = { orders: Order[]; settings: Settings; unitCosts: Partial<Record<Key, Unit>>; rows: Row[]; stock: Stock[] };
@@ -64,12 +64,12 @@ export default function CostsPage() {
 
   const uc = d.unitCosts, s = d.settings;
   const haveCosts = d.orders.length > 0;
-  const shown = d.rows.filter((r) => r.kind === "install" || r.logged || r.expenses);
+  const shown = d.rows.filter((r) => r.kind === "install" || r.logged || r.expenses || r.reviews);
   const logged = shown.filter((r) => r.logged);
   const priced = logged.filter((r) => r.sold);
   const sum = (f: (r: Row) => number) => priced.reduce((a, r) => a + f(r), 0);
-  const totSold = sum((r) => r.sold!.amount), totMat = sum((r) => r.materials), totCrew = sum((r) => r.crewPay), totExp = sum((r) => r.expenses);
-  const totLeft = totSold - totMat - totCrew - totExp;
+  const totSold = sum((r) => r.sold!.amount), totMat = sum((r) => r.materials), totCrew = sum((r) => r.crewPay), totRev = sum((r) => r.reviews || 0), totExp = sum((r) => r.expenses);
+  const totLeft = totSold - totMat - totCrew - totRev - totExp;
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-4">
@@ -93,11 +93,12 @@ export default function CostsPage() {
 
       {haveCosts && (
         <>
-          <div className={`grid grid-cols-2 gap-3 ${totExp > 0 ? "md:grid-cols-6" : "md:grid-cols-5"}`}>
+          <div className={`grid grid-cols-2 gap-3 ${["md:grid-cols-5", "md:grid-cols-6", "md:grid-cols-7"][(totExp > 0 ? 1 : 0) + (totRev > 0 ? 1 : 0)]}`}>
             <Tile label="Jobs with counts" value={`${logged.length} of ${shown.length}`} />
             <Tile label="Sold (those jobs)" value={$(totSold)} />
             <Tile label="Materials" value={$(totMat)} />
             <Tile label={`Crew pay (${s.crewPct}%)`} value={$(totCrew)} />
+            {totRev > 0 && <Tile label="Review bonuses" value={$(totRev)} />}
             {totExp > 0 && <Tile label="Crew expenses" value={$(totExp, true)} />}
             <Tile label="Left over" value={priced.length ? `${$(totLeft)} · ${Math.round((totLeft / totSold) * 100)}%` : "-"} color={totLeft >= 0 ? GREEN : RED} />
           </div>
@@ -109,16 +110,16 @@ export default function CostsPage() {
       <div className={card}>
         <h2 className={h2} style={{ color: NAVY }}>Job ledger</h2>
         <p className="text-sm text-slate-500 mb-3">
-          Fills in by itself from each job checklist (feet of roofline, C7 bulbs, mini strands). Sold price comes from Jobber; tap it to fix. Expenses are the receipts crews enter when they close out a job; tap one to see it.
+          Fills in by itself from each job checklist (feet of roofline, C7 bulbs, mini strands). Sold price comes from Jobber; tap it to fix. Expenses are the receipts crews enter when they close out a job; tap one to see it. Reviews are the $50 Google review bonuses.
           {` Repeat customers reuse the lights in their bin, so only ${s.repeatNewPct}% new material (for breakage) is charged to them.`}
         </p>
         {shown.length === 0 ? <p className="text-slate-500 text-sm">No install jobs synced yet.</p> : (
           <div className="overflow-x-auto -mx-4 px-4">
-            <table className="w-full text-sm min-w-[760px]">
+            <table className="w-full text-sm min-w-[820px]">
               <thead className="text-left text-slate-500 border-b">
                 <tr><th className="py-2 pr-2">Date</th><th className="pr-2">Job</th><th className="pr-2 text-right">Roofline ft</th><th className="pr-2 text-right">C7</th>
                   <th className="pr-2 text-right">Strands</th><th className="pr-2 text-right">Materials</th><th className="pr-2 text-right">Sold</th>
-                  <th className="pr-2 text-right">Crew pay</th><th className="pr-2 text-right">Expenses</th><th className="text-right">Left</th></tr>
+                  <th className="pr-2 text-right">Crew pay</th><th className="pr-2 text-right">Reviews</th><th className="pr-2 text-right">Expenses</th><th className="text-right">Left</th></tr>
               </thead>
               <tbody>
                 {shown.map((r) => (
@@ -141,6 +142,7 @@ export default function CostsPage() {
                     ) : <td colSpan={4} className="pr-2 text-right text-slate-400">not counted yet</td>}
                     <td className="pr-2 text-right"><SoldCell row={r} onSave={(amount) => post({ action: "sold", jobId: r.id, amount })} /></td>
                     <td className="pr-2 text-right">{r.sold ? $(r.crewPay) : ""}</td>
+                    <td className="pr-2 text-right">{r.reviews ? <a href={`/jobs/${r.id}`} className="underline decoration-dotted">{$(r.reviews)}</a> : ""}</td>
                     <td className="pr-2 text-right">{r.expenses ? <a href={`/jobs/${r.id}#expenses`} className="underline decoration-dotted">{$(r.expenses, true)}</a> : ""}</td>
                     <td className="text-right font-semibold" style={{ color: r.left == null ? undefined : r.left >= 0 ? GREEN : RED }}>
                       {r.left != null && r.logged ? <>{$(r.left)}<div className="text-xs font-normal text-slate-500">{Math.round(r.marginPct!)}%</div></> : ""}

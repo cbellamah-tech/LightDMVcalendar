@@ -10,6 +10,7 @@ import { listUsers } from "@/lib/users";
 import { isOffice, type Session } from "@/lib/session";
 import { getPayOverrides, payFor, setPayOverride } from "@/lib/crewPay";
 import { kvGet } from "@/lib/store";
+import { bonusesByJob } from "@/lib/reviews";
 import type { JobDetail } from "@/lib/jobDetails";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +30,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const job = await load(params.id, s);
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
   // The checklist, the saved Jobber detail and pay overrides side by side (the page re-polls every 5 s).
-  const [checklist, cached, overrides] = await Promise.all([
+  const [checklist, cached, overrides, bonuses] = await Promise.all([
     getChecklist(job),
     job.jobberJobId ? kvGet<JobDetail>(`ldmv:jobdetail:${job.jobberJobId}`) : null,
     getPayOverrides(),
+    bonusesByJob(),
   ]);
   // Job details only on the first load. A saved copy shows at once; a stale one is refreshed from Jobber after the answer.
   let detail = null;
@@ -43,7 +45,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
   const pay = payFor(job, cached, overrides);
   const parts = cached ? jobParts(cached.lines) : [];
-  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, pay, parts });
+  // Google review bonuses: the office sees how each was placed; a crew sees who earned it.
+  const reviews = (bonuses[job.id] ?? []).map((b) => (isOffice(s) ? b : { ...b, how: undefined }));
+  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, pay, parts, reviews });
 }
 
 /* Body: { itemId, done?, addPhotos?: string[], part?: string (which part of the job the photos show), removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands, stakeFeet } } or { complete: true } or { reopen: true } */
