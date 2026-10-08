@@ -10,8 +10,8 @@ const TABS = [
   { href: "/", label: "Home", icon: Home, roles: ["owner", "manager"] },
   { href: "/signs", label: "Yard signs", icon: MapPin, roles: ["owner", "manager"] },
   { href: "/jobs", label: "Jobs", icon: ClipboardCheck, roles: ["owner", "manager", "lead", "crew"] },
-  { href: "/training", label: "Training", icon: GraduationCap, roles: ["owner", "manager"] },
-  { href: "/install", label: "Install", icon: Hammer, roles: ["owner", "manager", "lead", "crew"] },
+  { href: "/training", label: "Quote Creation Training", icon: GraduationCap, roles: ["owner", "manager"] },
+  { href: "/install", label: "Installer Training", icon: Hammer, roles: ["owner", "manager", "lead", "crew"] },
   { href: "/marketing", label: "Marketing", icon: Megaphone, roles: ["owner", "manager"] },
   { href: "/briefing", label: "Briefing", icon: Newspaper, roles: ["owner"] },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, roles: ["owner"] },
@@ -64,7 +64,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         {tabs.slice(0, 5).map((t) => (
           <Link key={t.href} href={t.href}
-            className="flex-1 flex flex-col items-center py-2 text-[11px] font-semibold"
+            className="flex-1 flex flex-col items-center py-2 text-[11px] leading-tight text-center font-semibold"
             style={{ color: active(t.href) ? NAVY : "#94A3B8" }}>
             <t.icon size={20} />
             {t.label}

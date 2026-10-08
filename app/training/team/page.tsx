@@ -31,7 +31,7 @@ export default function TeamProgress() {
   if (course) {
     return (
       <div className="pb-4">
-        <TeamView base="/api/training/course" back="/training" backLabel="Quote training" title="Quote training: team progress"
+        <TeamView base="/api/training/course" back="/training" backLabel="Quote Creation Training" title="Quote Creation Training: team progress"
           sub="Time counts only while a page is on screen and in use. Practice shows good houses out of tries; the final shows each run." />
         <div className="max-w-3xl mx-auto px-4 space-y-4">
           {me?.role === "owner" && <RatesEditor />}
@@ -43,7 +43,7 @@ export default function TeamProgress() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <Link href="/training" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> Training</Link>
+      <Link href="/training" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> Quote Creation Training</Link>
       <H1 sub="Who has passed what, and how close their practice quotes land.">Team progress</H1>
       {!d.trainees.length && <Card><p className="text-slate-600">Nobody has started the course yet.</p></Card>}
       {d.trainees.map((t) => {

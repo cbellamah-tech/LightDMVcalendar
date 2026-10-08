@@ -51,7 +51,7 @@ export default function PriceHelper() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <Link href="/training" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> Training</Link>
+      <Link href="/training" className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}><ChevronLeft size={16} /> Quote Creation Training</Link>
       <H1 sub="Enter what you measured. The rule price uses the owners' rates; the range is what past sold quotes charged.">Price helper</H1>
       <Card className="grid sm:grid-cols-2 gap-3">
         {field("roof", "Roofline feet (all runs and peaks)", "e.g. 120")}
