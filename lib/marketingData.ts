@@ -1,3 +1,4 @@
+import { getDrafts, POST_URL } from "./drafts";
 import { adsSummary, allAdDays } from "./ads";
 import { attribution } from "./attribution";
 import { getAutoPost } from "./autopost";
@@ -99,6 +100,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     inbox: mail,
     feed,
     autopost: (await getAutoPost()).on,
+    drafts: { text: await getDrafts(), urls: POST_URL },
     attribution: ghl ? attribution(ghl.leads, ghl.opps ?? [], await allAdDays(), opts.days ?? 30, today) : null,
     ads: await adsSummary(),
     cold: { url: SMARTLEAD_URL, latest: await latestCold() },
