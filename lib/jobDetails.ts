@@ -2,7 +2,7 @@ import { kvGet, kvSet } from "./store";
 import { gql } from "./jobber";
 import { buildSelection, fieldsMatching, fieldType, rows, Spec } from "./jobberSchema";
 import { driveFor, DriveIndex, DriveMatch } from "./drive";
-import { jobParts } from "./sops";
+import { jobParts, JobPart } from "./sops";
 
 /* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices:
    the job's dollar value is kept server-side only, to work out crew pay (lib/crewPay.ts). */
@@ -209,7 +209,7 @@ export async function refreshStaleDetails(jobberJobIds: string[], limit = 12) {
 }
 
 /** The parts of the job to photograph (from the saved Jobber detail; empty when it hasn't been pulled yet). */
-export async function cachedJobParts(jobberJobId?: string): Promise<string[]> {
+export async function cachedJobParts(jobberJobId?: string): Promise<JobPart[]> {
   if (!jobberJobId) return [];
   const d = await kvGet<JobDetail>(key(jobberJobId));
   return d ? jobParts(d.lines) : [];
