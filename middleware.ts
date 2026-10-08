@@ -7,7 +7,8 @@ const OWNER_ONLY = ["/calendar", "/api/board", "/insurance", "/api/insurance", "
 
 // Crew leads and crew see their own jobs and the install course, nothing else.
 const CREW_OK = ["/jobs", "/api/jobs", "/install", "/api/install", "/api/me", "/api/upload", "/api/photos", "/api/training/img"];
-const CREW_NEVER = ["/install/team", "/api/install/team"];
+// Crew leads also see their crew's course progress and sign people off.
+const CREW_NEVER = ["/install/team", "/api/install/team", "/api/install/signoff"];
 
 // Owners only, not the manager either.
 const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs"];
@@ -28,7 +29,7 @@ export async function middleware(req: NextRequest) {
   }
   if (s.role === "lead" || s.role === "crew") {
     const asset = !pathname.startsWith("/api/") && /\.(png|jpe?g|webp|svg|gif|ico)$/i.test(pathname); // course drawings and icons
-    const ok = asset || CREW_OK.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && !CREW_NEVER.some((p) => pathname.startsWith(p));
+    const ok = asset || CREW_OK.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && (s.role === "lead" || !CREW_NEVER.some((p) => pathname.startsWith(p)));
     if (ok) return NextResponse.next();
     if (isApi) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
     return NextResponse.redirect(new URL("/jobs", req.url));
