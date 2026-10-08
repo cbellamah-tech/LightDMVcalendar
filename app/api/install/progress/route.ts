@@ -19,5 +19,5 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
   if (typeof b.module !== "string" || !Number.isInteger(b.page) || b.page < 0 || b.page > 200) return NextResponse.json({ error: "Bad progress" }, { status: 400 });
   const needsQuiz = !!b.done && !!toCourse((await loadPack())?.install?.modules ?? []).find((m) => m.key === b.module)?.quiz;
-  return NextResponse.json(await recordInstall(s.uid, { module: b.module.slice(0, 80), page: b.page, secs: b.secs, done: !!b.done, needsQuiz }));
+  return NextResponse.json(await recordInstall(s.uid, { module: b.module.slice(0, 80), page: b.page, secs: b.secs, done: !!b.done, needsQuiz, video: typeof b.video === "string" ? b.video.slice(0, 20) : undefined }));
 }

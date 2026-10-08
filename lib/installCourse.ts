@@ -36,8 +36,14 @@ export function toCourse(mods: { title: string; blocks: Block[]; quiz?: { q: str
   });
 }
 
-export type QuizResult = { tries: number; best: number; passed?: number };
-export type ModuleProgress = { seen: number[]; secs: Record<number, number>; started: number; done?: number; quiz?: QuizResult };
+export type QuizResult = { tries: number; best: number; passed?: number; attempts?: { at: number; pct: number }[] };
+export type ModuleProgress = {
+  seen: number[]; secs: Record<number, number>; started: number; lastAt?: number; done?: number; quiz?: QuizResult;
+  videos?: string[]; signedOff?: { by: string; at: number };
+};
+/** Modules 1 to 6 (the basics and safety) come first: the rest open once those six are done. */
+export const BASICS = 6;
+export const unlocked = (i: number, course: { key: string }[], p: InstallProgress) => i < BASICS || course.slice(0, BASICS).every((m) => p.modules[m.key]?.done);
 export type InstallProgress = { modules: Record<string, ModuleProgress>; last?: number };
 
 export const totalSecs = (p?: ModuleProgress) => Object.values(p?.secs ?? {}).reduce((t, s) => t + s, 0);
