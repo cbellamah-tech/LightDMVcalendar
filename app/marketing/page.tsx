@@ -4,22 +4,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Copy, ExternalLink, EyeOff, Loader2, Mail, Plus, RefreshCw, Undo2 } from "lucide-react";
 import { ago, api, fmtDay, NAVY } from "@/components/ui";
 import { Card, Dot, Feed, FeedItem, Light, LIGHT_WORD } from "./parts";
-import { Media, MediaBoard, SheetView } from "./media";
+import { ChannelName, Media, MediaBoard, SheetView } from "./media";
 
-type Ch = { id: string; label: string; box: string; bot?: string; auto?: string; done: number; lastWeek: number; goal: number; light: Light };
-type Box = { id: string; title: string; line: string; bots: string[]; done: number; goal: number; light: Light; channels: string[] };
-type Lead = { id: string; name: string; sourceName: string; day: string; at: number; phone?: string; email?: string };
+export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
+type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
 type Thread = { id: string; from: string; email: string; subject: string; snippet: string; lastAt: number; waiting: boolean; link: string; kind?: "customer" | "lead" };
 type Data = {
   today: string; week: string; thisWeek: string; daysIn: number; role: string;
   channels: Ch[]; boxes: Box[];
   events: { id: string; channel: string; n: number; day: string; at: number; by: string; via: string; note?: string }[];
-  ghl: { configured: boolean; at: number | null; errors: string[]; accounts: { platform: string; name: string; expired?: boolean }[]; leads: Lead[]; weekLeads: number; bySource: Record<string, number>; pipeline: { name: string; count: number; value: number; pipeline?: string }[] };
+  ghl: { configured: boolean; at: number | null; errors: string[]; accounts: { platform: string; name: string; expired?: boolean }[]; weekLeads: number; bySource: Record<string, number> };
   google: { configured: boolean; connected: boolean; email?: string; sheetUrl: string };
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
   autopost: boolean;
-  ads: { facebook: AdSide & { configured: boolean }; google: AdSide; error?: string };
+  ads: { facebook: AdSide & { configured: boolean }; google: AdSide; lsa: AdSide; error?: string };
   cold: { url: string; latest: { day: string; sent: number; responses: number; positive: number } | null };
   media: Media[];
   platforms: { id: "facebook" | "instagram" | "linkedin" | "google"; label: string }[];
@@ -101,11 +100,13 @@ export default function Marketing() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {d.boxes.map((b) => (
             <button key={b.id} onClick={() => b.id === "cold" ? window.open(d.cold.url, "_blank", "noopener") : setOpen(open === b.id ? null : b.id)}
+              title={b.id === "cold" ? "Opens Smartlead" : "Show what's in it"}
               className={`text-left bg-white rounded-xl border p-3 hover:shadow ${open === b.id ? "border-slate-500" : "border-slate-200"}`}>
               <div className="flex items-center gap-2">
                 <Dot l={b.light} />
                 <span className="font-bold flex-1">{b.title}</span>
-                {b.goal ? <span className="text-sm font-semibold tabular-nums">{b.done} / {b.goal}</span> : <span className="text-sm tabular-nums">{b.done}</span>}
+                {b.id === "paid" ? <span className="text-sm font-semibold tabular-nums">${b.done.toLocaleString()} spent</span>
+                  : b.goal ? <span className="text-sm font-semibold tabular-nums">{b.done} / {b.goal}</span> : <span className="text-sm tabular-nums">{b.done}</span>}
               </div>
               <div className="text-xs text-slate-500 mt-1">{b.id === "cold" && d.cold.latest
                 ? `Last week: ${d.cold.latest.sent.toLocaleString()} sent, ${d.cold.latest.responses} replies, ${d.cold.latest.positive} positive · Open Smartlead ↗`
@@ -121,44 +122,31 @@ export default function Marketing() {
         {open && (
           <div className="bg-white rounded-xl border border-slate-200 p-3">
             {open === "paid"
-              ? <AdsPanel ads={d.ads} botBox={d.botBox} />
+              ? <><ChannelRows rows={d.channels.filter((c) => c.box === open)} onLog={log} busy={busy} /><AdsPanel ads={d.ads} botBox={d.botBox} /></>
               : <ChannelRows rows={d.channels.filter((c) => c.box === open)} onLog={log} busy={busy} />}
           </div>
         )}
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl border border-slate-200 p-3">
-            <div className="flex items-center gap-2"><span className="font-bold flex-1">GoHighLevel</span>
-              <span className="text-sm font-semibold tabular-nums">{d.ghl.configured ? `${d.ghl.weekLeads} new leads` : "Not connected"}</span></div>
-            <div className="text-xs text-slate-500 mt-1">
-              {Object.keys(d.ghl.bySource).length ? Object.entries(d.ghl.bySource).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") : "Every lead, text and reply, with where they came from"}
-            </div>
-            {d.ghl.pipeline.length > 0 && (
-              <div className="mt-2 space-y-1.5">
-                {[...new Set(d.ghl.pipeline.map((st) => st.pipeline ?? ""))].map((pl) => (
-                  <div key={pl}>
-                    {pl && <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{pl}</div>}
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {d.ghl.pipeline.filter((st) => (st.pipeline ?? "") === pl).map((st) => (
-                        <span key={st.name} className="text-xs rounded bg-slate-100 px-1.5 py-0.5" title={st.value ? `$${Math.round(st.value).toLocaleString()}` : undefined}>
-                          {st.name} <b className="tabular-nums">{st.count}</b>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-3">
-            <div className="flex items-center gap-2"><span className="font-bold flex-1">info@lightdmv.com</span>
-              <span className="text-sm font-semibold tabular-nums">{d.inbox ? `${d.inbox.threads.filter((t) => t.waiting && t.kind !== "lead").length} customers waiting` : "Not connected"}</span></div>
-            <div className="text-xs text-slate-500 mt-1">{waiting.length ? `${waiting.length} with no reply after 4 hours` : "Customer emails that skip GoHighLevel"}{d.inbox && d.inbox.threads.some((t) => t.kind === "lead") ? ` · ${d.inbox.threads.filter((t) => t.kind === "lead").length} cold email leads` : ""}</div>
-          </div>
-        </div>
-        <a href="/jobs" className="block bg-white rounded-xl border border-slate-200 p-3 hover:shadow">
-          <div className="font-bold">Jobber</div>
-          <div className="text-xs text-slate-500 mt-1">Quotes and booked jobs. Won dollars per lead source comes in a later step.</div>
+        <a href={GHL_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 p-3 hover:shadow text-sm">
+          <span className="font-bold">Where leads came from</span>
+          <span className="flex-1 text-xs text-slate-500 truncate">
+            {!d.ghl.configured ? "GoHighLevel isn't connected"
+              : `${d.ghl.weekLeads} new this week${Object.keys(d.ghl.bySource).length ? ": " + Object.entries(d.ghl.bySource).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(" · ") : ""}`}
+          </span>
+          <span className="text-xs underline inline-flex items-center gap-1 shrink-0">GoHighLevel <ExternalLink size={11} /></span>
         </a>
+        {d.events.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-xs text-slate-600">Recent taps (undo a mistake)</summary>
+            <div className="mt-2 space-y-1">
+              {d.events.slice(0, 12).map((e) => (
+                <div key={e.id} className="flex items-center gap-2 text-xs">
+                  <span className="flex-1">{e.by}: +{e.n} {label(e.channel)} <span className="text-slate-400">{ago(e.at)}</span></span>
+                  <button onClick={() => undo(e.id)} className="p-1 text-slate-400 hover:text-slate-700" aria-label="Undo"><Undo2 size={13} /></button>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </section>
 
       {(asks.length > 0 || waiting.length > 0) && (
@@ -173,72 +161,9 @@ export default function Marketing() {
         </Card>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card title={`${isThisWeek ? "This week" : `Week of ${shortDay(d.week)}`} against the campaign sheet`}
-          right={<a href={d.google.sheetUrl} target="_blank" rel="noreferrer" className="text-xs underline inline-flex items-center gap-1">Sheet <ExternalLink size={11} /></a>}>
-          <ChannelRows rows={d.channels} onLog={log} busy={busy} />
-          <p className="text-xs text-slate-500">Weekly goal = the sheet's monthly goal ÷ 4. Door-to-door, car magnets and Bing aren't rows in the sheet, so they count here only. Yard signs count themselves from the Yard signs tab; social posts count from GoHighLevel once it's connected. Tap + when you post a listing or hand out cards.</p>
-          {d.events.length > 0 && (
-            <details className="text-sm">
-              <summary className="cursor-pointer text-slate-600">Recent taps</summary>
-              <div className="mt-2 space-y-1">
-                {d.events.slice(0, 12).map((e) => (
-                  <div key={e.id} className="flex items-center gap-2 text-xs">
-                    <span className="flex-1">{e.by}: +{e.n} {label(e.channel)} <span className="text-slate-400">{ago(e.at)}</span></span>
-                    <button onClick={() => undo(e.id)} className="p-1 text-slate-400 hover:text-slate-700" aria-label="Undo"><Undo2 size={13} /></button>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-        </Card>
+      <Inbox inbox={d.inbox} onHide={hide} />
 
-        <div className="space-y-4">
-          <Card title="Leads" right={d.ghl.at ? <span className="text-xs text-slate-400">GoHighLevel, {ago(d.ghl.at)}</span> : null}>
-            {!d.ghl.configured ? <p className="text-sm text-slate-500">Shows here once GoHighLevel is connected (see Setup below).</p>
-              : d.ghl.leads.length === 0 ? <p className="text-sm text-slate-500">No leads came back from GoHighLevel.</p>
-              : (
-                <div className="divide-y divide-slate-100 max-h-80 overflow-auto">
-                  {d.ghl.leads.map((l) => (
-                    <div key={l.id} className="py-1.5 text-sm flex gap-2">
-                      <span className="flex-1 truncate font-semibold">{l.name}</span>
-                      <span className="text-slate-600">{l.sourceName}</span>
-                      <span className="text-slate-400 w-24 text-right">{shortDay(l.day)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            {d.ghl.errors.map((e) => <p key={e} className="text-xs text-red-600 break-words">{e}</p>)}
-          </Card>
-
-          <Card title="Inbox" right={d.inbox ? <span className="text-xs text-slate-400">{ago(d.inbox.at)}</span> : null}>
-            {!d.inbox ? <p className="text-sm text-slate-500">Shows info@lightdmv.com here once Google is connected (see Setup below).</p>
-              : d.inbox.threads.length === 0 ? <p className="text-sm text-slate-500">No customer or lead emails in the last 14 days.</p>
-              : (
-                <div className="divide-y divide-slate-100 max-h-80 overflow-auto">
-                  {d.inbox.threads.map((t) => (
-                    <div key={t.id} className="flex items-start gap-1 py-1.5 hover:bg-slate-50">
-                      <a href={t.link} target="_blank" rel="noreferrer" className="block flex-1 min-w-0 text-sm">
-                        <div className="flex gap-2">
-                          <span className={`flex-1 truncate ${t.waiting ? "font-bold" : ""}`}>{t.from}</span>
-                          {t.kind === "lead" && <span className="text-[11px] font-semibold rounded bg-blue-50 text-blue-700 px-1.5">Lead</span>}
-                          <span className={`text-xs ${t.waiting ? "text-red-600 font-semibold" : "text-green-700"}`}>{t.waiting ? "Waiting" : "Replied"}</span>
-                          <span className="text-xs text-slate-400">{ago(t.lastAt)}</span>
-                        </div>
-                        <div className="text-xs text-slate-500 truncate">{t.subject} · {t.snippet}</div>
-                      </a>
-                      <button title="Not a customer: hide this sender from now on" aria-label="Not a customer" onClick={() => hide(t.email)}
-                        className="p-1 text-slate-300 hover:text-slate-700"><EyeOff size={14} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            {d.inbox?.error && <p className="text-xs text-red-600 break-words">{d.inbox.error}</p>}
-          </Card>
-        </div>
-      </div>
-
-      <SheetView today={d.today} owner={owner} sheetUrl={d.google.sheetUrl} />
+      <SheetView today={d.today} owner={owner} sheetUrl={d.google.sheetUrl} channels={d.channels} onLog={log} busy={busy} />
 
       <Card title="Bot reports">
         <Feed items={reports} canAnswer={owner} onChange={load} empty="Nothing from the bots yet. Once a bot has the drop box line (Setup below), its results land here." />
@@ -255,10 +180,10 @@ function ChannelRows({ rows, onLog, busy }: { rows: Ch[]; onLog: (id: string, as
       {rows.map((c) => (
         <div key={c.id} className="flex items-center gap-2 py-1.5 text-sm">
           <Dot l={c.light} />
-          <span className="flex-1">{c.label}{c.auto === "signs" && <span className="text-xs text-slate-400"> · automatic</span>}</span>
+          <span className="flex-1"><ChannelName c={c} />{c.auto && <span className="text-xs text-slate-400"> · automatic</span>}</span>
           <span className="tabular-nums font-semibold w-20 text-right">{c.done}{c.goal ? ` / ${c.goal}` : ""}</span>
           <span className="tabular-nums text-xs text-slate-400 w-16 text-right" title="Last week">last {c.lastWeek}</span>
-          {c.auto !== "signs" ? (
+          {!c.auto ? (
             <span className="flex">
               <button disabled={busy} onClick={() => onLog(c.id)} className="rounded-l-md border border-slate-300 px-2 py-1 hover:bg-slate-50" aria-label={`Add one ${c.label}`}><Plus size={14} /></button>
               <button disabled={busy} onClick={() => onLog(c.id, true)} className="rounded-r-md border border-l-0 border-slate-300 px-2 py-1 text-xs font-semibold hover:bg-slate-50">#</button>
@@ -350,22 +275,28 @@ type AdSide = { has: boolean; week: AdTotals; month: AdTotals };
 const money = (x: number) => `$${x.toLocaleString()}`;
 function adsLine(a: Data["ads"]) {
   const part = (name: string, s: AdSide) => s.has ? `${name} ${money(s.week.spend)}, ${s.week.leads} leads` : "";
-  return `Last 7 days: ${[part("Facebook", a.facebook), part("Google", a.google)].filter(Boolean).join(" · ")}`;
+  return `Last 7 days: ${[part("Facebook", a.facebook), part("Google", a.google), part("Local Services", a.lsa)].filter(Boolean).join(" · ")}`;
 }
 
 function googleAdsScript(url: string, key: string) {
-  return `// Light DMV app: sends yesterday's and the last 30 days' Google Ads numbers to the Marketing tab.
+  return `// Light DMV app: sends the last 30 days of Google Ads and Local Services numbers to the Marketing tab, daily.
 function main() {
-  var rows = AdsApp.search("SELECT segments.date, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions " +
-    "FROM customer WHERE segments.date DURING LAST_30_DAYS");
-  var days = [];
+  var rows = AdsApp.search("SELECT segments.date, campaign.advertising_channel_type, metrics.cost_micros, metrics.clicks, " +
+    "metrics.impressions, metrics.conversions FROM campaign WHERE segments.date DURING LAST_30_DAYS");
+  var by = { google: {}, lsa: {} };
   while (rows.hasNext()) {
     var r = rows.next();
-    days.push({ day: r.segments.date, spend: r.metrics.costMicros / 1e6, clicks: Number(r.metrics.clicks),
-      impressions: Number(r.metrics.impressions), leads: Math.round(Number(r.metrics.conversions)) });
+    var src = r.campaign.advertisingChannelType === "LOCAL_SERVICES" ? "lsa" : "google";
+    var d = by[src][r.segments.date] = by[src][r.segments.date] || { day: r.segments.date, spend: 0, clicks: 0, impressions: 0, leads: 0 };
+    d.spend += Number(r.metrics.costMicros) / 1e6; d.clicks += Number(r.metrics.clicks);
+    d.impressions += Number(r.metrics.impressions); d.leads += Math.round(Number(r.metrics.conversions));
   }
-  UrlFetchApp.fetch("${url}/ads", { method: "post", contentType: "application/json",
-    headers: { Authorization: "Bearer ${key}" }, payload: JSON.stringify({ source: "google", days: days }) });
+  ["google", "lsa"].forEach(function (src) {
+    var days = Object.keys(by[src]).map(function (k) { return by[src][k]; });
+    if (!days.length) return;
+    UrlFetchApp.fetch("${url}/ads", { method: "post", contentType: "application/json",
+      headers: { Authorization: "Bearer ${key}" }, payload: JSON.stringify({ source: src, days: days }) });
+  });
 }`;
 }
 
@@ -384,7 +315,7 @@ function AdsPanel({ ads, botBox }: { ads: Data["ads"]; botBox: Data["botBox"] })
   );
   return (
     <div className="space-y-2 text-sm">
-      <div className="flex gap-2 flex-wrap">{side("Facebook ads", ads.facebook)}{side("Google ads", ads.google)}</div>
+      <div className="flex gap-2 flex-wrap">{side("Facebook ads", ads.facebook)}{side("Google ads", ads.google)}{ads.lsa.has && side("Local Services", ads.lsa)}</div>
       {ads.error && <p className="text-xs text-red-600 break-words">{ads.error}</p>}
       {!ads.facebook.configured && (
         <p className="text-xs text-slate-600"><b>Pair Facebook:</b> in Meta Business Settings, make a System User with the ad account assigned (view performance), generate a token with ads_read,
@@ -392,12 +323,48 @@ function AdsPanel({ ads, botBox }: { ads: Data["ads"]; botBox: Data["botBox"] })
       )}
       {!ads.google.has && botBox && (
         <div className="text-xs text-slate-600 space-y-1">
-          <p><b>Pair Google:</b> in Google Ads go to Tools, Bulk actions, Scripts, press +, paste this, Authorize, then set Frequency to Daily.</p>
+          <p><b>Pair Google (once the app is live on the real site):</b> in Google Ads go to Tools, Bulk actions, Scripts, press +, paste this, Authorize, then set Frequency to Daily. It covers Local Services too.</p>
           <button className="rounded-lg px-3 py-1.5 font-semibold border border-slate-300" onClick={() => {
             navigator.clipboard.writeText(googleAdsScript(botBox.url, botBox.key)).then(() => setCopied(true)).catch(() => {});
           }}>{copied ? "Copied" : "Copy the Google Ads script"}</button>
         </div>
       )}
     </div>
+  );
+}
+
+const GHL_URL = "https://app.gohighlevel.com/";
+
+/** Short on purpose: customers waiting on us first, then the rest, five at a time. */
+function Inbox({ inbox, onHide }: { inbox: Data["inbox"]; onHide: (email: string) => void }) {
+  const [all, setAll] = useState(false);
+  const rank = (t: Thread) => (t.kind === "lead" ? 2 : t.waiting ? 0 : 1);
+  const sorted = [...(inbox?.threads ?? [])].sort((a, b) => rank(a) - rank(b) || b.lastAt - a.lastAt);
+  const shown = all ? sorted : sorted.slice(0, 5);
+  const waiting = sorted.filter((t) => rank(t) === 0).length;
+  return (
+    <Card title={`Inbox${waiting ? ` · ${waiting} waiting on us` : ""}`} right={inbox ? <span className="text-xs text-slate-400">info@, {ago(inbox.at)}</span> : null}>
+      {!inbox ? <p className="text-sm text-slate-500">Shows info@lightdmv.com once Google is connected (Setup below).</p>
+        : !sorted.length ? <p className="text-sm text-slate-500">Nothing from customers or leads in the last 14 days.</p>
+        : (
+          <div className="divide-y divide-slate-100">
+            {shown.map((t) => (
+              <div key={t.id} className="flex items-center gap-2 py-1.5 text-sm">
+                <a href={t.link} target="_blank" rel="noreferrer" className="flex-1 min-w-0 flex gap-2 hover:underline">
+                  <span className={`truncate ${t.waiting && t.kind !== "lead" ? "font-bold" : ""}`}>{t.from}</span>
+                  <span className="truncate text-slate-500 flex-1">{t.subject}</span>
+                </a>
+                {t.kind === "lead" ? <span className="text-[11px] font-semibold rounded bg-blue-50 text-blue-700 px-1.5">Lead</span>
+                  : t.waiting ? <span className="text-xs text-red-600 font-semibold">Reply</span> : null}
+                <span className="text-xs text-slate-400 w-14 text-right">{ago(t.lastAt)}</span>
+                <button title="Not a customer: hide this sender from now on" aria-label="Not a customer" onClick={() => onHide(t.email)}
+                  className="p-1 text-slate-300 hover:text-slate-700"><EyeOff size={14} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+      {sorted.length > 5 && <button onClick={() => setAll(!all)} className="text-xs underline text-slate-600">{all ? "Show fewer" : `Show all ${sorted.length}`}</button>}
+      {inbox?.error && <p className="text-xs text-red-600 break-words">{inbox.error}</p>}
+    </Card>
   );
 }

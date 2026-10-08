@@ -4,7 +4,7 @@ import { addDays, etDay } from "./marketing";
 /* Paid ads: Facebook (Meta Marketing API, read-only token in Vercel) and Google Ads (a script inside the
    Google Ads account posts its daily numbers to /api/marketing/bot/ads). Spend, clicks and leads per day. */
 
-export type AdSource = "facebook" | "google";
+export type AdSource = "facebook" | "google" | "lsa"; // lsa = Google Local Services, sent by the same Google Ads script
 export type AdDay = { source: AdSource; day: string; spend: number; clicks: number; impressions: number; leads: number };
 const DAYS = "ldmv:mkt:ads";
 const META_AT = "ldmv:mkt:ads:meta-at";
@@ -55,6 +55,8 @@ const sum = (rows: AdDay[]): AdTotals => ({
   lastDay: rows.map((r) => r.day).sort().pop(),
 });
 
+export const allAdDays = async () => Object.values((await kvGet<Record<string, AdDay>>(DAYS)) ?? {});
+
 export async function adsSummary() {
   let error: string | undefined;
   await syncMetaAds().catch((e) => { error = e.message; });
@@ -64,5 +66,5 @@ export async function adsSummary() {
     const rows = all.filter((r) => r.source === s);
     return { has: rows.length > 0, week: sum(rows.filter((r) => r.day > weekAgo)), month: sum(rows.filter((r) => r.day.startsWith(month))) };
   };
-  return { facebook: { ...by("facebook"), configured: metaConfigured() }, google: by("google"), error };
+  return { facebook: { ...by("facebook"), configured: metaConfigured() }, google: by("google"), lsa: by("lsa"), error };
 }

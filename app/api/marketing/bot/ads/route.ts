@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   if (!(await checkBotKey(req.headers.get("authorization")))) return NextResponse.json({ error: "Bad key" }, { status: 401 });
   const b = await req.json().catch(() => null);
-  if (b?.source !== "google" && b?.source !== "facebook") return NextResponse.json({ error: "source must be google or facebook" }, { status: 400 });
+  if (!["google", "lsa", "facebook"].includes(b?.source)) return NextResponse.json({ error: "source must be google, lsa or facebook" }, { status: 400 });
   const num = (x: unknown) => (Number.isFinite(Number(x)) ? Math.max(0, Math.min(1e7, Number(x))) : 0);
   const days: AdDay[] = (Array.isArray(b.days) ? b.days : []).slice(0, 400)
     .filter((d: any) => /^\d{4}-\d{2}-\d{2}$/.test(String(d?.day)))

@@ -9,7 +9,8 @@ import { getVisits } from "./signs";
 export type ChannelId =
   | "google_posts" | "facebook_posts" | "fb_groups" | "marketplace" | "craigslist" | "linkedin_posts"
   | "linkedin_engage" | "instagram_posts" | "nextdoor" | "blog" | "cold_emails" | "yard_signs"
-  | "door_hangers" | "tree_shop_cards" | "eddm" | "door_to_door" | "car_magnets" | "bing_posts";
+  | "door_hangers" | "tree_shop_cards" | "eddm" | "door_to_door" | "car_magnets" | "bing_posts"
+  | "fb_ads" | "google_ads" | "google_lsa" | "influencers";
 
 export type BoxId = "signs" | "social" | "listings" | "website" | "paid" | "cold";
 
@@ -20,40 +21,46 @@ export type Channel = {
   monthlyGoal?: number;   // from the sheet's "Monthly project goals" column
   box: BoxId;
   bot?: string;           // the bot that looks after it
-  auto?: "signs" | "ghl"; // counted without anyone tapping
+  auto?: "signs" | "ghl" | "smartlead" | "ads"; // counted without anyone tapping ("ads" = dollars spent)
   ghlPlatform?: string;   // GoHighLevel Social Planner platform name
+  adSource?: "facebook" | "google" | "lsa";
+  link?: string;          // where the thing itself lives: tapping its name opens this
 };
 
 // Goals as they stood in the 2026 sheet on 2026-10-07.
 export const CHANNELS: Channel[] = [
-  { id: "yard_signs", label: "Yard signs", sheetRow: "Yard Signs", monthlyGoal: 1200, box: "signs", auto: "signs" },
+  { id: "yard_signs", label: "Yard signs", sheetRow: "Yard Signs", monthlyGoal: 1200, box: "signs", auto: "signs", link: "/signs" },
   { id: "door_hangers", label: "Door hangers", sheetRow: "Door Hangers", monthlyGoal: 300, box: "signs" },
   { id: "tree_shop_cards", label: "Tree shop business cards", sheetRow: "Christmas Tree Shops Giving Biz cards", monthlyGoal: 20, box: "signs" },
-  { id: "eddm", label: "Direct mail (EDDM)", sheetRow: "Direct Mail (EDDM)", box: "signs" },
+  { id: "eddm", label: "Direct mail (EDDM)", sheetRow: "Direct Mail (EDDM)", box: "signs", link: "https://eddm.usps.com/eddm/select-routes.htm" },
   // In the company SOP (Part 3) but not rows in the 2026 sheet: counted in the app only.
   { id: "door_to_door", label: "Door-to-door after jobs", sheetRow: "Door to Door", box: "signs" },
   { id: "car_magnets", label: "Car magnets out", sheetRow: "Car Magnets", box: "signs" },
-  { id: "google_posts", label: "Google Business posts", sheetRow: "Google Image Posting (Automated)", monthlyGoal: 28, box: "social", bot: "SEO", auto: "ghl", ghlPlatform: "google" },
-  { id: "facebook_posts", label: "Facebook Page posts", sheetRow: "Facebook Account Posting (Automated)", monthlyGoal: 28, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "facebook" },
-  { id: "instagram_posts", label: "Instagram posts", sheetRow: "Instagram Posting", monthlyGoal: 4, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "instagram" },
-  { id: "linkedin_posts", label: "LinkedIn posts", sheetRow: "LinkedIn Posting", monthlyGoal: 4, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "linkedin" },
-  { id: "bing_posts", label: "Bing Places posts", sheetRow: "Bing Posting", box: "social" },
-  { id: "linkedin_engage", label: "LinkedIn comments and follows", sheetRow: "LinkedIn Commenting Following", monthlyGoal: 100, box: "social" },
-  { id: "fb_groups", label: "Facebook Groups posts", sheetRow: "Facebook Groups Posting", monthlyGoal: 10, box: "listings" },
-  { id: "marketplace", label: "Marketplace listings", sheetRow: "FB marketplace posting", monthlyGoal: 5, box: "listings" },
-  { id: "craigslist", label: "Craigslist ads", sheetRow: "Craigslist Posting", monthlyGoal: 5, box: "listings" },
-  { id: "nextdoor", label: "Nextdoor posts", sheetRow: "Nextdoor Posting", monthlyGoal: 4, box: "listings" },
-  { id: "blog", label: "Blog posts and city pages", sheetRow: "Blog Posting (Automated)", monthlyGoal: 5, box: "website", bot: "Website" },
-  { id: "cold_emails", label: "Cold emails", sheetRow: "Cold Emails", monthlyGoal: 5000, box: "cold" },
+  { id: "google_posts", label: "Google Business posts", sheetRow: "Google Image Posting (Automated)", monthlyGoal: 28, box: "social", bot: "SEO", auto: "ghl", ghlPlatform: "google", link: "https://business.google.com/locations" },
+  { id: "facebook_posts", label: "Facebook Page posts", sheetRow: "Facebook Account Posting (Automated)", monthlyGoal: 28, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "facebook", link: "https://business.facebook.com/latest/content_calendar" },
+  { id: "instagram_posts", label: "Instagram posts", sheetRow: "Instagram Posting", monthlyGoal: 4, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "instagram", link: "https://www.instagram.com/" },
+  { id: "linkedin_posts", label: "LinkedIn posts", sheetRow: "LinkedIn Posting", monthlyGoal: 4, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "linkedin", link: "https://www.linkedin.com/feed/" },
+  { id: "bing_posts", label: "Bing Places posts", sheetRow: "Bing Posting", box: "social", link: "https://www.bingplaces.com/Dashboard" },
+  { id: "linkedin_engage", label: "LinkedIn comments and follows", sheetRow: "LinkedIn Commenting Following", monthlyGoal: 100, box: "social", link: "https://www.linkedin.com/feed/" },
+  { id: "fb_groups", label: "Facebook Groups posts", sheetRow: "Facebook Groups Posting", monthlyGoal: 10, box: "listings", link: "https://www.facebook.com/groups/feed/" },
+  { id: "marketplace", label: "Marketplace listings", sheetRow: "FB marketplace posting", monthlyGoal: 5, box: "listings", link: "https://www.facebook.com/marketplace/you/selling" },
+  { id: "craigslist", label: "Craigslist ads", sheetRow: "Craigslist Posting", monthlyGoal: 5, box: "listings", link: "https://accounts.craigslist.org/login/home" },
+  { id: "nextdoor", label: "Nextdoor posts", sheetRow: "Nextdoor Posting", monthlyGoal: 4, box: "listings", link: "https://nextdoor.com/news_feed/" },
+  { id: "blog", label: "Blog posts and city pages", sheetRow: "Blog Posting (Automated)", monthlyGoal: 5, box: "website", bot: "Website", link: "https://lightdmv.com/blog" },
+  { id: "fb_ads", label: "Facebook ads ($ spent)", sheetRow: "FB Ads", box: "paid", bot: "Paid", auto: "ads", adSource: "facebook", link: "https://adsmanager.facebook.com/adsmanager/manage/campaigns" },
+  { id: "google_ads", label: "Google ads ($ spent)", sheetRow: "Google Ads", box: "paid", bot: "Paid", auto: "ads", adSource: "google", link: "https://ads.google.com/aw/overview" },
+  { id: "google_lsa", label: "Google Local Services ($ spent)", sheetRow: "Google LSA", box: "paid", bot: "Paid", auto: "ads", adSource: "lsa", link: "https://ads.google.com/localservices/" },
+  { id: "influencers", label: "Local influencer sponsorships", sheetRow: "Local Influencer Sponsorships", box: "paid" },
+  { id: "cold_emails", label: "Cold emails", sheetRow: "Cold Emails", monthlyGoal: 5000, box: "cold", auto: "smartlead", link: "https://app.smartlead.ai/client-login" },
 ];
 
-export const BOXES: { id: BoxId; title: string; line: string; bots: string[] }[] = [
+export const BOXES: { id: BoxId; title: string; line: string; bots: string[]; link?: string }[] = [
   { id: "signs", title: "Yard signs and in person", line: "Signs, door hangers, tree lots, door-to-door", bots: [] },
   { id: "social", title: "Social posts", line: "Facebook, Instagram, LinkedIn, Google, via GoHighLevel", bots: ["CMO", "SEO"] },
   { id: "listings", title: "One-tap listings", line: "Craigslist, Marketplace, FB Groups, Nextdoor", bots: [] },
   { id: "website", title: "Website and SEO", line: "LightDMV.com city pages, blog, reviews", bots: ["Website", "SEO"] },
   { id: "paid", title: "Paid ads", line: "Facebook ads (Goohoo) and Google ads", bots: ["Paid"] },
-  { id: "cold", title: "Cold email", line: "Smartlead, run by the agency", bots: [] },
+  { id: "cold", title: "Cold email", line: "Smartlead, run by the agency", bots: [], link: "https://app.smartlead.ai/client-login" },
 ];
 
 export const channel = (id: string) => CHANNELS.find((c) => c.id === id);
@@ -97,8 +104,8 @@ export async function undoCount(id: string) {
   await kvUpdate<CountEvent[]>(EVENTS, [], (all) => all.filter((e) => e.id !== id));
 }
 
-/** Per channel, per day: everything the app knows about. GHL post counts are passed in by the caller. */
-export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = []) {
+/** Per channel, per day: everything the app knows about. GHL posts and ad spend are passed in by the caller. */
+export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = [], adSpend: { source: string; day: string; spend: number }[] = []) {
   const out = new Map<string, number>(); // `${channel}|${day}`
   const add = (c: ChannelId, day: string, n: number) => out.set(`${c}|${day}`, (out.get(`${c}|${day}`) ?? 0) + n);
   for (const e of await getEvents()) add(e.channel, e.day, e.n);
@@ -107,6 +114,10 @@ export async function dailyCounts(ghlPosts: { platform: string; day: string }[] 
   for (const p of ghlPosts) {
     const c = CHANNELS.find((x) => x.ghlPlatform && p.platform.toLowerCase().includes(x.ghlPlatform));
     if (c) add(c.id, p.day, 1);
+  }
+  for (const a of adSpend) {
+    const c = CHANNELS.find((x) => x.adSource === a.source);
+    if (c) add(c.id, a.day, Math.round(a.spend));
   }
   return out;
 }
