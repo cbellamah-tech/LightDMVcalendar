@@ -10,8 +10,9 @@ import type { Checklist, CrewPay, Job, JobDetail, Progress, SopItem } from "../t
 import { dur } from "../types";
 import JobInfo from "./JobInfo";
 import PayLine from "./PayLine";
+import Expenses from "./Expenses";
 
-type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress; pay?: CrewPay; parts?: string[] };
+type Data = { job: Job; checklist: Checklist; sop: { title: string; items: SopItem[] }; progress: Progress; pay?: CrewPay; parts?: { name: string; images: { url: string; name: string }[] }[] };
 
 export default function JobPage({ params }: { params: { id: string } }) {
   const [d, setD] = useState<Data | null>(null);
@@ -49,7 +50,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
 
   const thumb = (itemId: string, u: string) => (
     <div key={u} className="relative">
-      <img src={u} alt="" onClick={() => setViewer(u)} className="w-16 h-16 object-cover rounded-md cursor-pointer" />
+      <img src={u} alt="" loading="lazy" decoding="async" onClick={() => setViewer(u)} className="w-16 h-16 object-cover rounded-md cursor-pointer" />
       <button onClick={() => update({ itemId, removePhoto: u })} aria-label="Remove photo"
         className="absolute -top-1.5 -right-1.5 bg-white rounded-full shadow p-0.5"><X size={12} /></button>
     </div>
@@ -96,7 +97,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
             <li key={item.id} className={`bg-white rounded-xl border p-3 space-y-2 ${e.done ? "border-green-300" : item.required ? "border-red-200" : "border-slate-200"}`}>
               <div className="flex gap-3 items-start">
                 <button aria-label={e.done ? "Uncheck" : "Check"}
-                  onClick={() => (item.perPart && parts.length ? setToast("Add a photo of each part below; the box checks itself.") : item.photo && !e.photos.length ? setToast("Add a photo first.") : update({ itemId: item.id, done: !e.done }))}
+                  onClick={() => (item.perPart && parts.length ? setToast("Add a photo of each item below; the box checks itself.") : item.photo && !e.photos.length ? setToast("Add a photo first.") : update({ itemId: item.id, done: !e.done }))}
                   className={`w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center ${e.done ? "bg-green-600 border-green-600 text-white" : "border-slate-300"}`}>
                   {e.done && <Check size={20} />}
                 </button>
@@ -128,14 +129,32 @@ export default function JobPage({ params }: { params: { id: string } }) {
               )}
               {item.perPart && parts.length > 0 && (
                 <div className="space-y-2">
-                  {parts.map((p) => {
+                  {!!detail?.quoteMockups?.length && (
+                    <div className="flex gap-2 overflow-x-auto items-center">
+                      <span className="text-[11px] font-bold uppercase text-slate-400 shrink-0">Quote mockups</span>
+                      {detail.quoteMockups.map((u) => (
+                        <img key={u} src={u} alt="" onClick={() => setViewer(u)} className="w-24 h-16 object-cover rounded-md cursor-pointer border border-slate-200 shrink-0" />
+                      ))}
+                    </div>
+                  )}
+                  {parts.map(({ name: p, images }) => {
                     const mine = e.photos.filter((u) => e.parts?.[u]?.toLowerCase() === p.toLowerCase());
                     return (
                       <div key={p} className={`rounded-lg border p-2 space-y-1.5 ${mine.length ? "border-green-200 bg-green-50/50" : "border-slate-200"}`}>
                         <div className="text-sm font-semibold flex items-center gap-1.5">
                           {mine.length ? <Check size={14} className="text-green-600" /> : <Camera size={14} className="text-slate-400" />} {p}
                         </div>
+                        {images.length > 0 && (
+                          <div className="flex gap-2 overflow-x-auto items-center">
+                            <span className="text-[11px] font-bold uppercase text-slate-400 shrink-0">Design</span>
+                            {images.map((f) => (
+                              <img key={f.url} src={f.url} alt={f.name} onClick={() => setViewer(f.url)}
+                                className="w-24 h-16 object-cover rounded-md cursor-pointer border border-slate-200 shrink-0" />
+                            ))}
+                          </div>
+                        )}
                         <div className="flex gap-2 flex-wrap items-center">
+                          {images.length > 0 && <span className="text-[11px] font-bold uppercase text-slate-400">Yours</span>}
                           {mine.map((u) => thumb(item.id, u))}
                           <PhotoButton folder={`jobs/${job.id}/${item.id}`} label={mine.length ? "More" : "Add photo"} className="text-sm !py-1.5"
                             onUploaded={(urls) => update({ itemId: item.id, addPhotos: urls, part: p })} />
@@ -177,6 +196,8 @@ export default function JobPage({ params }: { params: { id: string } }) {
           {progress.requiredLeft.length ? `${progress.requiredLeft.length} required box${progress.requiredLeft.length > 1 ? "es" : ""} left` : "Mark job done"}
         </button>
       )}
+
+      <Expenses jobId={job.id} done={!!c.completedAt} onView={setViewer} />
 
       {viewer && (
         <div className="fixed inset-0 z-[2000] bg-black/90 flex items-center justify-center p-4" onClick={() => setViewer("")}>

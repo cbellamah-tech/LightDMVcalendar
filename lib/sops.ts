@@ -26,18 +26,18 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
       // Required pictures (chris, 2026-10-08): whole house on arrival, each part as it is set, goodie bag at the door,
       // our yard sign out front, the whole finished job, and the timer. Every one is copied to Drive by customer.
       { id: "arrival-photo", text: "Take a picture of the entire home on arrival", required: true, photo: true },
-      { id: "merch", text: "Wear company merchandise" },
-      { id: "triangle-sign", text: "Bring the triangle sign and set it up" },
+      { id: "merch", text: "Wear company merchandise and your review tag" },
+      { id: "triangle-sign", text: "Bring the triangle sign and set it up (1099 crews bring their own)" },
       { id: "ladder-wind", text: "On windy days, tie the ladder down at the gutter", required: true },
-      { id: "staples", text: "Staple only when necessary, on certain trees" },
+      { id: "staples", text: "Staple only when necessary, on certain trees (big or slippery bark: one staple at the top, pressed halfway)" },
       { id: "rubber-clamps", text: "Use big rubber clamps" },
       { id: "white-house-cord", text: "On a white house, use white wire extension for wreaths and jumps across the siding" },
       { id: "white-columns", text: "Use white wire minis on white columns" },
-      { id: "part-photos", text: "Take a picture of each part of the job as it is being set", required: true, photo: true, perPart: true },
-      { id: "timer", text: "Make sure the timer is set, and send a picture of it to the group chat", required: true, photo: true },
+      { id: "part-photos", text: "Take a picture of every item of the job as it is being set", required: true, photo: true, perPart: true },
+      { id: "timer", text: "Make sure the timer is set (on 6 PM, off 11 PM or midnight), and send a picture of it to the group chat", required: true, photo: true },
       { id: "finished-photos", text: "Take pictures of the entire finished job", required: true, photo: true },
       { id: "goodie-bag", text: "Leave a goodie bag at the front door and take a picture of it", required: true, photo: true },
-      { id: "yard-sign", text: "Put our yard sign in front and take a picture of it", required: true, photo: true },
+      { id: "yard-sign", text: "Put one of our special yard signs in front and take a picture of it", required: true, photo: true },
       { id: "materials", text: "Enter the material used on this job (leave blank what you didn't use)", required: true, counts: MATERIAL_COUNTS },
       { id: "review", text: "Ask for a Google review while wearing the review tag ($50)", noteLabel: "Customer said" },
       { id: "cross-sell", text: "Offer cross-sells (crew member gets 15% of the upsell price)", noteLabel: "Upsell sold and price" },
@@ -88,13 +88,19 @@ export function partName(raw: string): string {
     .trim();
 }
 
-/** The parts of a job a crew should photograph while setting: one per distinct line item. */
-export function jobParts(lines: { name: string }[]): string[] {
-  const out: string[] = [];
-  for (const l of lines) {
-    const n = partName(l.name || "");
-    if (!n || NOT_A_PART.test(n)) continue;
-    if (!out.some((o) => o.toLowerCase() === n.toLowerCase())) out.push(n);
-  }
-  return out.slice(0, 20);
+export type JobPart = { name: string; images: { url: string; name: string }[] };
+
+/** The items a crew photographs while setting: one per line item (three "Tree Lighting" lines are Tree Lighting 1, 2 and 3),
+ *  each with the line item's own photos or mockups so the crew can match the design. */
+export function jobParts(lines: { name: string; quantity?: number; images?: { url: string; name: string; image?: boolean }[] }[]): JobPart[] {
+  const kept = lines.map((l) => ({ l, n: partName(l.name || "") })).filter((x) => x.n && !NOT_A_PART.test(x.n));
+  const total = new Map<string, number>();
+  for (const x of kept) total.set(x.n.toLowerCase(), (total.get(x.n.toLowerCase()) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return kept.slice(0, 25).map(({ l, n }) => {
+    const k = n.toLowerCase();
+    const i = (seen.get(k) ?? 0) + 1; seen.set(k, i);
+    const qty = l.quantity && l.quantity > 1 ? `${l.quantity} × ` : "";
+    return { name: `${qty}${n}${total.get(k)! > 1 ? ` ${i}` : ""}`, images: (l.images ?? []).filter((f) => f.image !== false).map((f) => ({ url: f.url, name: f.name })) };
+  });
 }

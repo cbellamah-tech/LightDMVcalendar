@@ -8,6 +8,7 @@ import { getGhlSnap, ghlConfigured, leadSource, refreshGhl } from "./ghl";
 import { coldEmailReports, ColdReport, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
 import { getMedia, PLATFORMS, runnerKey } from "./media";
 import { stableOrigin } from "./jobber";
+import { laterOnce } from "./background";
 
 /* Everything the Marketing tab shows, in one read. */
 
@@ -37,11 +38,22 @@ async function syncColdEmail() {
 }
 const latestCold = async () => Object.values((await kvGet<Record<string, ColdReport>>(COLD)) ?? {}).sort((a, b) => b.day.localeCompare(a.day))[0] ?? null;
 
-async function inbox(force = false) {
-  const g = await googleStatus();
-  if (!g.connected) return null;
-  const cur = await kvGet<{ at: number; threads: InboxThread[]; error?: string }>(INBOX);
-  if (cur && !force && Date.now() - cur.at < 5 * 60_000 && cur.threads.every((t) => t.kind)) return cur;
+type Inbox = { at: number; threads: InboxThread[]; error?: string };
+
+/** The saved inbox at once; when it's over 5 minutes old Gmail is re-read after the page has its answer. */
+async function inbox(force = false, g?: { connected: boolean }) {
+  if (!(g ?? (await googleStatus())).connected) return null;
+  const cur = await kvGet<Inbox>(INBOX);
+  const usable = !!cur && cur.threads.every((t) => t.kind);
+  if (usable && !force && Date.now() - cur!.at < 5 * 60_000) return cur;
+  if (usable && !force) {
+    await laterOnce("gmail-inbox", () => readInbox(cur));
+    return cur;
+  }
+  return readInbox(cur);
+}
+
+async function readInbox(cur: Inbox | null) {
   try {
     await syncColdEmail().catch(() => {});
     const next = { at: Date.now(), threads: await inboxThreads() };
@@ -60,8 +72,21 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
   const week = opts.week ? weekOf(opts.week) : thisWeek;
   const daysIn = week === thisWeek ? Math.max(1, (Date.parse(today) - Date.parse(week)) / 86400_000 + 1) : 7;
 
-  const ghl = ghlConfigured() ? await refreshGhl(opts.refresh ? 0 : undefined).catch(() => getGhlSnap()) : null;
-  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays());
+  // GoHighLevel: the saved snapshot at once, re-read in the background when it's over 10 minutes old
+  // (only the Refresh button waits for it). Everything else is read side by side.
+  const ghlP = !ghlConfigured() ? null
+    : opts.refresh ? refreshGhl(0).catch(() => getGhlSnap())
+    : getGhlSnap().then(async (cur) => {
+        if (!cur) return refreshGhl().catch(() => null);
+        if (Date.now() - cur.at >= 10 * 60_000) await laterOnce("ghl-refresh", () => refreshGhl());
+        return cur;
+      });
+  const googleP = googleStatus();
+  const [ghl, adDays, events, feedAll, autopost, drafts, ads, cold, mediaAll, lastFill, g, mail] = await Promise.all([
+    ghlP, allAdDays(), getEvents(), getFeed(), getAutoPost(), getDrafts(), adsSummary(), latestCold(), getMedia(), kvGet<FillResult>(FILL), googleP,
+    googleP.then((gs) => inbox(opts.refresh, gs)),
+  ]);
+  const daily = await dailyCounts(ghl?.posts ?? [], adDays, events);
   const totals = weekTotals(daily, week);
   const prev = weekTotals(daily, addDays(week, -7));
 
@@ -81,13 +106,12 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     return { ...b, done, goal, light: light(done, goal, daysIn), channels: cs.map((c) => c.id) };
   });
 
-  const mail = await inbox(opts.refresh);
-  const feed = (await getFeed()).filter((f) => !f.dismissed);
+  const feed = feedAll.filter((f) => !f.dismissed);
 
   return {
     today, week, thisWeek, daysIn,
     channels, boxes,
-    events: (await getEvents()).slice(0, 25),
+    events: events.slice(0, 25),
     ghl: {
       configured: ghlConfigured(),
       at: ghl?.at ?? null,
@@ -96,17 +120,17 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
       weekLeads: weekLeads.length,
       bySource,
     },
-    google: { ...(await googleStatus()), sheetUrl: sheetUrl() },
+    google: { ...g, sheetUrl: sheetUrl() },
     inbox: mail,
     feed,
-    autopost: (await getAutoPost()).on,
-    drafts: { text: await getDrafts(), urls: POST_URL },
-    attribution: ghl ? attribution(ghl.leads, ghl.opps ?? [], await allAdDays(), opts.days ?? 30, today) : null,
-    ads: await adsSummary(),
-    cold: { url: SMARTLEAD_URL, latest: await latestCold() },
-    media: (await getMedia()).filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
+    autopost: autopost.on,
+    drafts: { text: drafts, urls: POST_URL },
+    attribution: ghl ? attribution(ghl.leads, ghl.opps ?? [], adDays, opts.days ?? 30, today) : null,
+    ads,
+    cold: { url: SMARTLEAD_URL, latest: cold },
+    media: mediaAll.filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
     platforms: PLATFORMS,
-    lastFill: await kvGet<FillResult>(FILL),
+    lastFill,
   };
 }
 

@@ -29,8 +29,8 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
         {d.repeatWhy && <p className="text-xs text-slate-500">{d.repeatWhy}.</p>}
         {d.repeat && !bins.length && <p className="text-xs text-amber-700">No bin number found in Jobber notes or the bin list. Check the storage unit.</p>}
 
-        <PhotoStrip title="Last takedown photos" photos={d.drive.photos} onView={onView} />
-        <PhotoStrip title="Last season's finished install" photos={d.drive.installPhotos ?? []} onView={onView} />
+        <PhotoStrip title="Takedown photos" empty="No takedown photo" photos={d.drive.photos} onView={onView} />
+        <PhotoStrip title="Install photos from our library" empty="No install photos in our library" photos={d.drive.installPhotos ?? []} onView={onView} />
       </div>
 
       {(d.instructions || d.notes.length > 0) && (
@@ -49,6 +49,7 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
       {lines.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
           <div className="font-bold flex items-center gap-2"><FileText size={16} /> What we're installing</div>
+          <p className="text-xs text-slate-500">Line photos: {d.photoInfo || (d.error ? `couldn't reach Jobber (${d.error})` : "not checked yet, refresh in a minute")}.</p>
           {!!d.quoteMockups?.length && (
             <div className="pb-1">
               <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">Mockups from the signed quote</div>
@@ -67,19 +68,18 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
           )}
         </div>
       )}
-      {d.photoInfo && <p className="text-xs text-slate-400">Line photos: {d.photoInfo}.</p>}
       {d.error && <p className="text-xs text-slate-400">Couldn't refresh from Jobber just now ({d.error}).</p>}
     </div>
   );
 }
 
-function PhotoStrip({ title, photos, onView }: { title: string; photos: DrivePhoto[]; onView: (url: string) => void }) {
-  if (!photos.length) return null;
+function PhotoStrip({ title, empty, photos, onView }: { title: string; empty: string; photos: DrivePhoto[]; onView: (url: string) => void }) {
+  if (!photos.length) return <div className="text-xs font-bold uppercase text-slate-500">{empty}</div>;
   return (
     <div>
-      <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">{title}</div>
+      <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">{title} ({photos.length})</div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {photos.slice(0, 8).map((p) => (
+        {photos.slice(0, 12).map((p) => (
           <button key={p.fileId} onClick={() => onView(p.link)} className="shrink-0 w-28 text-left">
             <img src={p.thumb} alt={p.title} loading="lazy" className="w-28 h-28 object-cover rounded-lg bg-slate-100"
               onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }} />
@@ -107,7 +107,7 @@ function Files({ files, onView }: { files: DetailFile[]; onView: (url: string) =
     <div className="flex gap-2 flex-wrap mt-1.5">
       {files.map((f, i) => f.image ? (
         <button key={i} onClick={() => onView(f.url)} className="w-20 h-20 rounded-md overflow-hidden bg-slate-100">
-          <img src={f.url} alt={f.name} className="w-full h-full object-cover" />
+          <img src={f.url} alt={f.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         </button>
       ) : (
         <a key={i} href={f.url} target="_blank" rel="noreferrer" className="text-xs underline flex items-center gap-1">

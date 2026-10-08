@@ -2,7 +2,7 @@ import { kvGet, kvSet } from "./store";
 import { gql } from "./jobber";
 import { buildSelection, fieldsMatching, fieldType, rows, Spec } from "./jobberSchema";
 import { driveFor, DriveIndex, DriveMatch } from "./drive";
-import { jobParts } from "./sops";
+import { jobParts, JobPart } from "./sops";
 
 /* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices:
    the job's dollar value is kept server-side only, to work out crew pay (lib/crewPay.ts). */
@@ -31,7 +31,7 @@ export type JobDetail = {
   photoInfo?: string;       // where the line photos came from (or why there are none), shown small on the job page
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
-const IMGV = 2;
+const IMGV = 3;
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
 export const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
@@ -163,7 +163,8 @@ export async function fetchJobDetail(jobberJobId: string): Promise<JobDetail> {
     d = { fetchedAt: Date.now(), imgv: IMGV, ...parse(r.job || {}) };
     // Copy line item photos and the signed quote's mockups into our photo storage (Jobber's links expire).
     const { importJobImages } = await import("./jobImages");
-    d = await importJobImages(d, await kvGet<JobDetail>(key(jobberJobId))).catch(() => d);
+    const base = d;
+    d = await importJobImages(d, await kvGet<JobDetail>(key(jobberJobId))).catch((e) => ({ ...base, photoInfo: `photo import failed: ${e?.message || e}` }));
   } catch (e: any) {
     selCache = null;
     const prev = await kvGet<JobDetail>(key(jobberJobId));
@@ -173,10 +174,17 @@ export async function fetchJobDetail(jobberJobId: string): Promise<JobDetail> {
   return d;
 }
 
-export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolean } = {}): Promise<JobDetail | null> {
-  const d = await kvGet<JobDetail>(key(jobberJobId));
+/** stale: "background" returns a saved but out-of-date detail at once and refreshes it from Jobber after the answer.
+    have: the saved detail when the caller already read it. */
+export async function getJobDetail(jobberJobId: string, opts: { refresh?: boolean; stale?: "wait" | "background"; have?: JobDetail | null } = {}): Promise<JobDetail | null> {
+  const d = opts.have !== undefined ? (opts.have ? structuredClone(opts.have) : null) : await kvGet<JobDetail>(key(jobberJobId));
   if (d) { delete (d as any).quoteMessage; if (isContract(d.instructions)) d.instructions = undefined; d.notes = d.notes.map(crewNote).filter((n) => n.message.trim() || n.files.length); } // saved before these notes were left out
   if (d && !opts.refresh && Date.now() - d.fetchedAt < MAX_AGE && d.imgv === IMGV) return d;
+  if (d && !opts.refresh && opts.stale === "background" && d.imgv === IMGV) {
+    const { laterOnce } = await import("./background");
+    await laterOnce(`jobdetail:${jobberJobId}`, () => fetchJobDetail(jobberJobId), 60_000);
+    return d;
+  }
   return opts.refresh || !d ? fetchJobDetail(jobberJobId) : d;
 }
 
@@ -210,7 +218,7 @@ export async function refreshStaleDetails(jobberJobIds: string[], limit = 12) {
 }
 
 /** The parts of the job to photograph (from the saved Jobber detail; empty when it hasn't been pulled yet). */
-export async function cachedJobParts(jobberJobId?: string): Promise<string[]> {
+export async function cachedJobParts(jobberJobId?: string): Promise<JobPart[]> {
   if (!jobberJobId) return [];
   const d = await kvGet<JobDetail>(key(jobberJobId));
   return d ? jobParts(d.lines) : [];

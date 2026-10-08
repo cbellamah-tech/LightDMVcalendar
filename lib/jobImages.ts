@@ -24,8 +24,9 @@ async function copyUrl(url: string, name: string, folder: string): Promise<strin
   const k = copyKey(url);
   const have = await kvGet<string>(k);
   if (have) return have;
-  const res = await fetch(url, { cache: "no-store" }).catch(() => null);
-  if (!res?.ok) return null;
+  const { jobberFile } = await import("./jobber");
+  const res = await jobberFile(url).catch(() => null);
+  if (!res) return null;
   const type = res.headers.get("content-type") || "image/jpeg";
   if (!/^image\//.test(type)) return null;
   const saved = await savePhoto(new File([await res.arrayBuffer()], name || "photo.jpg", { type }), folder);
@@ -35,12 +36,12 @@ async function copyUrl(url: string, name: string, folder: string): Promise<strin
 
 type PdfRead = { urls: string[]; status: string };
 /** Mockups from the signed quote PDF, copied once per PDF. */
-async function quotePdfMockups(pdfUrl: string, folder: string): Promise<PdfRead | null> {
+async function quotePdfMockups(pdfUrl: string, folder: string): Promise<PdfRead> {
   const k = pdfKey(pdfUrl);
   const have = await kvGet<PdfRead | string[]>(k);
   if (have && !Array.isArray(have)) return have;
-  const res = await fetch(pdfUrl, { cache: "no-store" }).catch(() => null);
-  if (!res?.ok) return null;
+  const { jobberFile } = await import("./jobber");
+  const res = await jobberFile(pdfUrl);
   const buf = Buffer.from(await res.arrayBuffer());
   const pics = pdfPictures(buf).slice(0, 20);
   const urls: string[] = [];
@@ -73,14 +74,15 @@ export async function importJobImages(d: JobDetail, prev: JobDetail | null): Pro
   out.photoInfo = fromJobber ? `${fromJobber} line photo${fromJobber === 1 ? "" : "s"} from Jobber` : d.quotePdf ? "" : "no line photos from Jobber and no signed quote PDF on this quote yet";
   // The signed quote's mockups, when Jobber's API gave no photo on the lines themselves.
   if (d.quotePdf && !fromJobber) {
-    const fresh = await quotePdfMockups(d.quotePdf, folder).catch((e) => ({ urls: [], status: `couldn't read the signed quote PDF (${e.message})` }));
-    if (!fresh && prev) {
-      // Couldn't read the PDF this time: keep what the last pull found.
-      out.lines = out.lines.map((l) => ({ ...l, images: l.images.length ? l.images : prev.lines.find((p) => p.name === l.name)?.images ?? [] }));
-      return { ...out, quoteMockups: prev.quoteMockups, photoInfo: prev.photoInfo };
+    let fresh: PdfRead;
+    try { fresh = await quotePdfMockups(d.quotePdf, folder); }
+    catch (e: any) {
+      // Couldn't read the PDF this time: keep what the last pull found, and say why.
+      out.lines = out.lines.map((l) => ({ ...l, images: l.images.length ? l.images : prev?.lines.find((p) => p.name === l.name)?.images ?? [] }));
+      return { ...out, quoteMockups: prev?.quoteMockups, photoInfo: `couldn't read the signed quote PDF: ${e.message}` };
     }
-    out.photoInfo = fresh?.status ?? "couldn't download the signed quote PDF from Jobber";
-    const mockups = fresh?.urls ?? [];
+    out.photoInfo = fresh.status;
+    const mockups = fresh.urls;
     const photoLines = lines.map((l, i) => (wantsPhoto(l) ? i : -1)).filter((i) => i >= 0);
     if (mockups.length && mockups.length === photoLines.length) {
       // One picture per "Click Photo to Preview" line, in the quote's order.

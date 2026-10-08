@@ -16,6 +16,7 @@ export type Block =
 export type Band = { cat: string; n: number; p25: number; median: number; p75: number; avg?: number };
 export type Rates = {
   rooflinePerFt: number; perStrand: number; pillar: number; wreath: Record<string, number>;
+  roofline1StoryLow: number; roofline1StoryHigh: number; roofline2Story: number; rooflineSteep: number; earlyDiscountPct: number; startingPrice: number;
   depositPct: number; taxPct: number; cashDiscountPct: number; returningDiscountPct: number; returningBefore: string; passPct: number;
 };
 export type Grade = "pass" | "close" | "miss";

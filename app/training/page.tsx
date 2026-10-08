@@ -29,7 +29,7 @@ export default function TrainingHome() {
   // Training files from the rebuild carry the quote course in the same engine as the installer course.
   if (course) {
     return (
-      <CourseView id="quote" base="/api/training/course" title="Quote training" teamHref="/training/team" teamRoles={["owner", "manager"]}
+      <CourseView id="quote" base="/api/training/course" title="Quote Creation Training" teamHref="/training/team" teamRoles={["owner", "manager"]}
         sub="How to build a Light DMV quote the way we really do it: read the request, size up the house, measure, choose the lines, price them."
         signoffNote="An owner signs you off once they've watched you quote a real house."
         practice={(m, onProgress, prog) => <QuotePractice m={m} onProgress={onProgress} prog={prog} />}
@@ -45,7 +45,7 @@ export default function TrainingHome() {
   if (!d.loaded) {
     return (
       <div className="max-w-3xl mx-auto p-4 space-y-4">
-        <H1 sub="How to build a Light DMV holiday lighting quote, practiced on real jobs.">Quote training</H1>
+        <H1 sub="How to build a Light DMV holiday lighting quote, practiced on real jobs.">Quote Creation Training</H1>
         <Card>
           {office ? <PackUpload onDone={load} /> : <p className="text-slate-600">The course isn't loaded yet. Ask Chris or Liam.</p>}
         </Card>
@@ -56,7 +56,7 @@ export default function TrainingHome() {
   const passed = d.modules!.filter((m) => m.status === "passed").length;
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <H1 sub={`${passed} of ${d.modules!.length} modules passed. How to build a Light DMV quote, from the house to the price of every line. You're ready when 5 real jobs in a row land within 10% of what we charged.`}>Quote training</H1>
+      <H1 sub={`${passed} of ${d.modules!.length} modules passed. How to build a Light DMV quote, from the house to the price of every line. You're ready when 5 real jobs in a row land within 10% of what we charged.`}>Quote Creation Training</H1>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <Tile href="/training/jobs" icon={<Images size={18} />} label="Photo library" sub="Every real job, every line, every price" />
         <Tile href="/training/helper" icon={<Calculator size={18} />} label="Price helper" sub="How would we price this?" />

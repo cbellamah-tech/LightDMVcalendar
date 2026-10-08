@@ -9,9 +9,9 @@ import type { CrewPay, Job, Progress } from "./types";
 import { dur } from "./types";
 import DrivePhotos from "./DrivePhotos";
 
-type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay };
+type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay; expenses?: number };
 
-const money = (n: number) => `$${n.toLocaleString("en-US")}`;
+const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
 export default function JobsPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -26,11 +26,18 @@ export default function JobsPage() {
     .then((d) => { setRows(d.jobs); setFixes(d.fixes || []); setFixSheet(d.fixSheet); setSample(d.sample); })
     .catch((e) => setErr(e.message)), []);
   useEffect(() => {
+    // The home page links straight to one crew's day with ?crew=crew1.
+    const c = new URLSearchParams(window.location.search).get("crew");
+    if (c) setCrew(c);
     api<Me>("/api/me").then(setMe).catch(() => {});
     load();
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [load]);
+
+  // #fixes from the home page: jump to the fixes box once the list has drawn.
+  const loaded = !!rows;
+  useEffect(() => { if (loaded && window.location.hash === "#fixes") document.getElementById("fixes")?.scrollIntoView(); }, [loaded]);
 
   const office = me?.role === "owner" || me?.role === "manager";
   const days = useMemo(() => byDay(rows || [], crew), [rows, crew]);
@@ -57,7 +64,7 @@ export default function JobsPage() {
         </div>
       )}
       {office && <DrivePhotos />}
-      <section className="rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-3 space-y-3">
+      <section id="fixes" className="scroll-mt-16 rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="font-extrabold text-amber-900 flex items-center gap-2"><Wrench size={18} /> Fixes (service calls){openFixes ? ` · ${openFixes} open` : ""}</h2>
           {fixSheet?.url && (
@@ -130,8 +137,11 @@ function JobCard({ j, fix, office, gap }: { j: Row; fix?: boolean; office?: bool
               {j.arrivedAt && j.completedAt ? ` · ${dur(j.completedAt - j.arrivedAt)} on site` : ""}
             </div>
           )}
-          {j.pay?.amount != null && (
-            <div className="text-sm font-bold text-green-700">{office ? "Crew pay" : "Your crew's pay"} {money(j.pay.amount)}</div>
+          {(j.pay?.amount != null || !!j.expenses) && (
+            <div className="text-sm font-bold text-green-700">
+              {j.pay?.amount != null && <>{office ? "Crew pay" : "Your crew's pay"} {money(j.pay.amount)}</>}
+              {!!j.expenses && <>{j.pay?.amount != null ? " + " : ""}{money(j.expenses)} expenses</>}
+            </div>
           )}
         </div>
         {j.completedAt || (fix && j.doneInJobber) ? <CheckCircle2 className="text-green-600 shrink-0" /> : <span className="text-sm font-semibold text-slate-500 shrink-0">{j.progress.done}/{j.progress.total}</span>}
@@ -154,15 +164,18 @@ function gapBefore(j: Row, dayJobs: Row[]) {
   return prev ? j.arrivedAt - prev.completedAt! : undefined;
 }
 
-/** What the crew makes that day, from the jobs that have a pay figure. */
+/** What the crew makes that day: pay for the jobs that have a figure, plus the expenses they paid out of pocket. */
 function DayPay({ jobs, office }: { jobs: Row[]; office: boolean }) {
   const known = jobs.filter((j) => j.pay?.amount != null);
-  if (!known.length) return null;
-  const total = known.reduce((t, j) => t + (j.pay!.amount as number), 0);
+  const spent = jobs.reduce((t, j) => t + (j.expenses || 0), 0);
+  if (!known.length && !spent) return null;
+  const pay = known.reduce((t, j) => t + (j.pay!.amount as number), 0);
   const missing = jobs.length - known.length;
   return (
-    <span className="normal-case text-green-700">
-      {office ? "Crew pay" : "Day pay"} {money(total)}{missing ? ` (+${missing} not set)` : ""}
+    <span className="normal-case text-green-700 text-right">
+      {office ? "Crew day total" : "Day total"} {money(pay + spent)}{spent > 0 && !pay ? " expenses" : ""}
+      {spent > 0 && pay > 0 && <span className="font-normal text-slate-500"> (pay {money(pay)} + expenses {money(spent)})</span>}
+      {missing ? <span className="font-normal text-slate-500">{` +${missing} not set`}</span> : ""}
     </span>
   );
 }

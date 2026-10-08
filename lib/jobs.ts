@@ -1,4 +1,4 @@
-import { kvGet, kvSet, kvUpdate } from "./store";
+import { kvGet, kvGetMany, kvSet, kvUpdate } from "./store";
 import { JobKind, SOPS } from "./sops";
 import type { Session } from "./session";
 import type { User } from "./users";
@@ -89,10 +89,16 @@ export const jobVisibleTo = (j: Job, s: Session, me?: User) =>
   s.role === "owner" || s.role === "manager" || (!!s.crew && j.crew === s.crew) ||
   j.assignedNames.some((n) => [me?.jobberName, me?.name].some((v) => v && v.toLowerCase() === n.toLowerCase()));
 
+const orEmpty = (job: Job, c: Checklist | null): Checklist => (c && c.kind === job.kind ? c : { jobId: job.id, kind: job.kind, items: {}, rev: 0 });
+
 export async function getChecklist(job: Job): Promise<Checklist> {
-  const c = await kvGet<Checklist>(checkKey(job.id));
-  if (c && c.kind === job.kind) return c;
-  return { jobId: job.id, kind: job.kind, items: {}, rev: 0 };
+  return orEmpty(job, await kvGet<Checklist>(checkKey(job.id)));
+}
+
+/** Checklists for many jobs in one database round trip. */
+export async function getChecklists(jobs: Job[]): Promise<Checklist[]> {
+  const cs = await kvGetMany<Checklist>(jobs.map((j) => checkKey(j.id)));
+  return jobs.map((j, i) => orEmpty(j, cs[i]));
 }
 
 export async function saveChecklist(c: Checklist) {
@@ -127,11 +133,13 @@ export function sampleJobs(): Job[] {
   ];
 }
 
-export async function ensureSampleJobs() {
+/** The saved jobs, seeding the sample jobs first on a brand new app. */
+export async function ensureSampleJobs(): Promise<Record<string, Job>> {
   const all = await getJobs();
-  if (Object.keys(all).length) return;
-  if (await kvGet("ldmv:jobber:tokens")) return;
+  if (Object.keys(all).length) return all;
+  if (await kvGet("ldmv:jobber:tokens")) return all;
   await upsertJobs(sampleJobs());
+  return getJobs();
 }
 
 // ---------- materials used (read later by the inventory ledger sync) ----------

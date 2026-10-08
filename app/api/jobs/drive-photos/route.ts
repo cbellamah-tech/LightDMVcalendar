@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { OFFICE, requireRole } from "@/lib/auth";
-import { getChecklist, getJobs } from "@/lib/jobs";
+import { getChecklists, getJobs } from "@/lib/jobs";
 import { copyJobPhotos, driveCopyStatus } from "@/lib/jobPhotosDrive";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export const maxDuration = 60;
 
 async function all() {
   const jobs = Object.values(await getJobs());
-  const lists = await Promise.all(jobs.map((j) => getChecklist(j)));
+  const lists = await getChecklists(jobs);
   return { jobs, lists: lists.filter((c) => Object.values(c.items).some((e) => e.photos?.length)) };
 }
 

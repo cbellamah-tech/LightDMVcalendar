@@ -8,10 +8,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const s = await requireRole(...ANYONE);
   if (s instanceof NextResponse) return s;
-  const pack = await loadPack();
+  const [pack, p] = await Promise.all([loadPack(), getProgress(s.uid)]);
   const rates = await getRates(pack);
   if (!pack) return NextResponse.json({ loaded: false, rates });
-  const p = await getProgress(s.uid);
   return NextResponse.json({
     loaded: true, builtAt: pack.builtAt, rates, bands: pack.bands, treeGroups: pack.treeGroups, practiceCount: pack.quotes.length,
     modules: pack.modules.map((m) => ({ id: m.id, title: m.title, goal: m.goal, practice: m.practice, ...moduleStatus(m, p, rates.passPct) })),

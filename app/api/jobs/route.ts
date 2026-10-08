@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { checklistProgress, ensureSampleJobs, getChecklist, getJobs, jobVisibleTo } from "@/lib/jobs";
+import { checklistProgress, ensureSampleJobs, getChecklists, jobVisibleTo, type Job } from "@/lib/jobs";
 import { syncIfStale } from "@/lib/jobber";
 import { listUsers } from "@/lib/users";
-import { kvGet } from "@/lib/store";
+import { kvGetMany } from "@/lib/store";
 import { JobDetail, withDrive } from "@/lib/jobDetails";
 import { loadDriveIndex } from "@/lib/drive";
 import { fixSheetStatus, fixSheetUrl } from "@/lib/serviceSheet";
 import { getPayOverrides, payFor } from "@/lib/crewPay";
+import { expenseTotal, getAllExpenses } from "@/lib/expenses";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
@@ -16,37 +17,44 @@ export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
 export async function GET(req: Request) {
   const s = await requireRole();
   if (s instanceof NextResponse) return s;
-  await ensureSampleJobs();
-  await syncIfStale();
   const url = new URL(req.url);
+  const office = s.role === "owner" || s.role === "manager";
+  // Everything the list needs, read side by side; the Jobber sync (when due) runs after the answer is sent.
+  const [all, users, idx, overrides, sheet] = await Promise.all([
+    ensureSampleJobs(), listUsers(), loadDriveIndex(), getPayOverrides(), office ? fixSheetStatus() : null, syncIfStale().catch(() => {}),
+  ]);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const from = url.searchParams.get("from") || new Date(today.getTime() - 86400_000).toISOString();
   const to = url.searchParams.get("to") || new Date(today.getTime() + 8 * 86400_000).toISOString();
-  const me = (await listUsers()).find((u) => u.id === s.uid);
-  const visible = Object.values(await getJobs()).filter((j) => jobVisibleTo(j, s, me));
+  const me = users.find((u) => u.id === s.uid);
+  const visible = Object.values(all).filter((j) => jobVisibleTo(j, s, me));
   // Fixes (service calls) are never mixed into the day's jobs: they come back in their own list, which also
   // carries open fixes from before the range so a missed one stays on the schedule.
   const fixList = visible.filter((j) => j.kind === "fix" && j.start < to && (j.start >= from || !j.doneInJobber));
   const jobs = url.searchParams.get("only") === "fixes" ? [] : visible.filter((j) => j.kind !== "fix" && j.start >= from && j.start < to);
   jobs.sort((a, b) => a.start.localeCompare(b.start));
   fixList.sort((a, b) => a.start.localeCompare(b.start));
-  const idx = await loadDriveIndex();
-  const overrides = await getPayOverrides();
-  const withProgress = async (j: (typeof jobs)[number]) => {
-    const c = await getChecklist(j);
+  // Checklists and cached Jobber details for every row in two queries instead of two per job.
+  const rows = [...jobs, ...fixList];
+  const [lists, details, expenses] = await Promise.all([
+    getChecklists(rows),
+    kvGetMany<JobDetail>(rows.map((j) => (j.jobberJobId ? `ldmv:jobdetail:${j.jobberJobId}` : "ldmv:none"))),
+    getAllExpenses(),
+  ]);
+  const withProgress = (j: Job, i: number) => {
+    const c = lists[i];
     // Repeat / new and bin from what's already cached; the job page fetches fresh details.
-    const d = j.jobberJobId ? await kvGet<JobDetail>(`ldmv:jobdetail:${j.jobberJobId}`) : null;
+    const d = j.jobberJobId ? details[i] : null;
     const v = j.source === "jobber" ? withDrive(idx, d, j.client) : null;
     const info = v ? { repeat: v.repeat, bins: v.drive.bins.map((b) => b.bin), known: !!d } : undefined;
-    return { ...j, progress: checklistProgress(c), arrivedAt: c.arrivedAt, completedAt: c.completedAt, info, pay: payFor(j, d, overrides) };
+    return { ...j, progress: checklistProgress(c), arrivedAt: c.arrivedAt, completedAt: c.completedAt, info, pay: payFor(j, d, overrides), expenses: expenseTotal(expenses[j.id]) };
   };
-  const fixes = (await Promise.all(fixList.map(withProgress)))
+  const out = rows.map(withProgress);
+  const fixes = out.slice(jobs.length)
     // An old fix finished in the app drops off once its day has passed.
     .filter((f) => f.start >= from || !f.completedAt);
-  const office = s.role === "owner" || s.role === "manager";
-  const sheet = office ? await fixSheetStatus() : null;
   return NextResponse.json({
-    jobs: await Promise.all(jobs.map(withProgress)),
+    jobs: out.slice(0, jobs.length),
     fixes,
     fixSheet: sheet ? { url: fixSheetUrl(sheet.sheetId || process.env.SERVICE_SHEET_ID?.trim()), lastAt: sheet.lastAt, lastError: sheet.lastError } : null,
     sample: jobs.some((j) => j.source === "sample"),

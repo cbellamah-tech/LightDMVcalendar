@@ -104,6 +104,15 @@ async function gqlOnce<T>(query: string, variables: Record<string, unknown>): Pr
   return j.data as T;
 }
 
+/** Download a Jobber file (some file links need the app's sign-in, some refuse it). */
+export async function jobberFile(url: string): Promise<Response> {
+  const plain = await fetch(url, { cache: "no-store" }).catch(() => null);
+  if (plain?.ok) return plain;
+  const authed = await fetch(url, { cache: "no-store", headers: { authorization: `Bearer ${await accessToken()}` } }).catch(() => null);
+  if (authed?.ok) return authed;
+  throw new Error(`Jobber file download failed (${plain?.status ?? "no answer"}${authed ? `/${authed.status}` : ""})`);
+}
+
 export const isConnected = async () => !!(await kvGet(TOKENS));
 export const getStatus = async () => (await kvGet<SyncStatus>(STATUS)) ?? {};
 export async function disconnect() {
@@ -227,12 +236,14 @@ export async function syncJobber(detailLimit = 25): Promise<number> {
   }
 }
 
-/** Sync at most every 5 minutes when someone opens the jobs list. */
+/** Sync at most every 5 minutes when someone opens the jobs list. The sync runs after the list is sent
+    (it can take many seconds against Jobber), so the page shows what's saved and picks up the new jobs on its next poll. */
 export async function syncIfStale() {
-  if (!jobberConfigured() || !(await isConnected())) return;
-  const s = await getStatus();
-  if (s.lastSyncAt && Date.now() - s.lastSyncAt < 5 * 60_000) return;
-  await syncJobber(4).catch(() => {});
+  if (!jobberConfigured()) return;
+  const [connected, s] = await Promise.all([isConnected(), getStatus()]);
+  if (!connected || (s.lastSyncAt && Date.now() - s.lastSyncAt < 5 * 60_000)) return;
+  const { laterOnce } = await import("./background");
+  await laterOnce("jobber-sync", () => syncJobber(4));
 }
 
 // Quotes with line items, one page per call so a long history never hits the function time limit.
