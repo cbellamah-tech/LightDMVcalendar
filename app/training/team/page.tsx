@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { api, GREEN, Me, NAVY, RED, fmtDay } from "@/components/ui";
 import { Btn, Card, H1, Rates, Spinner, useBusy } from "../parts";
 import { PackUpload } from "../PackUpload";
+import { TeamView } from "@/components/course/TeamView";
 
 type Trainee = {
   uid: string; name: string;
@@ -20,11 +21,25 @@ export default function TeamProgress() {
   const [d, setD] = useState<{ passPct: number; trainees: Trainee[] } | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [err, setErr] = useState("");
+  const [course, setCourse] = useState<boolean | null>(null);
   useEffect(() => {
     api("/api/training/team").then(setD).catch((e) => setErr(e.message));
     api<Me>("/api/me").then(setMe).catch(() => {});
+    api<{ loaded: boolean }>("/api/training/course").then((r) => setCourse(r.loaded)).catch(() => setCourse(false));
   }, []);
-  if (!d) return err ? <div className="p-6 text-red-600">{err}</div> : <Spinner />;
+  if (!d || course === null) return err ? <div className="p-6 text-red-600">{err}</div> : <Spinner />;
+  if (course) {
+    return (
+      <div className="pb-4">
+        <TeamView base="/api/training/course" back="/training" backLabel="Quote training" title="Quote training: team progress"
+          sub="Time counts only while a page is on screen and in use. Practice shows good houses out of tries; the final shows each run." />
+        <div className="max-w-3xl mx-auto px-4 space-y-4">
+          {me?.role === "owner" && <RatesEditor />}
+          <Card><PackUpload /></Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">

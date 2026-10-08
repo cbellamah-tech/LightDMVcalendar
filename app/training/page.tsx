@@ -6,19 +6,41 @@ import { BarChart3, Calculator, CheckCircle2, ChevronRight, Circle, CircleDot, I
 import { api, GREEN, Me, NAVY } from "@/components/ui";
 import { Card, H1, Spinner } from "./parts";
 import { PackUpload } from "./PackUpload";
+import { CourseView } from "@/components/course/CourseView";
+import { QuotePractice } from "./QuotePractice";
 
 type Mod = { id: string; title: string; goal: string; status: "not started" | "in progress" | "passed"; detail: string };
 type Home = { loaded: boolean; builtAt?: string; modules?: Mod[]; practiceCount?: number };
 
 export default function TrainingHome() {
   const [d, setD] = useState<Home | null>(null);
+  const [course, setCourse] = useState<boolean | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [err, setErr] = useState("");
   const load = () => api<Home>("/api/training").then(setD).catch((e) => setErr(e.message));
-  useEffect(() => { load(); api<Me>("/api/me").then(setMe).catch(() => {}); }, []);
+  useEffect(() => {
+    load(); api<Me>("/api/me").then(setMe).catch(() => {});
+    api<{ loaded: boolean }>("/api/training/course").then((r) => setCourse(r.loaded)).catch(() => setCourse(false));
+  }, []);
 
-  if (!d) return err ? <div className="p-6 text-red-600">{err}</div> : <Spinner />;
+  if (!d || course === null) return err ? <div className="p-6 text-red-600">{err}</div> : <Spinner />;
   const office = me?.role === "owner" || me?.role === "manager";
+
+  // Training files from the rebuild carry the quote course in the same engine as the installer course.
+  if (course) {
+    return (
+      <CourseView id="quote" base="/api/training/course" title="Quote training" teamHref="/training/team" teamRoles={["owner", "manager"]}
+        sub="How to build a Light DMV quote the way we really do it: read the request, size up the house, measure, choose the lines, price them."
+        signoffNote="An owner signs you off once they've watched you quote a real house."
+        practice={(m, onProgress, prog) => <QuotePractice m={m} onProgress={onProgress} prog={prog} />}
+        extra={
+          <div className="grid grid-cols-2 gap-2">
+            <Tile href="/training/jobs" icon={<Images size={18} />} label="Photo library" sub="Every real job, every line, every price" />
+            <Tile href="/training/helper" icon={<Calculator size={18} />} label="Price helper" sub="How would we price this?" />
+          </div>
+        } />
+    );
+  }
 
   if (!d.loaded) {
     return (

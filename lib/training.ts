@@ -22,7 +22,8 @@ export type Rates = {
   depositPct: number; taxPct: number; cashDiscountPct: number; returningDiscountPct: number; returningBefore: string; passPct: number;
 };
 export type Product = { key: string; name: string; desc: string; cat: string; price: number; textOnly?: boolean };
-export type QLine = { name: string; raw: string; desc: string; qty: number; unit: number; total: number; cat: string; how: string };
+/** total is what practice grades against; charged and note (from the cleaned answer key) explain when that differs from what we charged. */
+export type QLine = { name: string; raw: string; desc: string; qty: number; unit: number; total: number; cat: string; how: string; graded?: boolean; charged?: number; note?: string };
 /** A real sold quote and the photo of the finished install. */
 export type PQuote = { id: string; quoteId: string; season: string; photos: string[]; lines: QLine[]; included: string[]; total: number; featured: boolean };
 export type TreeGroup = { size: string; n: number; avg: number; low: number; high: number };
@@ -34,10 +35,29 @@ export type InstallGuide = {
   passPct?: number;
 };
 export type QuizQ = { q: string; choices: string[]; answer: number; why: string };
+/** Where a practice step sits in a quote-course module: an intake drill, pricing one kind of line, a whole job, or the final. */
+export type PracticeSpec =
+  | { kind: "intake"; need: number }
+  | { kind: "lines"; cats: string[]; tries: number; good: number }
+  | { kind: "job"; tries: number; good: number }
+  | { kind: "final"; jobs: number; within: number; linePct: number };
+/** A practice house: what the quoter starts from (address, request, Jobber history) and the answer key that goes with it. */
+export type QJob = {
+  id: string; address: string; lat?: number | null; lng?: number | null; request: string; returning: boolean | null; commercial: boolean | null;
+  feet?: number | null; stories?: number | null; peaks?: number | null; note?: string; finalOk?: boolean; notPicked?: string[];
+};
+export type IntakeItem = { id: string; text: string; answer: number; why: string };
+/** The quote course in the same shape as the installer course (lessons, graded quiz, practice), with practice houses. */
+export type QuoteCourse = {
+  intro: Block[]; passPct: number; pricePct: number;
+  modules: { title: string; blocks: Block[]; quiz?: QuizQ[]; practice?: PracticeSpec }[];
+  jobs: QJob[]; intake: { routes: string[]; items: IntakeItem[] };
+};
 export type Pack = {
   kind: "ldmv-training-pack"; version: number; builtAt: string; source: string;
   modules: Module[]; bands: Band[]; rates: Rates; catalog: Product[]; treeGroups: TreeGroup[]; quotes: PQuote[];
   install?: InstallGuide;
+  quote?: QuoteCourse;
 };
 
 const PACK = "ldmv:training:pack";

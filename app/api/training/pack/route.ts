@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const info = (p: Awaited<ReturnType<typeof loadPack>>) =>
-  ({ builtAt: p?.builtAt ?? null, modules: p?.modules.length ?? 0, practice: p?.quotes.length ?? 0, install: p?.install?.modules?.length ?? 0 });
+  ({ builtAt: p?.builtAt ?? null, modules: p?.quote?.modules.length ?? p?.modules.length ?? 0, practice: p?.quote?.jobs.length ?? p?.quotes.length ?? 0, install: p?.install?.modules?.length ?? 0 });
 
 export async function GET() {
   const s = await requireRole(...OFFICE);
