@@ -10,14 +10,16 @@ export type Kind = "organic" | "paid";
 export type SourceId =
   | "google_ads" | "google_lsa" | "meta_ads" | "cold_email"
   | "gmb" | "website" | "calls" | "email" | "facebook" | "instagram" | "yard_signs" | "referral" | "returning"
-  | "listings" | "direct_mail" | "other";
+  | "listings" | "direct_mail" | "reengaged" | "other";
 
 export const SOURCES: { id: SourceId; label: string; kind: Kind; spend?: AdDay["source"]; test: RegExp }[] = [
   // Paid first: a click id or "ad"/"cpc" wins over the platform name.
   { id: "google_lsa", label: "Google Local Services", kind: "paid", spend: "lsa", test: /\blsa\b|local service/ },
   { id: "google_ads", label: "Google ads", kind: "paid", spend: "google", test: /gclid|google ?ads|adwords|paid search|\bcpc\b|\bppc\b/ },
-  { id: "meta_ads", label: "Meta ads", kind: "paid", spend: "facebook", test: /fbclid|lead ?form|facebook ad|fb ad|meta ad|instagram ad|paid social|\bads?\b/ },
-  { id: "cold_email", label: "Cold email", kind: "paid", test: /cold|smartlead|headline theory|instantly/ },
+  { id: "meta_ads", label: "Meta ads", kind: "paid", spend: "facebook", test: /fbclid|lead ?form|facebook ads?\b|fb ads?\b|meta ads?\b|instagram ads?\b|paid social/ },
+  // GoHighLevel's "Cold Leads" pipelines and tags are old leads texted again, not cold email: organic, and checked first.
+  { id: "reengaged", label: "Old leads texted again", kind: "organic", test: /cold (permanent |bistro )?(lighting )?leads?|re-?engage|old leads?|first sms|second sms/ },
+  { id: "cold_email", label: "Cold email", kind: "paid", test: /cold ?email|cold outreach|smartlead|headline theory|instantly|new lead:/ },
   { id: "gmb", label: "Google Business", kind: "organic", test: /gmb|gbp|google business|google my business|business profile|google maps/ },
   { id: "calls", label: "Phone calls", kind: "organic", test: /call|phone|inbound voice/ },
   { id: "website", label: "Website", kind: "organic", test: /website|web form|form|organic search|lightdmv\.com|chat widget|direct traffic|\bsite\b|google/ },
@@ -47,7 +49,9 @@ export type Attribution = {
   rows: Row[];
   weeks: { week: string; organic: number; paid: number }[];
   untagged: string[]; // the raw source text of untagged leads, so the rules can be tightened
+  items: Item[];       // who's behind each number, for tapping into it
 };
+export type Item = { type: "lead" | "quote" | "sale"; kind: Kind; source: SourceId; name: string; day: string; value?: number; stage?: string; why: string };
 
 /** Leads by the day they came in; quotes and sales by the day the deal was made, credited to the contact's source. */
 export function attribution(leads: GhlLead[], opps: GhlOpp[], ads: AdDay[], days: number, today = etDay(Date.now())): Attribution {
@@ -62,6 +66,9 @@ export function attribution(leads: GhlLead[], opps: GhlOpp[], ads: AdDay[], days
   const text = (l: GhlLead) => [l.source, l.attr, ...l.tags].filter(Boolean).join(" ");
   const byContact = new Map(leads.map((l) => [l.id, classify(text(l))]));
   const untagged = new Map<string, number>();
+  const items: Item[] = [];
+  const names = new Map(leads.map((l) => [l.id, l.name]));
+  const whyOf = new Map(leads.map((l) => [l.id, text(l)]));
 
   // 12 weeks of leads for the trend, whatever the range.
   const weekStart = (d: string) => addDays(d, -((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7));
@@ -75,13 +82,23 @@ export function attribution(leads: GhlLead[], opps: GhlOpp[], ads: AdDay[], days
     if (w) w[s.kind]++;
     if (!inRange(l.day)) continue;
     row(s).leads++;
+    items.push({ type: "lead", kind: s.kind, source: s.id, name: l.name, day: l.day, why: text(l).slice(0, 120) });
     if (s.id === "other") { const k = text(l).trim() || "(blank)"; untagged.set(k, (untagged.get(k) ?? 0) + 1); }
   }
   for (const o of opps) {
-    const s = byContact.get(o.contactId) ?? classify(o.source);
-    if (inRange(o.day) && QUOTED.test(o.stage)) row(s).quotes++;
+    const s = byContact.get(o.contactId) ?? classify(`${o.pipeline} ${o.source}`);
+    const name = names.get(o.contactId) || o.name || "Unnamed";
+    const why = (whyOf.get(o.contactId) ?? `${o.pipeline} ${o.source}`).slice(0, 120);
+    if (inRange(o.day) && QUOTED.test(o.stage)) {
+      row(s).quotes++;
+      items.push({ type: "quote", kind: s.kind, source: s.id, name, day: o.day, value: o.value, stage: o.stage, why });
+    }
     const sold = o.status === "won" || SOLD.test(o.stage);
-    if (sold && o.status !== "lost" && inRange(o.closedDay ?? o.day)) { row(s).sales++; row(s).revenue += o.value; }
+    const soldDay = o.closedDay ?? o.day;
+    if (sold && o.status !== "lost" && inRange(soldDay)) {
+      row(s).sales++; row(s).revenue += o.value;
+      items.push({ type: "sale", kind: s.kind, source: s.id, name, day: soldDay, value: o.value, stage: o.stage, why });
+    }
   }
   for (const a of ads) {
     if (!inRange(a.day)) continue;
@@ -94,6 +111,7 @@ export function attribution(leads: GhlLead[], opps: GhlOpp[], ads: AdDay[], days
   for (const r of list) for (const k of ["leads", "quotes", "sales", "revenue", "spend"] as const) totals[r.kind][k] += r[k];
   return {
     from, to: today, totals, rows: list, weeks: [...weeks.values()],
+    items: items.sort((x, y) => y.day.localeCompare(x.day)),
     untagged: [...untagged.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${k} (${n})`),
   };
 }

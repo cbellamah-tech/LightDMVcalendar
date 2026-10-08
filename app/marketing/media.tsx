@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, Film, Loader2, Plus, RefreshCw, Send } from "lucide-react";
 import { ago, api, NAVY } from "@/components/ui";
 import { Card } from "./parts";
@@ -255,9 +255,11 @@ export function ChannelName({ c }: { c: { label: string; link?: string } }) {
   );
 }
 
-export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: logging }: {
+export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: logging, drafts }: {
   today: string; owner: boolean; sheetUrl: string; channels: SheetCh[]; onLog: (id: string, ask?: boolean) => Promise<void> | void; busy: boolean;
+  drafts: { text: Record<string, { title?: string; body: string }>; urls: Record<string, string> };
 }) {
+  const [doing, setDoing] = useState<string | null>(null);
   const [g, setG] = useState<{ connected: boolean; at?: number; rows: string[][]; error?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -331,14 +333,19 @@ export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: loggi
                       const pct = goal ? Math.min(100, Math.round((num(total) / goal) * 100)) : 0;
                       const canTap = c && !c.auto && month === thisMonth;
                       return (
-                        <tr key={i} className="border-t border-slate-100">
+                        <Fragment key={i}>
+                        <tr className="border-t border-slate-100">
                           <td className="py-1.5 pr-2">
                             <span className="flex items-center gap-1.5">
                               <span className="font-medium"><ChannelName c={c ?? { label: r[0] }} /></span>
                               {c?.auto && <span className="text-[10px] rounded bg-green-50 text-green-700 px-1">auto</span>}
+                              {c && drafts.text[c.id] && month === thisMonth && (
+                                <button onClick={() => setDoing(doing === c.id ? null : c.id)}
+                                  className="ml-auto rounded-md px-2.5 text-xs font-bold leading-6 text-white" style={{ background: "#1F9D55" }}>{doing === c.id ? "Close" : "Post"}</button>
+                              )}
                               {canTap && (
                                 <button disabled={logging} onClick={async () => { await onLog(c.id, true); if (owner) await sync(); }} title="Add how many you did"
-                                  className="ml-auto rounded border border-slate-300 px-1.5 text-xs leading-5 hover:bg-slate-50"><Plus size={12} /></button>
+                                  className={`${c && drafts.text[c.id] ? "" : "ml-auto "}rounded border border-slate-300 px-1.5 text-xs leading-5 hover:bg-slate-50`}><Plus size={12} /></button>
                               )}
                             </span>
                           </td>
@@ -355,6 +362,13 @@ export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: loggi
                             ) : <span className="text-xs text-slate-400">{r[1]}</span>}
                           </td>
                         </tr>
+                        {c && doing === c.id && drafts.text[c.id] && (
+                          <tr><td colSpan={7} className="pb-3">
+                            <PostDrawer label={c.label} draft={drafts.text[c.id]} url={drafts.urls[c.id]}
+                              onPosted={async () => { await onLog(c.id); if (owner) await sync(); setDoing(null); }} />
+                          </td></tr>
+                        )}
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -366,5 +380,29 @@ export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: loggi
         )}
       {(msg || g?.error) && <p className={`text-sm break-words ${msg.startsWith("Synced") ? "text-green-700" : "text-red-600"}`}>{msg || g?.error}</p>}
     </Card>
+  );
+}
+
+/** No API for these sites: copy the ready text, open the site, paste, post, then tap Posted to count it. */
+function PostDrawer({ label, draft, url, onPosted }: { label: string; draft: { title?: string; body: string }; url: string; onPosted: () => Promise<void> }) {
+  const [title, setTitle] = useState(draft.title ?? "");
+  const [body, setBody] = useState(draft.body);
+  const [step, setStep] = useState<"start" | "opened" | "busy">("start");
+  return (
+    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+      {draft.title !== undefined && <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm font-semibold bg-white" />}
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} className="w-full rounded-lg border border-slate-300 p-2 text-sm bg-white" />
+      <div className="flex gap-2 flex-wrap items-center">
+        <button onClick={async () => { await navigator.clipboard.writeText(title ? `${title}\n\n${body}` : body).catch(() => {}); window.open(url, "_blank", "noopener"); setStep("opened"); }}
+          className="rounded-xl px-4 py-2 font-bold text-white inline-flex items-center gap-2" style={{ background: NAVY }}>
+          <ExternalLink size={16} /> 1. Copy and open {label.replace(/ (posts|listings|ads)$/i, "")}
+        </button>
+        <button disabled={step === "busy"} onClick={async () => { setStep("busy"); await onPosted(); }}
+          className={`rounded-xl px-4 py-2 font-bold inline-flex items-center gap-2 ${step === "opened" ? "text-white" : "border border-slate-300"}`} style={step === "opened" ? { background: "#1F9D55" } : undefined}>
+          {step === "busy" ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} 2. Posted, count it
+        </button>
+        {step === "opened" && <span className="text-xs text-slate-500">Paste it in (it's copied), post it, then tap Posted.</span>}
+      </div>
+    </div>
   );
 }

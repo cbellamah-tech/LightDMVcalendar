@@ -19,6 +19,7 @@ type Data = {
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
   autopost: boolean;
+  drafts: { text: Record<string, { title?: string; body: string; at?: number }>; urls: Record<string, string> };
   attribution: Attribution | null;
   ads: { facebook: AdSide & { configured: boolean }; google: AdSide; lsa: AdSide; error?: string };
   cold: { url: string; latest: { day: string; sent: number; responses: number; positive: number } | null };
@@ -100,13 +101,13 @@ export default function Marketing() {
         </Card>
       )}
 
-      <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} />
+      <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} errors={d.ghl.errors} />
 
       <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} autopost={d.autopost} owner={owner} today={d.today} reload={load} />
 
       <Inbox inbox={d.inbox} onHide={hide} />
 
-      <SheetView today={d.today} owner={owner} sheetUrl={d.google.sheetUrl} channels={d.channels} onLog={log} busy={busy} />
+      <SheetView today={d.today} owner={owner} sheetUrl={d.google.sheetUrl} channels={d.channels} onLog={log} busy={busy} drafts={d.drafts} />
       {d.events.length > 0 && (
         <div className="px-1">
           <details className="text-sm">
