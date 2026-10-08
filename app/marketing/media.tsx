@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, Film, Loader2, RefreshCw, Send } from "lucide-react";
+import { Check, ExternalLink, Film, Loader2, Plus, RefreshCw, Send } from "lucide-react";
 import { ago, api, NAVY } from "@/components/ui";
 import { Card } from "./parts";
 
@@ -156,7 +156,32 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner,
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const num = (s?: string) => { const n = Number(String(s ?? "").replace(/[$,%\s]/g, "")); return Number.isFinite(n) ? n : 0; };
 
-export function SheetView({ today, owner, sheetUrl }: { today: string; owner: boolean; sheetUrl: string }) {
+type SheetCh = { id: string; label: string; box: string; sheetRow: string; auto?: string; link?: string };
+const GROUPS: { box: string; title: string }[] = [
+  { box: "social", title: "Social posts" },
+  { box: "listings", title: "Listings (posted by hand)" },
+  { box: "website", title: "Website" },
+  { box: "cold", title: "Cold email" },
+  { box: "signs", title: "Yard signs and in person" },
+  { box: "paid", title: "Paid ads ($ spent)" },
+];
+const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+const isHeading = (x: string) => /:\s*$/.test(x) || /^campaign type$/i.test(x.trim());
+
+/** A channel's name, opening wherever that thing lives (the page, the ad account, the app tab). */
+export function ChannelName({ c }: { c: { label: string; link?: string } }) {
+  if (!c.link) return <>{c.label}</>;
+  const inApp = c.link.startsWith("/");
+  return (
+    <a href={c.link} target={inApp ? undefined : "_blank"} rel="noreferrer" className="hover:underline inline-flex items-center gap-1">
+      {c.label}{!inApp && <ExternalLink size={11} className="text-slate-400" />}
+    </a>
+  );
+}
+
+export function SheetView({ today, owner, sheetUrl, channels, onLog, busy: logging }: {
+  today: string; owner: boolean; sheetUrl: string; channels: SheetCh[]; onLog: (id: string, ask?: boolean) => Promise<void> | void; busy: boolean;
+}) {
   const [g, setG] = useState<{ connected: boolean; at?: number; rows: string[][]; error?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -167,7 +192,17 @@ export function SheetView({ today, owner, sheetUrl }: { today: string; owner: bo
   const thisMonth = +today.slice(5, 7);
   const thisWeek = Math.min(4, Math.ceil(+today.slice(8, 10) / 7));
   const start = 2 + (month - 7) * 5; // the sheet's layout: July starts at column C, 4 weeks + a total per month
-  const rows = useMemo(() => (g?.rows ?? []).filter((r) => (r[0] ?? "").trim() && !/^(marketing|channel|task|week)/i.test(r[0])), [g]);
+  const rows = useMemo(() => (g?.rows ?? []).filter((r) => (r[0] ?? "").trim() && !/^(marketing|channel|task|week)/i.test(r[0]) && !isHeading(r[0])), [g]);
+  // The sheet's rows, regrouped the way the tab's boxes are; anything the app doesn't know lands in "Other".
+  const groups = useMemo(() => {
+    const byRow = new Map(channels.map((c) => [norm(c.sheetRow), c]));
+    const out = [...GROUPS, { box: "other", title: "Other" }].map((gr) => ({ ...gr, rows: [] as { r: string[]; c?: SheetCh }[] }));
+    for (const r of rows) {
+      const c = byRow.get(norm(r[0]));
+      out.find((gr) => gr.box === (c?.box ?? "other"))!.rows.push({ r, c });
+    }
+    return out.filter((gr) => gr.rows.length);
+  }, [rows, channels]);
 
   async function sync() {
     setBusy(true); setMsg("");
@@ -200,7 +235,7 @@ export function SheetView({ today, owner, sheetUrl }: { today: string; owner: bo
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-slate-500">
-                    <th className="text-left font-semibold py-1 pr-2">Channel</th>
+                    <th className="text-left font-semibold py-1 pr-2">Tap a name to open it</th>
                     {[1, 2, 3, 4].map((w) => (
                       <th key={w} className={`text-right font-semibold px-2 ${month === thisMonth && w === thisWeek ? "text-slate-900" : ""}`}>
                         Wk {w}{month === thisMonth && w === thisWeek ? " ●" : ""}
@@ -210,34 +245,47 @@ export function SheetView({ today, owner, sheetUrl }: { today: string; owner: bo
                     <th className="text-left font-semibold px-2 w-32">Goal</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rows.map((r, i) => {
-                    const weeks = [0, 1, 2, 3].map((k) => r[start + k] ?? "");
-                    const total = r[start + 4] || String(weeks.reduce((s, v) => s + num(v), 0) || "");
-                    const goal = num(r[1]);
-                    const pct = goal ? Math.min(100, Math.round((num(total) / goal) * 100)) : 0;
-                    return (
-                      <tr key={i}>
-                        <td className="py-1.5 pr-2 font-medium">{r[0]}</td>
-                        {weeks.map((v, k) => (
-                          <td key={k} className={`text-right tabular-nums px-2 ${month === thisMonth && k + 1 === thisWeek ? "bg-amber-50 font-bold" : ""}`}>{v}</td>
-                        ))}
-                        <td className="text-right tabular-nums px-2 font-semibold">{total}</td>
-                        <td className="px-2">
-                          {goal ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex-1 h-1.5 rounded bg-slate-100 overflow-hidden"><div className="h-full" style={{ width: `${pct}%`, background: pct >= 100 ? "#1F9D55" : pct >= 50 ? "#D97706" : "#DC2626" }} /></div>
-                              <span className="text-xs tabular-nums text-slate-500">{r[1]}</span>
-                            </div>
-                          ) : <span className="text-xs text-slate-400">{r[1]}</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                {groups.map((gr) => (
+                  <tbody key={gr.box}>
+                    <tr><td colSpan={7} className="pt-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">{gr.title}</td></tr>
+                    {gr.rows.map(({ r, c }, i) => {
+                      const weeks = [0, 1, 2, 3].map((k) => r[start + k] ?? "");
+                      const total = r[start + 4] || String(weeks.reduce((s, v) => s + num(v), 0) || "");
+                      const goal = num(r[1]);
+                      const pct = goal ? Math.min(100, Math.round((num(total) / goal) * 100)) : 0;
+                      const canTap = c && !c.auto && month === thisMonth;
+                      return (
+                        <tr key={i} className="border-t border-slate-100">
+                          <td className="py-1.5 pr-2">
+                            <span className="flex items-center gap-1.5">
+                              <span className="font-medium"><ChannelName c={c ?? { label: r[0] }} /></span>
+                              {c?.auto && <span className="text-[10px] rounded bg-green-50 text-green-700 px-1">auto</span>}
+                              {canTap && (
+                                <button disabled={logging} onClick={async () => { await onLog(c.id, true); if (owner) await sync(); }} title="Add how many you did"
+                                  className="ml-auto rounded border border-slate-300 px-1.5 text-xs leading-5 hover:bg-slate-50"><Plus size={12} /></button>
+                              )}
+                            </span>
+                          </td>
+                          {weeks.map((v, k) => (
+                            <td key={k} className={`text-right tabular-nums px-2 ${month === thisMonth && k + 1 === thisWeek ? "bg-amber-50 font-bold" : ""}`}>{v}</td>
+                          ))}
+                          <td className="text-right tabular-nums px-2 font-semibold">{total}</td>
+                          <td className="px-2">
+                            {goal ? (
+                              <div className="flex items-center gap-1.5">
+                                <div className="flex-1 h-1.5 rounded bg-slate-100 overflow-hidden"><div className="h-full" style={{ width: `${pct}%`, background: pct >= 100 ? "#1F9D55" : pct >= 50 ? "#D97706" : "#DC2626" }} /></div>
+                                <span className="text-xs tabular-nums text-slate-500">{r[1]}</span>
+                              </div>
+                            ) : <span className="text-xs text-slate-400">{r[1]}</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                ))}
               </table>
             </div>
-            <p className="text-xs text-slate-500">Read live from the Google sheet. The app writes its own counts into this month's weeks every morning; anything typed into the sheet shows here too.</p>
+            <p className="text-xs text-slate-500">"auto" rows fill themselves every morning (posts from GoHighLevel, yard signs from the app, cold emails from Smartlead's report, ad spend once paired). For the rest, tap + when you do it. Anything typed into the sheet shows here too.</p>
           </>
         )}
       {(msg || g?.error) && <p className={`text-sm break-words ${msg.startsWith("Synced") ? "text-green-700" : "text-red-600"}`}>{msg || g?.error}</p>}

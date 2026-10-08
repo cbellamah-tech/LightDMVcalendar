@@ -65,7 +65,7 @@ export async function googleStatus() {
 }
 export const googleDisconnect = () => kvDel(TOKENS);
 
-async function access(): Promise<string> {
+export async function googleAccessToken(): Promise<string> {
   const t = await kvGet<Tokens>(TOKENS);
   if (!t) throw new Error("Google is not connected.");
   if (t.expires_at > Date.now()) return t.access_token;
@@ -74,10 +74,10 @@ async function access(): Promise<string> {
   return j.access_token;
 }
 
-async function gapi<T = any>(url: string, init?: { method?: string; body?: unknown }): Promise<T> {
+export async function gapi<T = any>(url: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const res = await fetch(url, {
     method: init?.method ?? "GET",
-    headers: { authorization: `Bearer ${await access()}`, ...(init?.body ? { "content-type": "application/json" } : {}) },
+    headers: { authorization: `Bearer ${await googleAccessToken()}`, ...(init?.body ? { "content-type": "application/json" } : {}) },
     body: init?.body ? JSON.stringify(init.body) : undefined,
     cache: "no-store",
   });
@@ -249,7 +249,7 @@ export async function drivePhotoJpeg(id: string, w = 1600): Promise<Response> {
   const f = await gapi(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=thumbnailLink,mimeType&supportsAllDrives=true`);
   if (!f.thumbnailLink || !/^image\//.test(f.mimeType)) throw new Error("Not a photo, or Drive has no preview for it yet.");
   const url = String(f.thumbnailLink).replace(/=s\d+$/, `=s${Math.min(2400, Math.max(200, w))}`);
-  const res = await fetch(url, { headers: { authorization: `Bearer ${await access()}` }, cache: "no-store" });
+  const res = await fetch(url, { headers: { authorization: `Bearer ${await googleAccessToken()}` }, cache: "no-store" });
   if (!res.ok) throw new Error(`Drive preview failed (${res.status})`);
   return res;
 }
@@ -271,7 +271,7 @@ export async function writeRunnerFile(text: string) {
     : "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
   const res = await fetch(url, {
     method: id ? "PATCH" : "POST",
-    headers: { authorization: `Bearer ${await access()}`, "content-type": `multipart/related; boundary=${boundary}` },
+    headers: { authorization: `Bearer ${await googleAccessToken()}`, "content-type": `multipart/related; boundary=${boundary}` },
     body,
   });
   if (!res.ok) throw new Error(`Couldn't save the runner key to Drive (${res.status})`);
