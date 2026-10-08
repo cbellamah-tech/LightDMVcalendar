@@ -1,4 +1,5 @@
 import { adsSummary, allAdDays } from "./ads";
+import { attribution } from "./attribution";
 import { getAutoPost } from "./autopost";
 import { kvGet, kvSet } from "./store";
 import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
@@ -52,7 +53,7 @@ async function inbox(force = false) {
   }
 }
 
-export async function marketingDashboard(opts: { week?: string; refresh?: boolean } = {}) {
+export async function marketingDashboard(opts: { week?: string; refresh?: boolean; days?: number } = {}) {
   const today = etDay(Date.now());
   const thisWeek = weekOf(today);
   const week = opts.week ? weekOf(opts.week) : thisWeek;
@@ -98,6 +99,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     inbox: mail,
     feed,
     autopost: (await getAutoPost()).on,
+    attribution: ghl ? attribution(ghl.leads, ghl.opps ?? [], await allAdDays(), opts.days ?? 30, today) : null,
     ads: await adsSummary(),
     cold: { url: SMARTLEAD_URL, latest: await latestCold() },
     media: (await getMedia()).filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),

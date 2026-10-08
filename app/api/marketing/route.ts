@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const area = q.get("area") === "owners" ? "owners" : "marketing";
   if (area === "owners" && s.role !== "owner") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   ensureRunnerFile().catch(() => {});
-  const d = await marketingDashboard({ week: q.get("week") || undefined, refresh: q.get("refresh") === "1" });
+  const d = await marketingDashboard({ week: q.get("week") || undefined, refresh: q.get("refresh") === "1", days: [7, 30, 90].includes(+q.get("days")!) ? +q.get("days")! : 30 });
   return NextResponse.json({
     ...d,
     feed: d.feed.filter((f) => f.area === area),

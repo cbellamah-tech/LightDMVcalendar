@@ -6,9 +6,10 @@ import { CheckCircle2, ExternalLink, Loader2, Wrench } from "lucide-react";
 import { api, fmtDay, fmtTime, Me, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../signs/types";
 import type { CrewPay, Job, Progress } from "./types";
+import { dur } from "./types";
 import DrivePhotos from "./DrivePhotos";
 
-type Row = Job & { progress: Progress; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay };
+type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay };
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
@@ -83,7 +84,7 @@ export default function JobsPage() {
             <span>{fmtDay(jobs[0].start)}</span>
             <DayPay jobs={jobs} office={office} />
           </h3>
-          {jobs.map((j) => <JobCard key={j.id} j={j} office={office} />)}
+          {jobs.map((j) => <JobCard key={j.id} j={j} office={office} gap={office ? gapBefore(j, jobs) : undefined} />)}
         </section>
       ))}
     </div>
@@ -104,7 +105,7 @@ function byDay(list: Row[], crew: string) {
   return [...out.entries()];
 }
 
-function JobCard({ j, fix, office }: { j: Row; fix?: boolean; office?: boolean }) {
+function JobCard({ j, fix, office, gap }: { j: Row; fix?: boolean; office?: boolean; gap?: number }) {
   return (
     <Link href={`/jobs/${j.id}`} className={`block bg-white rounded-xl border p-4 hover:shadow-md ${fix ? "border-amber-300" : "border-slate-200"}`}>
       <div className="flex justify-between gap-2">
@@ -122,6 +123,13 @@ function JobCard({ j, fix, office }: { j: Row; fix?: boolean; office?: boolean }
           </div>
           {fix && j.request && <div className="text-sm font-semibold text-amber-900">{j.request}</div>}
           <div className="text-sm text-slate-500 truncate">{j.address}</div>
+          {office && (j.arrivedAt || j.completedAt) && (
+            <div className="text-xs text-slate-600">
+              {gap != null && <span className="font-semibold">{dur(gap)} since the last job · </span>}
+              {j.arrivedAt ? `Arrived ${clock(j.arrivedAt)}` : ""}{j.completedAt ? `${j.arrivedAt ? " · " : ""}Done ${clock(j.completedAt)}` : ""}
+              {j.arrivedAt && j.completedAt ? ` · ${dur(j.completedAt - j.arrivedAt)} on site` : ""}
+            </div>
+          )}
           {j.pay?.amount != null && (
             <div className="text-sm font-bold text-green-700">{office ? "Crew pay" : "Your crew's pay"} {money(j.pay.amount)}</div>
           )}
@@ -133,6 +141,17 @@ function JobCard({ j, fix, office }: { j: Row; fix?: boolean; office?: boolean }
       </div>
     </Link>
   );
+}
+
+const clock = (t: number) => fmtTime(new Date(t).toISOString());
+
+/** Time between this crew's previous job finishing and this one starting, the same day. */
+function gapBefore(j: Row, dayJobs: Row[]) {
+  if (!j.arrivedAt) return undefined;
+  const prev = dayJobs
+    .filter((x) => x.id !== j.id && (x.crew || x.assignedNames.join()) === (j.crew || j.assignedNames.join()) && x.completedAt && x.completedAt <= j.arrivedAt!)
+    .sort((a, b) => b.completedAt! - a.completedAt!)[0];
+  return prev ? j.arrivedAt - prev.completedAt! : undefined;
 }
 
 /** What the crew makes that day, from the jobs that have a pay figure. */

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Copy, ExternalLink, EyeOff, Loader2, Mail, P
 import { ago, api, fmtDay, NAVY } from "@/components/ui";
 import { Card, Dot, Feed, FeedItem, Light, LIGHT_WORD } from "./parts";
 import { ChannelName, Media, MediaBoard, SheetView } from "./media";
+import { Attribution, OrganicPaid } from "./dashboard";
 
 export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
@@ -18,6 +19,7 @@ type Data = {
   inbox: { at: number; threads: Thread[]; error?: string } | null;
   feed: FeedItem[];
   autopost: boolean;
+  attribution: Attribution | null;
   ads: { facebook: AdSide & { configured: boolean }; google: AdSide; lsa: AdSide; error?: string };
   cold: { url: string; latest: { day: string; sent: number; responses: number; positive: number } | null };
   media: Media[];
@@ -32,14 +34,14 @@ const STALE_MS = 4 * 3600_000;
 
 export default function Marketing() {
   const [d, setD] = useState<Data | null>(null);
-  const [week, setWeek] = useState<string | null>(null);
+  const [days, setDays] = useState(30);
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
   const load = useCallback((refresh = false) =>
-    api<Data>(`/api/marketing?${new URLSearchParams({ ...(week ? { week } : {}), ...(refresh ? { refresh: "1" } : {}) })}`)
-      .then(setD).catch((e) => setMsg(e.message)), [week]);
+    api<Data>(`/api/marketing?${new URLSearchParams({ days: String(days), ...(refresh ? { refresh: "1" } : {}) })}`)
+      .then(setD).catch((e) => setMsg(e.message)), [days]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -75,79 +77,16 @@ export default function Marketing() {
   if (!d) return <div className="p-6 text-slate-500 flex gap-2">{msg || <><Loader2 className="animate-spin" /> Loading marketing...</>}</div>;
   const owner = d.role === "owner";
   const label = (id: string) => d.channels.find((c) => c.id === id)?.label ?? id;
-  const isThisWeek = d.week === d.thisWeek;
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="flex items-center gap-2 flex-wrap pt-2">
         <h1 className="text-2xl font-extrabold flex-1" style={{ color: NAVY }}>Marketing</h1>
-        <div className="flex items-center gap-1 text-sm font-semibold">
-          <button aria-label="Previous week" className="p-1.5 rounded hover:bg-slate-200" onClick={() => setWeek(addDays(d.week, -7))}><ChevronLeft size={18} /></button>
-          <span>{isThisWeek ? "This week" : `Week of ${shortDay(d.week)}`}</span>
-          <button aria-label="Next week" disabled={isThisWeek} className="p-1.5 rounded hover:bg-slate-200 disabled:opacity-30" onClick={() => setWeek(addDays(d.week, 7))}><ChevronRight size={18} /></button>
-        </div>
         <button onClick={() => { setBusy(true); load(true).finally(() => setBusy(false)); }} className="p-2 rounded-md hover:bg-slate-200" aria-label="Refresh" title="Pull fresh numbers">
           <RefreshCw size={18} className={busy ? "animate-spin" : ""} />
         </button>
       </div>
       {msg && <p className="text-sm bg-white border border-slate-200 rounded-lg p-2">{msg}</p>}
-
-      <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} autopost={d.autopost} owner={owner} today={d.today} reload={load} />
-
-      {/* The map: where customers find us, then where leads land */}
-      <section className="rounded-xl border border-slate-200 bg-slate-100 p-3 space-y-3">
-        <div className="text-sm font-bold" style={{ color: NAVY }}>Where customers find us</div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {d.boxes.map((b) => (
-            <button key={b.id} onClick={() => b.id === "cold" ? window.open(d.cold.url, "_blank", "noopener") : setOpen(open === b.id ? null : b.id)}
-              title={b.id === "cold" ? "Opens Smartlead" : "Show what's in it"}
-              className={`text-left bg-white rounded-xl border p-3 hover:shadow ${open === b.id ? "border-slate-500" : "border-slate-200"}`}>
-              <div className="flex items-center gap-2">
-                <Dot l={b.light} />
-                <span className="font-bold flex-1">{b.title}</span>
-                {b.id === "paid" ? <span className="text-sm font-semibold tabular-nums">${b.done.toLocaleString()} spent</span>
-                  : b.goal ? <span className="text-sm font-semibold tabular-nums">{b.done} / {b.goal}</span> : <span className="text-sm tabular-nums">{b.done}</span>}
-              </div>
-              <div className="text-xs text-slate-500 mt-1">{b.id === "cold" && d.cold.latest
-                ? `Last week: ${d.cold.latest.sent.toLocaleString()} sent, ${d.cold.latest.responses} replies, ${d.cold.latest.positive} positive · Open Smartlead ↗`
-                : b.id === "cold" ? `${b.line} · Open Smartlead ↗`
-                : b.id === "paid" && (d.ads.facebook.has || d.ads.google.has) ? adsLine(d.ads) : b.line}</div>
-              <div className="text-xs mt-1 flex gap-1 flex-wrap">
-                <span className="text-slate-500">{LIGHT_WORD[b.light]}</span>
-                {b.bots.map((x) => <span key={x} className="rounded bg-slate-100 px-1.5 text-slate-600">{x} bot</span>)}
-              </div>
-            </button>
-          ))}
-        </div>
-        {open && (
-          <div className="bg-white rounded-xl border border-slate-200 p-3">
-            {open === "paid"
-              ? <><ChannelRows rows={d.channels.filter((c) => c.box === open)} onLog={log} busy={busy} /><AdsPanel ads={d.ads} botBox={d.botBox} /></>
-              : <ChannelRows rows={d.channels.filter((c) => c.box === open)} onLog={log} busy={busy} />}
-          </div>
-        )}
-        <a href={GHL_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 p-3 hover:shadow text-sm">
-          <span className="font-bold">Where leads came from</span>
-          <span className="flex-1 text-xs text-slate-500 truncate">
-            {!d.ghl.configured ? "GoHighLevel isn't connected"
-              : `${d.ghl.weekLeads} new this week${Object.keys(d.ghl.bySource).length ? ": " + Object.entries(d.ghl.bySource).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(" · ") : ""}`}
-          </span>
-          <span className="text-xs underline inline-flex items-center gap-1 shrink-0">GoHighLevel <ExternalLink size={11} /></span>
-        </a>
-        {d.events.length > 0 && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-xs text-slate-600">Recent taps (undo a mistake)</summary>
-            <div className="mt-2 space-y-1">
-              {d.events.slice(0, 12).map((e) => (
-                <div key={e.id} className="flex items-center gap-2 text-xs">
-                  <span className="flex-1">{e.by}: +{e.n} {label(e.channel)} <span className="text-slate-400">{ago(e.at)}</span></span>
-                  <button onClick={() => undo(e.id)} className="p-1 text-slate-400 hover:text-slate-700" aria-label="Undo"><Undo2 size={13} /></button>
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
-      </section>
 
       {(asks.length > 0 || waiting.length > 0) && (
         <Card title={`Needs you (${asks.length + waiting.length})`}>
@@ -161,13 +100,34 @@ export default function Marketing() {
         </Card>
       )}
 
+      <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} />
+
+      <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} autopost={d.autopost} owner={owner} today={d.today} reload={load} />
+
       <Inbox inbox={d.inbox} onHide={hide} />
 
       <SheetView today={d.today} owner={owner} sheetUrl={d.google.sheetUrl} channels={d.channels} onLog={log} busy={busy} />
+      {d.events.length > 0 && (
+        <div className="px-1">
+          <details className="text-sm">
+            <summary className="cursor-pointer text-xs text-slate-600">Recent taps (undo a mistake)</summary>
+            <div className="mt-2 space-y-1">
+              {d.events.slice(0, 12).map((e) => (
+                <div key={e.id} className="flex items-center gap-2 text-xs">
+                  <span className="flex-1">{e.by}: +{e.n} {label(e.channel)} <span className="text-slate-400">{ago(e.at)}</span></span>
+                  <button onClick={() => undo(e.id)} className="p-1 text-slate-400 hover:text-slate-700" aria-label="Undo"><Undo2 size={13} /></button>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
 
-      <Card title="Bot reports">
-        <Feed items={reports} canAnswer={owner} onChange={load} empty="Nothing from the bots yet. Once a bot has the drop box line (Setup below), its results land here." />
-      </Card>
+      {reports.length > 0 && (
+        <Card title="Bot reports">
+          <Feed items={reports} canAnswer={owner} onChange={load} empty="" />
+        </Card>
+      )}
 
       {owner && <Setup d={d} reload={load} />}
     </div>
@@ -219,6 +179,10 @@ function Setup({ d, reload }: { d: Data; reload: () => void }) {
 
   return (
     <Card title="Setup (owners)">
+      <div className="rounded-lg border border-slate-200 p-3">
+        <div className="font-bold text-sm mb-2">Paid ads</div>
+        <AdsPanel ads={d.ads} botBox={d.botBox} />
+      </div>
       <div className="grid md:grid-cols-3 gap-3 text-sm">
         <div className="rounded-lg border border-slate-200 p-3 space-y-1">
           <div className="font-bold">GoHighLevel</div>

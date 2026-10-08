@@ -27,7 +27,8 @@ export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: num
   parts?: Record<string, string>;   // photo url -> part of the job it shows (per-part photos)
   photoBy?: Record<string, string>; // photo url -> who took it
 };
-export type Checklist = { jobId: string; kind: JobKind; items: Record<string, CheckEntry>; completedAt?: number; completedBy?: string; rev: number };
+/** arrivedAt: the arrival photo (or the first box touched when the checklist has none); completedAt is when the job was marked done. */
+export type Checklist = { jobId: string; kind: JobKind; items: Record<string, CheckEntry>; arrivedAt?: number; completedAt?: number; completedBy?: string; rev: number };
 
 const JOBS = "ldmv:jobs";
 const checkKey = (jobId: string) => `ldmv:check:${jobId}`;
@@ -137,14 +138,14 @@ export async function ensureSampleJobs() {
 
 export type MaterialRecord = {
   jobId: string; jobberJobId?: string; jobberVisitId?: string; jobNumber?: number; kind: JobKind; date: string; crew?: string;
-  c9Feet: number; c7Bulbs: number; miniStrands: number; by: string; at: number;
+  c9Feet: number; c7Bulbs: number; miniStrands: number; stakeFeet?: number; by: string; at: number;
 };
 const MATERIALS = "ldmv:materials";
 
 export async function recordMaterials(job: Job, counts: Record<string, number>, by: string) {
   const r: MaterialRecord = {
     jobId: job.id, jobberJobId: job.jobberJobId, jobberVisitId: job.jobberVisitId, jobNumber: job.jobNumber, kind: job.kind, date: job.start, crew: job.crew,
-    c9Feet: counts.c9Feet ?? 0, c7Bulbs: counts.c7Bulbs ?? 0, miniStrands: counts.miniStrands ?? 0, by, at: Date.now(),
+    c9Feet: counts.c9Feet ?? 0, c7Bulbs: counts.c7Bulbs ?? 0, miniStrands: counts.miniStrands ?? 0, stakeFeet: counts.stakeFeet ?? 0, by, at: Date.now(),
   };
   await kvUpdate<Record<string, MaterialRecord>>(MATERIALS, {}, (all) => { all[job.id] = r; return all; });
 }

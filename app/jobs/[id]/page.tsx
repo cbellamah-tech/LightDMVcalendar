@@ -7,6 +7,7 @@ import PhotoButton from "@/components/PhotoButton";
 import { ago, api, fmtDay, fmtTime, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../../signs/types";
 import type { Checklist, CrewPay, Job, JobDetail, Progress, SopItem } from "../types";
+import { dur } from "../types";
 import JobInfo from "./JobInfo";
 import PayLine from "./PayLine";
 
@@ -73,6 +74,14 @@ export default function JobPage({ params }: { params: { id: string } }) {
         <PayLine jobId={job.id} kind={job.kind} pay={d.pay} onChange={(pay) => setD((cur) => (cur ? { ...cur, pay } : cur))} />
       </div>
 
+      {(c.arrivedAt || c.completedAt) && (
+        <div className="text-sm text-slate-600 bg-white rounded-xl border border-slate-200 px-4 py-2">
+          {c.arrivedAt ? <>Arrived {fmtTime(new Date(c.arrivedAt).toISOString())}</> : null}
+          {c.completedAt ? <>{c.arrivedAt ? " · " : ""}Done {fmtTime(new Date(c.completedAt).toISOString())}</> : null}
+          {c.arrivedAt && c.completedAt ? <> · {dur(c.completedAt - c.arrivedAt)} on site</> : null}
+        </div>
+      )}
+
       {detail && <JobInfo d={detail} onView={setViewer} />}
 
       <div className="flex items-center justify-between">
@@ -87,7 +96,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
             <li key={item.id} className={`bg-white rounded-xl border p-3 space-y-2 ${e.done ? "border-green-300" : item.required ? "border-red-200" : "border-slate-200"}`}>
               <div className="flex gap-3 items-start">
                 <button aria-label={e.done ? "Uncheck" : "Check"}
-                  onClick={() => (item.perPart && parts.length ? setToast("Add a photo of each part below; the box checks itself.") : item.photo && !e.photos.length ? setToast("Add a photo first.") : item.counts ? setToast("Fill in the three numbers; the box checks itself.") : update({ itemId: item.id, done: !e.done }))}
+                  onClick={() => (item.perPart && parts.length ? setToast("Add a photo of each part below; the box checks itself.") : item.photo && !e.photos.length ? setToast("Add a photo first.") : update({ itemId: item.id, done: !e.done }))}
                   className={`w-8 h-8 shrink-0 rounded-lg border-2 flex items-center justify-center ${e.done ? "bg-green-600 border-green-600 text-white" : "border-slate-300"}`}>
                   {e.done && <Check size={20} />}
                 </button>
@@ -101,7 +110,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
                 </div>
               </div>
               {item.counts && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {item.counts.map((k) => (
                     <label key={k.key} className="block text-sm">
                       <span className="font-semibold">{k.label}</span>

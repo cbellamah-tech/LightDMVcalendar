@@ -6,7 +6,8 @@ import { etDay } from "@/lib/marketing";
 export const dynamic = "force-dynamic";
 
 /* The daily run hands over what it made.
-   JSON { kind, contentType, title, captions: { facebook, instagram, google, linkedin }, photoIds }
+   JSON { kind, contentType, title, captions: { facebook, instagram, google, linkedin, youtube },
+          listings: { marketplace: { title, body, price }, craigslist: {...} }, photoIds }
      -> { id, uploadUrl }: PUT the file to uploadUrl, then POST /api/marketing/runner/done { id }.
    Small files (and local testing) can come as multipart instead: fields "file" and "meta" (that same JSON). */
 
@@ -14,10 +15,15 @@ const str = (x: unknown, max: number) => (typeof x === "string" ? x.trim().slice
 
 function item(meta: any, url: string, contentType: string, status: MediaItem["status"]): MediaItem {
   const caps: MediaItem["captions"] = {};
-  for (const p of ["facebook", "instagram", "google", "linkedin"] as const) if (str(meta?.captions?.[p], 3000)) caps[p] = str(meta.captions[p], 3000);
+  for (const p of ["facebook", "instagram", "google", "linkedin", "youtube"] as const) if (str(meta?.captions?.[p], 3000)) caps[p] = str(meta.captions[p], 3000);
+  const listings: MediaItem["listings"] = {};
+  for (const site of ["marketplace", "craigslist"] as const) {
+    const l = meta?.listings?.[site];
+    if (str(l?.title, 150) && str(l?.body, 4000)) listings[site] = { title: str(l.title, 150), body: str(l.body, 4000), price: str(l.price, 20) || undefined };
+  }
   return {
     id: newMediaId(), day: etDay(Date.now()), kind: meta?.kind === "photo" ? "photo" : "video", url, contentType,
-    title: str(meta?.title, 120) || "Today's video", captions: caps,
+    title: str(meta?.title, 120) || "Today's video", captions: caps, listings,
     photoIds: Array.isArray(meta?.photoIds) ? meta.photoIds.map(String).slice(0, 30) : [],
     createdAt: Date.now(), by: str(meta?.by, 40) || "Daily video run", status,
   };

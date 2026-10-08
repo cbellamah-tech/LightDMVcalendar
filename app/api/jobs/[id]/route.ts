@@ -40,7 +40,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, pay, parts });
 }
 
-/* Body: { itemId, done?, addPhotos?: string[], part?: string (which part of the job the photos show), removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands } } or { complete: true } or { reopen: true } */
+/* Body: { itemId, done?, addPhotos?: string[], part?: string (which part of the job the photos show), removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands, stakeFeet } } or { complete: true } or { reopen: true } */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const s = await requireRole();
   if (s instanceof NextResponse) return s;
@@ -103,19 +103,25 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         }
       }
     }
-    const countsMissing = item.counts?.filter((k) => e.counts?.[k.key] == null) ?? [];
+    const countsEntered = !!item.counts?.some((k) => e.counts?.[k.key] != null);
     if (typeof b.done === "boolean") {
       if (b.done && item.photo && !e.photos.length) return NextResponse.json({ error: "Add a photo first." }, { status: 400 });
       if (b.done && item.noteRequired && !e.note) return NextResponse.json({ error: `${item.noteLabel || "Note"}: fill it in first.` }, { status: 400 });
       if (b.done && partsMissing.length) return NextResponse.json({ error: `Still need a photo of: ${partsMissing.join("; ")}` }, { status: 400 });
-      if (b.done && countsMissing.length) return NextResponse.json({ error: `Fill in: ${countsMissing.map((k) => k.label).join("; ")}` }, { status: 400 });
       e.done = b.done;
     }
     if (item.photo && !e.photos.length) e.done = false;
     if (item.noteRequired && !e.note) e.done = false;
     if (item.perPart) e.done = e.photos.length > 0 && !partsMissing.length; // checks itself once every part has a photo
-    if (item.counts) e.done = !countsMissing.length; // the box is the counts: checked once all three are in
+    // Materials are "if any": the box checks itself once a number is in, and ticking it with all blank means none used.
+    if (item.counts) {
+      if (b.done === false) e.done = false;
+      else if (b.done === true || countsEntered) { e.done = true; for (const k of item.counts) (e.counts ??= {})[k.key] ??= 0; }
+    }
     e.by = s.uid; e.byName = s.name; e.at = Date.now();
+    // Time on site: arrival is the arrival photo, or the first box touched on a checklist without one.
+    const arrivalItem = sop.items.find((i) => i.id === "arrival-photo");
+    if (!c.arrivedAt && (arrivalItem ? item.id === arrivalItem.id && e.photos.length > 0 : true)) c.arrivedAt = Date.now();
     if (!e.done && item.required) { c.completedAt = undefined; c.completedBy = undefined; }
   }
   c.rev = (c.rev || 0) + 1;

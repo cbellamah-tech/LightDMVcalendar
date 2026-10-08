@@ -37,9 +37,11 @@ function listIn(j: any, keys: string[]): any[] {
 
 export type GhlAccount = { id: string; platform: string; name: string; expired?: boolean };
 export type GhlPost = { platform: string; day: string; text: string; status: string };
-export type GhlLead = { id: string; name: string; source: string; tags: string[]; day: string; at: number; phone?: string; email?: string };
+export type GhlLead = { id: string; name: string; source: string; tags: string[]; day: string; at: number; phone?: string; email?: string; attr?: string };
+/** One deal, slimmed down for attribution: where it came from, how far it got, what it's worth. */
+export type GhlOpp = { id: string; contactId: string; source: string; status: string; stage: string; pipeline: string; value: number; day: string; closedDay?: string };
 export type GhlStage = { name: string; count: number; value: number; pipeline?: string };
-export type GhlSnap = { at: number; accounts: GhlAccount[]; posts: GhlPost[]; leads: GhlLead[]; pipeline: GhlStage[]; errors: string[] };
+export type GhlSnap = { at: number; accounts: GhlAccount[]; posts: GhlPost[]; leads: GhlLead[]; pipeline: GhlStage[]; opps?: GhlOpp[]; errors: string[] };
 
 async function accounts(): Promise<GhlAccount[]> {
   const j = await ghl(`/social-media-posting/${loc()}/accounts`);
@@ -72,35 +74,51 @@ async function posts(accts: GhlAccount[], since: Date): Promise<GhlPost[]> {
   return out;
 }
 
-async function leads(): Promise<GhlLead[]> {
-  let list: any[];
-  try {
-    const j = await ghl(`/contacts/search`, {
-      method: "POST",
-      body: { locationId: loc(), pageLimit: 100, sort: [{ field: "dateAdded", direction: "desc" }] },
-    });
-    list = listIn(j, ["contacts"]);
-  } catch {
-    list = listIn(await ghl(`/contacts/?locationId=${encodeURIComponent(loc())}&limit=100`), ["contacts"]);
+const attrText = (a: any) => (a ? [a.sessionSource, a.medium, a.utmSource, a.utmMedium, a.utmCampaign, a.gclid ? "gclid" : "", a.fbclid ? "fbclid" : ""] : [])
+  .filter(Boolean).join(" ").slice(0, 200);
+
+/** Contacts added in the last 120 days (newest first, up to 2,000). */
+async function leads(since: Date): Promise<GhlLead[]> {
+  const out: any[] = [];
+  for (let page = 1; page <= 20; page++) {
+    let list: any[];
+    try {
+      const j = await ghl(`/contacts/search`, {
+        method: "POST",
+        body: { locationId: loc(), page, pageLimit: 100, sort: [{ field: "dateAdded", direction: "desc" }] },
+      });
+      list = listIn(j, ["contacts"]);
+    } catch (e) {
+      if (page > 1) break;
+      list = listIn(await ghl(`/contacts/?locationId=${encodeURIComponent(loc())}&limit=100`), ["contacts"]);
+      out.push(...list);
+      break;
+    }
+    out.push(...list);
+    const last = Date.parse(list[list.length - 1]?.dateAdded ?? "") || 0;
+    if (list.length < 100 || (last && last < since.getTime())) break;
   }
-  return list
+  return out
     .map((c: any) => {
       const at = Date.parse(c.dateAdded ?? c.createdAt ?? "") || 0;
       const name = c.contactName || [c.firstName, c.lastName].filter(Boolean).join(" ") || c.companyName || c.email || c.phone || "Unnamed";
-      return { id: String(c.id), name: String(name), source: String(c.source ?? c.attributionSource?.medium ?? ""), tags: (c.tags ?? []).map(String), day: at ? etDay(at) : "", at, phone: c.phone, email: c.email };
+      return {
+        id: String(c.id), name: String(name), source: String(c.source ?? c.attributionSource?.medium ?? ""), tags: (c.tags ?? []).map(String),
+        day: at ? etDay(at) : "", at, phone: c.phone, email: c.email, attr: attrText(c.attributionSource ?? c.lastAttributionSource),
+      };
     })
     .filter((c) => c.at)
     .sort((a, b) => b.at - a.at);
 }
 
 /** Open deals per stage, kept per pipeline (Light DMV runs several: sales, cold leads, permanent lighting...). */
-async function pipeline(): Promise<GhlStage[]> {
+async function pipeline(opps: GhlOpp[] = []): Promise<GhlStage[]> {
   const pj = await ghl(`/opportunities/pipelines?locationId=${encodeURIComponent(loc())}`);
   const stage = new Map<string, { pipeline: string; name: string; i: number }>();
   for (const p of listIn(pj, ["pipelines"]))
     (p.stages ?? []).forEach((st: any, i: number) => stage.set(st.id, { pipeline: String(p.name ?? "Pipeline"), name: String(st.name), i }));
   const counts = new Map<string, GhlStage & { i: number }>();
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; page <= 20; page++) {
     const j = await ghl(`/opportunities/search?location_id=${encodeURIComponent(loc())}&limit=100&page=${page}`);
     const list = listIn(j, ["opportunities"]);
     for (const o of list) {
@@ -109,6 +127,14 @@ async function pipeline(): Promise<GhlStage[]> {
       const c = counts.get(key) ?? { pipeline: st.pipeline, name: st.name, count: 0, value: 0, i: st.i };
       c.count++; c.value += Number(o.monetaryValue) || 0;
       counts.set(key, c);
+      const created = Date.parse(o.createdAt ?? o.dateAdded ?? "") || 0;
+      const closed = Date.parse(o.lastStatusChangeAt ?? o.updatedAt ?? "") || 0;
+      if (created) opps.push({
+        id: String(o.id), contactId: String(o.contactId ?? o.contact?.id ?? ""),
+        source: [o.source, ...(o.contact?.tags ?? [])].filter(Boolean).join(" ").slice(0, 200),
+        status: String(o.status ?? "open").toLowerCase(), stage: st.name, pipeline: st.pipeline, value: Number(o.monetaryValue) || 0,
+        day: etDay(created), closedDay: closed ? etDay(closed) : undefined,
+      });
     }
     if (list.length < 100) break;
   }
@@ -131,9 +157,10 @@ export async function refreshGhl(maxAgeMs = 10 * 60_000): Promise<GhlSnap | null
   const since = new Date(Date.now() - 120 * 86400_000); // back to early June: the whole campaign season
   const accts = await accounts().catch((e) => { errors.push(e.message); return cur?.accounts ?? []; });
   const ps = await posts(accts, since).catch((e) => { errors.push(e.message); return cur?.posts ?? []; });
-  const ls = await leads().catch((e) => { errors.push(e.message); return cur?.leads ?? []; });
-  const pl = await pipeline().catch((e) => { errors.push(e.message); return cur?.pipeline ?? []; });
-  const snap: GhlSnap = { at: Date.now(), accounts: accts, posts: ps, leads: ls, pipeline: pl, errors };
+  const ls = await leads(since).catch((e) => { errors.push(e.message); return cur?.leads ?? []; });
+  const opps: GhlOpp[] = [];
+  const pl = await pipeline(opps).catch((e) => { errors.push(e.message); return cur?.pipeline ?? []; });
+  const snap: GhlSnap = { at: Date.now(), accounts: accts, posts: ps, leads: ls, pipeline: pl, opps: opps.length ? opps : cur?.opps ?? [], errors };
   await kvSet(SNAP, snap);
   return snap;
 }
