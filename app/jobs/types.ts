@@ -17,13 +17,16 @@ export type JobDetail = {
   notes: { from: "job" | "quote"; message: string; at?: string; files: DetailFile[] }[];
   clientTags: string[]; otherJobs: { jobNumber?: number; title?: string; createdAt?: string }[];
   repeat: boolean; repeatWhy?: string; bins: string[];
+  quoteMockups?: string[];
   drive: {
     bins: { bin: string; status: string; source: string }[];
-    photos: { fileId: string; title: string; year: number; bin: string | null; thumb: string; link: string; sure: boolean }[];
+    photos: DrivePhoto[];
+    installPhotos?: DrivePhoto[];
     indexedAt: string | null;
   };
 };
 export type CrewPay = { amount: number | null; how: "set" | "rule" | "unknown" };
+export type DrivePhoto = { fileId: string; title: string; year: number; bin: string | null; thumb: string; link: string; sure: boolean };
 
 /** "3 h 28 m" */
 export const dur = (ms: number) => { const m = Math.max(0, Math.round(ms / 60000)); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} m` : `${m} m`; };

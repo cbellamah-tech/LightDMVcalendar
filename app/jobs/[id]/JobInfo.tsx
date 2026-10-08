@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, FileText, Image as ImageIcon, Package, StickyNote } from "lucide-react";
 import { NAVY } from "@/components/ui";
-import type { DetailFile, JobDetail } from "../types";
+import type { DetailFile, DrivePhoto, JobDetail } from "../types";
 
 /** Everything the crew needs from Jobber and Drive: repeat or new, bin, last takedown photos, notes, line items. No prices. */
 export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: string) => void }) {
@@ -29,21 +29,8 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
         {d.repeatWhy && <p className="text-xs text-slate-500">{d.repeatWhy}.</p>}
         {d.repeat && !bins.length && <p className="text-xs text-amber-700">No bin number found in Jobber notes or the bin list. Check the storage unit.</p>}
 
-        {d.drive.photos.length > 0 && (
-          <div>
-            <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">Last takedown photos</div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {d.drive.photos.slice(0, 8).map((p) => (
-                <a key={p.fileId} href={p.link} target="_blank" rel="noreferrer" className="shrink-0 w-28">
-                  <img src={p.thumb} alt={p.title} className="w-28 h-28 object-cover rounded-lg bg-slate-100"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  <div className="text-[11px] text-slate-500 truncate">{p.year} · {p.title}{p.sure ? "" : " (possible)"}</div>
-                </a>
-              ))}
-            </div>
-            <p className="text-[11px] text-slate-400">Opens in Google Drive. Sign in with the Light DMV Google account if it asks.</p>
-          </div>
-        )}
+        <PhotoStrip title="Last takedown photos" photos={d.drive.photos} onView={onView} />
+        <PhotoStrip title="Last season's finished install" photos={d.drive.installPhotos ?? []} onView={onView} />
       </div>
 
       {(d.instructions || d.notes.length > 0) && (
@@ -69,12 +56,36 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
               <Files files={l.images} onView={onView} />
             </div>
           ))}
+          {!!d.quoteMockups?.length && (
+            <div className="border-t border-slate-100 pt-2">
+              <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">Mockups from the signed quote</div>
+              <Files files={d.quoteMockups.map((url, i) => ({ name: `Mockup ${i + 1}`, url, image: true }))} onView={onView} />
+            </div>
+          )}
           {lines.length > shown.length && (
             <button className="text-sm underline text-slate-600" onClick={() => setAllLines(true)}>Show all {lines.length}</button>
           )}
         </div>
       )}
       {d.error && <p className="text-xs text-slate-400">Couldn't refresh from Jobber just now ({d.error}).</p>}
+    </div>
+  );
+}
+
+function PhotoStrip({ title, photos, onView }: { title: string; photos: DrivePhoto[]; onView: (url: string) => void }) {
+  if (!photos.length) return null;
+  return (
+    <div>
+      <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">{title}</div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {photos.slice(0, 8).map((p) => (
+          <button key={p.fileId} onClick={() => onView(p.link)} className="shrink-0 w-28 text-left">
+            <img src={p.thumb} alt={p.title} loading="lazy" className="w-28 h-28 object-cover rounded-lg bg-slate-100"
+              onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }} />
+            <div className="text-[11px] text-slate-500 truncate">{p.year || ""}{p.bin ? ` · bin ${p.bin}` : ""}{p.sure ? "" : " (possible)"}</div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

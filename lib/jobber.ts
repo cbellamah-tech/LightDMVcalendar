@@ -216,6 +216,9 @@ export async function syncJobber(detailLimit = 25): Promise<number> {
     await kvSet<SyncStatus>(STATUS, { ...(await getStatus()), lastSyncAt: Date.now(), lastCount: jobs.length, lastError: undefined });
     // Notes, line items and client history for each job, a batch at a time (oldest first).
     const { refreshStaleDetails } = await import("./jobDetails");
+    // Bin lists and takedown / install photos straight from Drive first, so each job's photos match on this pass.
+    const { syncDriveIndex } = await import("./driveSync");
+    await syncDriveIndex().catch(() => {});
     await refreshStaleDetails(jobs.map((j) => j.jobberJobId!).filter(Boolean), detailLimit).catch(() => {});
     return jobs.length;
   } catch (e: any) {

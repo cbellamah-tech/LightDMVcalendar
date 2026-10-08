@@ -37,7 +37,7 @@ export function PackUpload({ onDone }: { onDone?: () => void }) {
       <div className="font-bold">Course content</div>
       <p className="text-sm text-slate-600">
         {info?.builtAt
-          ? `Loaded: the file built ${new Date(info.builtAt).toLocaleString()}. Quote course ${info.modules} modules, ${info.practice} real jobs. ${info.install ? `Installer course ${info.install} modules.` : "No installer course in it; upload the newest training_pack.json."}`
+          ? `Loaded: the file built ${new Date(info.builtAt).toLocaleString()}. Quote course ${info.modules} modules, ${info.practice} practice houses. ${info.install ? `Installer course ${info.install} modules.` : "No installer course in it; upload the newest training_pack.json."}`
           : "Not loaded yet. Upload training_pack.json to turn the course on."}
       </p>
       <label className="inline-block rounded-lg px-4 py-2 font-semibold border border-slate-300 cursor-pointer text-sm">

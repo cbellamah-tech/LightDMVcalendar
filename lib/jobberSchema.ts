@@ -61,3 +61,20 @@ export async function buildSelection(gql: <T>(q: string, v: Record<string, unkno
 
 /** Rows from a connection ({ nodes }), a plain list, or a single object. */
 export const rows = (x: any): any[] => (x == null ? [] : Array.isArray(x) ? x : Array.isArray(x.nodes) ? x.nodes : [x]);
+
+/** Names of the fields on `typeName` whose name matches `re` (e.g. any photo or file field Jobber adds to line items). */
+export async function fieldsMatching(gql: <T>(q: string, v: Record<string, unknown>) => Promise<T>, typeName: string, re: RegExp): Promise<string[]> {
+  const t = await typeInfo(gql, typeName);
+  return (t?.fields ?? []).map((f) => f.name).filter((n) => re.test(n));
+}
+
+/** The type a field on `typeName` returns, unwrapped from lists and connections' `nodes`. */
+export async function fieldType(gql: <T>(q: string, v: Record<string, unknown>) => Promise<T>, typeName: string, field: string): Promise<string | null> {
+  const t = await typeInfo(gql, typeName);
+  const f = t?.fields.find((x) => x.name === field);
+  if (!f) return null;
+  const inner = named(f.type).name!;
+  const conn = await typeInfo(gql, inner);
+  const nodes = conn?.fields.find((x) => x.name === "nodes");
+  return nodes ? named(nodes.type).name : inner;
+}
