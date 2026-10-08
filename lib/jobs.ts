@@ -38,8 +38,12 @@ export const isFixTitle = (title?: string) => /^\s*service\b/i.test(title || "")
 
 /** Takedown if the title says so, otherwise install (Jan to Mar defaults to takedown). Fixes are decided by the caller. */
 export function kindFor(title: string, start: string): JobKind {
-  if (/take ?down|removal|remove|teardown/i.test(title)) return "takedown";
-  if (/install/i.test(title)) return "install";
+  // Most Jobber titles name the whole service ("Installation, Maintenance, Takedown, and Storage"), so a title that
+  // says both goes by the visit date: January to March is the takedown, the rest of the year the install.
+  const down = /take ?down|removal|remove|teardown/i.test(title);
+  const up = /install/i.test(title);
+  if (down && !up) return "takedown";
+  if (up && !down) return "install";
   const m = new Date(start).getMonth();
   return m <= 2 ? "takedown" : "install";
 }
@@ -57,7 +61,12 @@ export function crewFor(names: string[], users: User[]): string | undefined {
   return undefined;
 }
 
-export const getJobs = async () => (await kvGet<Record<string, Job>>(JOBS)) ?? {};
+export async function getJobs() {
+  const all = (await kvGet<Record<string, Job>>(JOBS)) ?? {};
+  // Jobs saved before kindFor learned full-service titles were stored as takedowns; correct them on read.
+  for (const j of Object.values(all)) if (j.kind !== "fix") j.kind = kindFor(j.title, j.start);
+  return all;
+}
 
 export async function upsertJobs(jobs: Job[], removeSourceIn?: { source: Job["source"]; from: string; to: string }) {
   await kvUpdate<Record<string, Job>>(JOBS, {}, (all) => {
