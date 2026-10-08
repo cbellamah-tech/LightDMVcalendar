@@ -38,7 +38,7 @@ export async function knownFiles() {
   return Object.values(lib).flat().map((m) => m.file);
 }
 
-/** The customer's mockups: first initial plus the whole last name ("Jane Gibbons-Kincaid" = J_Gibbons_Kincaid). */
+/** The customer's mockups: first initial plus the whole last name ("Jane Doe-Roe" = J_Doe_Roe). */
 export function mockupsFor(lib: Library, clientName: string): Mockup[] {
   const w = norm(clientName).split(" ").filter(Boolean);
   if (w.length < 2) return [];
