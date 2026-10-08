@@ -27,14 +27,14 @@ export type JobDetail = {
   repeatWhy?: string;
   bins: string[];           // bin numbers written in Jobber notes
   value?: number;           // pre-tax job total, server-side only (crew pay); withDrive drops it
-  quotePdf?: string;        // Jobber link to the signed quote PDF, server-side only (its mockups are copied out)
-  quoteMockups?: string[];  // mockups copied out of the signed quote that couldn't be tied to one line
+  quoteId?: string;         // the Jobber quote the job came from
+  quoteMockups?: string[];  // designs that aren't tied to one line (the AI whole-house picture, extra designs)
   imgv?: number;            // photo import version this detail was pulled with
-  photoInfo?: string;
-  quoteLines?: { name: string; description?: string }[]; // the quote's lines in order (Light Design Hero designs follow them)       // where the line photos came from (or why there are none), shown small on the job page
+  photoInfo?: string;       // where the line photos came from (or why there are none), shown small on the job page
+  quoteLines?: { name: string; description?: string }[]; // the quote's lines in order (Light Design Hero designs follow them)
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
-const IMGV = 3;
+const IMGV = 4;
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
 export const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
@@ -117,8 +117,6 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
     ...rows(quote.notes).map((n: any) => ({ from: "quote" as const, message: n.message || "", at: n.createdAt, files: filesOf(n) })),
     ...rows(j.notes).map((n: any) => ({ from: "job" as const, message: n.message || "", at: n.createdAt, files: filesOf(n) })),
   ];
-  // The signed quote PDF carries the line item mockups; it is read on the server, never shown as a note.
-  const quotePdf = allNotes.flatMap((n) => n.files).find((f) => SIGNED_PDF.test(f.name))?.url;
   const notes = allNotes.map(crewNote).filter((n) => n.message.trim() || n.files.length);
   const text = [j.instructions, quote.message, ...notes.map((n) => n.message), ...lines.map((l) => `${l.name} ${l.description || ""}`)].join("\n");
   const bins = [...new Set([...text.matchAll(BIN_RE)].map((m) => m[1]))];
@@ -135,9 +133,9 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
   return {
     // The quote's customer message (our service agreement) is for the customer, not the crew, so it is never sent.
     createdAt: j.createdAt, instructions: j.instructions && !isContract(j.instructions) ? j.instructions : undefined,
-    quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined,
+    quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined, quoteId: quote.id || undefined,
     lines, notes, clientName: client.name, clientTags: rows(client.tags).map((t: any) => t.label).filter(Boolean),
-    otherJobs, repeat, repeatWhy, bins, value: jobValue(j), quotePdf,
+    otherJobs, repeat, repeatWhy, bins, value: jobValue(j),
     quoteLines: quoteLines.map((x: any) => ({ name: String(x.name || ""), description: x.description || undefined })),
   };
 }
@@ -165,10 +163,10 @@ export async function fetchJobDetail(jobberJobId: string): Promise<JobDetail> {
   try {
     const r = await gql<{ job: any }>(await jobQuery(), { id: jobberJobId });
     d = { fetchedAt: Date.now(), imgv: IMGV, ...parse(r.job || {}) };
-    // Copy line item photos and the signed quote's mockups into our photo storage (Jobber's links expire).
+    // Copy any Jobber pictures into our photo storage (Jobber's links expire).
     const { importJobImages } = await import("./jobImages");
     const base = d;
-    d = await importJobImages(d, await kvGet<JobDetail>(key(jobberJobId))).catch((e) => ({ ...base, photoInfo: `photo import failed: ${e?.message || e}` }));
+    d = await importJobImages(d).catch((e) => ({ ...base, photoInfo: `photo import failed: ${e?.message || e}` }));
   } catch (e: any) {
     selCache = null;
     const prev = await kvGet<JobDetail>(key(jobberJobId));
@@ -198,17 +196,20 @@ export function withDrive(idx: DriveIndex, d: JobDetail | null, clientName: stri
   const base = d ?? { fetchedAt: 0, lines: [], notes: [], clientTags: [], otherJobs: [], repeat: false, bins: [] };
   const drive = driveFor(idx, clientName || base.clientName || "", base.bins);
   const repeat = base.repeat || drive.bins.length > 0 || drive.photos.length > 0 || drive.installPhotos.length > 0;
-  const { value: _value, quotePdf: _pdf, quoteLines: _ql, ...shown } = base; // never send the job's price (or the signed quote) to the browser
+  const { value: _value, quoteLines: _ql, quoteId: _q, ...shown } = base; // never send the job's price to the browser
+  delete (shown as any).quotePdf; // saved by an older version
   if (lib) {
-    // Light Design Hero mockups from the owners' library, on the lines Jobber gave no photo for.
-    const mine = mockupsFor(lib, clientName || base.clientName || "");
+    // Light Design Hero designs (from Google Drive), on the lines Jobber gave no photo for.
+    const who = clientName || base.clientName || "";
+    const mine = mockupsFor(lib, who);
     if (mine.length) {
       const { lines, extra } = attachMockups(shown.lines, mine, base.quoteLines);
       shown.lines = lines;
-      shown.quoteMockups = [...extra, ...(shown.quoteMockups ?? [])];
-      shown.photoInfo = `${mine.length} Light Design Hero mockup${mine.length === 1 ? "" : "s"} for this customer`;
+      shown.quoteMockups = extra;
+      shown.photoInfo = `${mine.length} Light Design Hero design${mine.length === 1 ? "" : "s"} for this customer`;
     } else if (!shown.lines.some((l) => l.images.length)) {
-      shown.photoInfo = `no Light Design Hero mockups found for ${clientName || base.clientName || "this customer"} (add them on the Jobber tab)` + (shown.photoInfo ? `; ${shown.photoInfo}` : "");
+      shown.quoteMockups = [];
+      shown.photoInfo = `no Light Design Hero designs for ${who || "this customer"} in Google Drive yet`;
     }
   }
   return { ...shown, drive, repeat, repeatWhy: base.repeatWhy || (repeat ? "On last season's bin list" : undefined) };

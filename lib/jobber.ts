@@ -82,13 +82,13 @@ export async function gql<T>(query: string, variables: Record<string, unknown>):
   }
 }
 
-async function gqlOnce<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+async function gqlOnce<T>(query: string, variables: Record<string, unknown>, version = VERSION): Promise<T> {
   const res = await fetch(GQL_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${await accessToken()}`,
-      "X-JOBBER-GRAPHQL-VERSION": VERSION,
+      "X-JOBBER-GRAPHQL-VERSION": version,
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -103,6 +103,9 @@ async function gqlOnce<T>(query: string, variables: Record<string, unknown>): Pr
   }
   return j.data as T;
 }
+
+/** One query against another API version, to see what a newer version offers without moving the whole app to it. */
+export const gqlAt = <T>(query: string, variables: Record<string, unknown>, version: string) => gqlOnce<T>(query, variables, version);
 
 /** Download a Jobber file (some file links need the app's sign-in, some refuse it). */
 export async function jobberFile(url: string): Promise<Response> {
@@ -226,8 +229,9 @@ export async function syncJobber(detailLimit = 25): Promise<number> {
     // Notes, line items and client history for each job, a batch at a time (oldest first).
     const { refreshStaleDetails } = await import("./jobDetails");
     // Bin lists and takedown / install photos straight from Drive first, so each job's photos match on this pass.
-    const { syncDriveIndex } = await import("./driveSync");
+    const { syncDriveIndex, syncDriveMockups } = await import("./driveSync");
     await syncDriveIndex().catch(() => {});
+    await syncDriveMockups().catch(() => {});
     await refreshStaleDetails(jobs.map((j) => j.jobberJobId!).filter(Boolean), detailLimit).catch(() => {});
     return jobs.length;
   } catch (e: any) {

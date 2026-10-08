@@ -52,8 +52,8 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
           <p className="text-xs text-slate-500">Line photos: {d.photoInfo || (d.error ? `couldn't reach Jobber (${d.error})` : "not checked yet, refresh in a minute")}.</p>
           {!!d.quoteMockups?.length && (
             <div className="pb-1">
-              <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">Mockups from the signed quote</div>
-              <Files files={d.quoteMockups.map((url, i) => ({ name: `Mockup ${i + 1}`, url, image: true }))} onView={onView} />
+              <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">Whole-house design</div>
+              <Files files={d.quoteMockups.map((url, i) => ({ name: `Design ${i + 1}`, url, image: true }))} onView={onView} />
             </div>
           )}
           {shown.map((l, i) => (

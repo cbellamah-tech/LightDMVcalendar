@@ -1,13 +1,15 @@
 import { gapi, googleStatus } from "./google";
 import { loadDriveIndex, saveDriveIndex } from "./drive";
 import { kvGet, kvSet } from "./store";
+import { loadLibrary, parseMockupName, setDriveMockups } from "./mockups";
 
 /* Builds the Drive index (bin lists, takedown photos, finished-install photos) straight from Light DMV's Google Drive
    with the app's Google connection, so nobody uploads drive_index.json any more. Files are found by name at runtime
    (customer names and Drive ids never go in the code):
      bin sheets      Google Sheets whose name has "Bins" ("2026 Bins", "Storage unit bins"): box # | name | status
-     takedown photos folders whose name has "Takedown" ("2025 Holiday Takedown"): "418-Haney.heic" = bin 418, "LL-Name" = no bin
-     install photos  folders named "<year> Holiday Lighting": "Copy of Jane Doe.heic" = that customer's finished install */
+     takedown photos folders whose name has "Takedown" ("2025 Holiday Takedown"): "418-Doe.heic" = bin 418, "LL-Name" = no bin
+     install photos  folders named "<year> Holiday Lighting": "Copy of Jane Doe.heic" = that customer's finished install
+     designs         Light Design Hero downloads anywhere in Drive ("J_Doe_Design1.png"), synced from each quoting computer */
 
 const DRIVE = "https://www.googleapis.com/drive/v3/files";
 const STATUS = "ldmv:drive:auto";
@@ -33,7 +35,7 @@ async function list(q: string, fields = "id,name,mimeType"): Promise<any[]> {
 const year = (s: string) => Number(s.match(/20\d\d/)?.[0]) || 0;
 const base = (title: string) => title.replace(/\.[a-z0-9]{2,5}$/i, "").replace(/^copy of\s+/i, "").trim();
 
-/** "418-Haney" → bin 418, label Haney; "LL-Dominguez" → no bin. */
+/** "418-Doe" → bin 418, label Doe; "LL-Roe" → no bin. */
 export function parseTakedown(title: string) {
   const t = base(title);
   const m = t.match(/^(\d{1,4}[a-z]?)\s*[-_ ]\s*(.+)$/i);
@@ -67,7 +69,7 @@ async function readPhotos() {
     if (!isTakedown && !/^\s*20\d\d holiday lighting\s*$/i.test(f.name)) continue;
     const y = year(f.name);
     const add = (p: any, folderLabel?: string) => {
-      // A photo inside a customer's own subfolder ("418-Haney/IMG_1234.heic") takes the folder's name.
+      // A photo inside a customer's own subfolder ("418-Doe/IMG_1234.heic") takes the folder's name.
       const named = folderLabel && /^(img|photo|image|dsc|pxl)[-_ ]?\d|^photo-output|^\d+$/i.test(base(p.name)) ? folderLabel : base(p.name);
       if (isTakedown) takedown.push({ fileId: p.id, title: p.name, year: y, ...parseTakedown(named) });
       else install.push({ fileId: p.id, title: p.name, year: y, bin: null, label: named });
@@ -103,6 +105,43 @@ export async function syncDriveIndex(force = false): Promise<DriveSyncStatus> {
   } catch (e: any) {
     const s = { ...prev, at: Date.now() - MAX_AGE + 30 * 60_000, error: e.message }; // try again in half an hour
     await kvSet(STATUS, s);
+    return s;
+  }
+}
+
+const MOCKUPS = "ldmv:drive:mockups";
+export type MockupSyncStatus = { at?: number; error?: string; files?: number; customers?: number; copied?: number };
+export const mockupSyncStatus = async () => (await kvGet<MockupSyncStatus>(MOCKUPS)) ?? {};
+
+/** Light Design Hero designs anywhere in the company Drive (each quoting computer's Downloads folder, synced by Google
+ *  Drive for desktop), into the design library every job reads. Every 20 minutes at most, or now with force. */
+export async function syncDriveMockups(force = false): Promise<MockupSyncStatus> {
+  const prev = await mockupSyncStatus();
+  if (!force && prev.at && Date.now() - prev.at < 20 * 60_000) return prev;
+  if (!(await googleStatus()).connected) return prev;
+  try {
+    // Drive's name search only matches the start of words, so list the pictures and keep the ones named like a design.
+    const files = (await list(`mimeType contains 'image/' and trashed = false`, "id,name,modifiedTime"))
+      .filter((f) => parseMockupName(f.name))
+      .map((f) => ({ file: String(f.name), driveId: String(f.id), at: Date.parse(f.modifiedTime) || 0 }));
+    await setDriveMockups(files);
+    // Copy the newest ones into photo storage now so jobs open fast; the rest are copied the first time a job shows them.
+    const { copyDrivePhoto, driveCopyKey } = await import("./jobImages");
+    const lib = await loadLibrary();
+    const inUse = Object.values(lib).flat().filter((m) => m.driveId).sort((a, b) => b.at - a.at);
+    const started = Date.now();
+    let copied = 0;
+    for (const m of inUse) {
+      if (Date.now() - started > 15_000) break;
+      if (await kvGet<string>(driveCopyKey(m.driveId!))) continue;
+      if (await copyDrivePhoto(m.driveId!).then(() => true, () => false)) copied++;
+    }
+    const s: MockupSyncStatus = { at: Date.now(), files: inUse.length, customers: Object.values(lib).filter((l) => l.some((m) => m.driveId)).length, copied };
+    await kvSet(MOCKUPS, s);
+    return s;
+  } catch (e: any) {
+    const s = { ...prev, at: Date.now() - 15 * 60_000, error: e.message }; // try again in 5 minutes
+    await kvSet(MOCKUPS, s);
     return s;
   }
 }

@@ -1,12 +1,14 @@
 import { kvGet, kvUpdate } from "./store";
 import type { DetailLine } from "./jobDetails";
 
-/* Light Design Hero mockups, as downloaded before they go on a Jobber quote: "A_Name_Design1.png" is the first line
-   item's mockup for A. Name, "..._Design1_AI.png" the combined AI picture of the whole house. Jobber's API doesn't
-   hand out line item photos, so an owner drops these files on the Jobber tab once; they're kept in photo storage and paired
-   to each job by the customer's first initial and last name. Customer names stay in the database, never the code. */
+/* Light Design Hero designs, as downloaded before they go on a Jobber quote: "A_Name_Design1.png" is the first line
+   item's design for A. Name, "..._Design1_AI.png" the combined AI picture of the whole house. Jobber's API doesn't hand
+   out line item photos (and its quote PDF leaves them out), so the designs are read where they are made: each quoting
+   computer's Downloads folder synced to the company Google Drive, picked up by lib/driveSync.ts. Files can still be
+   added by hand on the Jobber tab. Each job pairs by the customer's first initial and last name; names stay in the
+   database, never the code. */
 
-export type Mockup = { n: number; ai: boolean; url: string; file: string; at: number };
+export type Mockup = { n: number; ai: boolean; url: string; file: string; at: number; driveId?: string };
 type Library = Record<string, Mockup[]>; // "a name" -> mockups
 const KEY = "ldmv:mockups";
 
@@ -31,6 +33,26 @@ export async function addMockup(file: string, url: string) {
     lib[p.who] = list.sort((a, b) => a.n - b.n || Number(a.ai) - Number(b.ai));
   });
 }
+
+/** Swap in the designs found in Google Drive (newest copy of each design wins; files added by hand stay unless Drive has a newer one). */
+export async function setDriveMockups(found: { file: string; driveId: string; at: number }[]) {
+  await kvUpdate<Library>(KEY, {}, (lib) => {
+    for (const who of Object.keys(lib)) lib[who] = lib[who].filter((m) => !m.driveId);
+    for (const f of [...found].sort((a, b) => a.at - b.at)) {
+      const p = parseMockupName(f.file);
+      if (!p) continue;
+      const list = lib[p.who] ?? [];
+      const same = list.find((x) => x.n === p.n && x.ai === p.ai);
+      if (same && same.at > f.at) continue;
+      lib[p.who] = [...list.filter((x) => x !== same), { n: p.n, ai: p.ai, url: `/api/jobs/drive-img/${f.driveId}`, file: f.file, at: f.at, driveId: f.driveId }]
+        .sort((a, b) => a.n - b.n || Number(a.ai) - Number(b.ai));
+    }
+    for (const who of Object.keys(lib)) if (!lib[who].length) delete lib[who];
+  });
+}
+
+/** A Drive design the library holds (the photo route serves only files the app found itself). */
+export const mockupByDriveId = (lib: Library, id: string) => Object.values(lib).flat().find((m) => m.driveId === id) ?? null;
 
 /** Files already in the library, so a second drop skips them. */
 export async function knownFiles() {
