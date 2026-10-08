@@ -7,10 +7,13 @@ import { Card } from "./parts";
 
 /* ---------- Today's media: watch it, tweak the words, tap Post ---------- */
 
-type Platform = "facebook" | "instagram" | "linkedin" | "google";
+type Platform = "facebook" | "instagram" | "linkedin" | "google" | "youtube";
+type Site = "marketplace" | "craigslist";
+type Listing = { title: string; body: string; price?: string; posted?: { at: number; by: string } };
 export type Media = {
   id: string; day: string; kind: "video" | "photo"; url: string; contentType: string; title: string;
   captions: Partial<Record<Platform, string>>; createdAt: number; by: string;
+  listings?: Partial<Record<Site, Listing>>; stills?: string[];
   posts?: { at: number; by: string; platforms: string[]; ok: boolean; error?: string }[];
 };
 type Account = { platform: string; name: string; expired?: boolean };
@@ -132,6 +135,7 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner,
           ))}
         </div>
       </div>
+      <Listings m={m} reload={reload} />
       {media.length > 1 && (
         <div>
           <div className="text-xs font-semibold text-slate-500 mb-1">Earlier</div>
@@ -148,6 +152,78 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner,
         </div>
       )}
     </Card>
+  );
+}
+
+/* ---------- Marketplace and Craigslist: no API, so copy, open, post, tap Posted ---------- */
+
+const SITES: { id: Site; label: string; postUrl: string }[] = [
+  { id: "marketplace", label: "Facebook Marketplace", postUrl: "https://www.facebook.com/marketplace/create/item" },
+  { id: "craigslist", label: "Craigslist", postUrl: "https://post.craigslist.org/" },
+];
+
+function Listings({ m, reload }: { m: Media; reload: () => void }) {
+  const sites = SITES.filter((x) => m.listings?.[x.id]);
+  const [site, setSite] = useState<Site>(sites[0]?.id ?? "marketplace");
+  const l = m.listings?.[site];
+  const [title, setTitle] = useState(l?.title ?? "");
+  const [body, setBody] = useState(l?.body ?? "");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setTitle(l?.title ?? ""); setBody(l?.body ?? ""); setMsg(""); }, [m.id, site]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!sites.length || !l) return null;
+  const info = SITES.find((x) => x.id === site)!;
+
+  async function copyOpen() {
+    await navigator.clipboard.writeText(`${title}\n\n${body}`).catch(() => {});
+    window.open(info.postUrl, "_blank", "noopener");
+    setMsg("Copied. Paste it in, add the photos below, post it, then tap Posted.");
+  }
+  async function posted() {
+    setBusy(true);
+    try {
+      const r = await api("/api/marketing/listing", { method: "POST", json: { id: m.id, site, title, body } });
+      setMsg(r.sheetError ? `Counted. The sheet didn't update: ${r.sheetError}` : "Counted and added to the sheet.");
+      reload();
+    } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="border-t border-slate-100 pt-3 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-bold flex-1">Listings</span>
+        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
+          {sites.map((x) => (
+            <button key={x.id} onClick={() => setSite(x.id)} aria-pressed={site === x.id}
+              className={`px-2.5 py-1 rounded-md inline-flex items-center gap-1 ${site === x.id ? "bg-white shadow-sm" : "text-slate-500"}`}>
+              {x.label}{m.listings?.[x.id]?.posted && <Check size={12} className="text-green-700" />}
+            </button>
+          ))}
+        </div>
+      </div>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm font-semibold" />
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} className="w-full rounded-lg border border-slate-300 p-2 text-sm" />
+      {l.price && <p className="text-xs text-slate-500">Price to enter: {l.price}</p>}
+      {(m.stills ?? []).length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {m.stills!.map((u, i) => (
+            <a key={u} href={u} download={`light-dmv-${i + 1}.jpg`} title="Download this photo" className="shrink-0">
+              <img src={u} alt={`Listing photo ${i + 1}`} className="h-20 w-28 object-cover rounded-lg" />
+            </a>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={copyOpen} className="rounded-xl px-4 py-2 font-bold text-white inline-flex items-center gap-2" style={{ background: NAVY }}>
+          <ExternalLink size={16} /> Copy and open {info.label}
+        </button>
+        <button disabled={busy} onClick={posted} className="rounded-xl px-4 py-2 font-bold border border-slate-300 inline-flex items-center gap-2 disabled:opacity-40">
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Posted
+        </button>
+      </div>
+      {l.posted && <p className="text-xs text-green-700">{l.posted.by} posted it {ago(l.posted.at)}</p>}
+      {msg && <p className="text-xs text-slate-600">{msg}</p>}
+    </div>
   );
 }
 

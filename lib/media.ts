@@ -7,11 +7,19 @@ import { etDay } from "./marketing";
 /* Daily media: the video (or photos) the daily run makes from Drive job photos, with a caption per platform,
    waiting on the Marketing tab for one tap to post through GoHighLevel. */
 
-export type Platform = "facebook" | "instagram" | "linkedin" | "google";
+export type Platform = "facebook" | "instagram" | "linkedin" | "google" | "youtube";
 export const PLATFORMS: { id: Platform; label: string }[] = [
   { id: "facebook", label: "Facebook" }, { id: "instagram", label: "Instagram" },
-  { id: "google", label: "Google Business" }, { id: "linkedin", label: "LinkedIn" },
+  { id: "google", label: "Google Business" }, { id: "linkedin", label: "LinkedIn" }, { id: "youtube", label: "YouTube" },
 ];
+
+/* Listings there's no API for: the app writes them, someone taps Copy & open, posts, then taps Posted (which counts it in the sheet). */
+export type ListingSite = "marketplace" | "craigslist";
+export const LISTING_SITES: { id: ListingSite; label: string; channel: "marketplace" | "craigslist"; postUrl: string }[] = [
+  { id: "marketplace", label: "Facebook Marketplace", channel: "marketplace", postUrl: "https://www.facebook.com/marketplace/create/item" },
+  { id: "craigslist", label: "Craigslist", channel: "craigslist", postUrl: "https://post.craigslist.org/" },
+];
+export type Listing = { title: string; body: string; price?: string; posted?: { at: number; by: string } };
 
 export type MediaItem = {
   id: string;
@@ -20,7 +28,9 @@ export type MediaItem = {
   url: string;                 // public URL (Supabase Storage)
   contentType: string;
   title: string;
-  captions: Partial<Record<Platform, string>>;
+  captions: Partial<Record<Platform, string>>;   // youtube: first line is the title
+  listings?: Partial<Record<ListingSite, Listing>>;
+  stills?: string[];           // a few still photos (public URLs) for the listings
   photoIds: string[];          // Drive photos used, so they aren't reused soon
   createdAt: number;
   by: string;
