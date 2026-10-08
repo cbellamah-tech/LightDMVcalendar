@@ -34,7 +34,7 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
       { id: "white-house-cord", text: "On a white house, use white wire extension for wreaths and jumps across the siding" },
       { id: "white-columns", text: "Use white wire minis on white columns" },
       { id: "part-photos", text: "Take a picture of every item of the job as it is being set", required: true, photo: true, perPart: true },
-      { id: "timer", text: "Make sure the timer is set (on 6 PM, off 11 PM or midnight), and send a picture of it to the group chat", required: true, photo: true },
+      { id: "timer", text: "Set timer", required: true, photo: true },
       { id: "finished-photos", text: "Take pictures of the entire finished job", required: true, photo: true },
       { id: "goodie-bag", text: "Leave a goodie bag at the front door and take a picture of it", required: true, photo: true },
       { id: "yard-sign", text: "Put one of our special yard signs in front and take a picture of it", required: true, photo: true },
