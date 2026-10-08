@@ -9,7 +9,7 @@ export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: num
   photoBy?: Record<string, string>; // photo url -> who took it
 };
 export type Checklist = { jobId: string; kind: string; items: Record<string, CheckEntry>; arrivedAt?: number; completedAt?: number; completedBy?: string; rev: number };
-export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; perPart?: boolean; noteLabel?: string; counts?: { key: string; label: string }[] };
+export type SopItem = { id: string; text: string; hint?: string; required?: boolean; photo?: boolean; perPart?: boolean; noteLabel?: string; counts?: { key: string; label: string }[] };
 export type DetailFile = { name: string; url: string; image: boolean };
 export type JobDetail = {
   fetchedAt: number; error?: string; instructions?: string; quoteNumber?: string;

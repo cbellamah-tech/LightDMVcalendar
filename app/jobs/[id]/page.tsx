@@ -103,6 +103,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
                 </button>
                 <div className="flex-1 min-w-0">
                   <div className={`font-semibold ${e.done ? "text-slate-500" : ""}`}>{item.text}</div>
+                  {item.hint && <div className="text-xs text-slate-500">{item.hint}</div>}
                   <div className="flex gap-2 text-xs mt-0.5">
                     {item.required && <span className="font-bold text-red-600">REQUIRED</span>}
                     {item.photo && <span className="font-bold flex items-center gap-1" style={{ color: NAVY }}><Camera size={12} /> PHOTO</span>}

@@ -7,14 +7,14 @@ export type SopCount = { key: "c9Feet" | "c7Bulbs" | "miniStrands" | "stakeFeet"
 /** counts: numbers the crew must enter before the box can be checked (materials used, for the ledger). */
 /** noteRequired: the box can't be checked until the note is filled in. */
 /** perPart: one photo for each part of the job (the Jobber line items: roofline, trees, wreaths...); the box checks itself. */
-export type SopItem = { id: string; text: string; required?: boolean; photo?: boolean; perPart?: boolean; noteLabel?: string; noteRequired?: boolean; counts?: SopCount[] };
+export type SopItem = { id: string; text: string; hint?: string; required?: boolean; photo?: boolean; perPart?: boolean; noteLabel?: string; noteRequired?: boolean; counts?: SopCount[] };
 
 export const MATERIAL_COUNTS: SopCount[] = [
   // chris 2026-10-08: each one "if any"; a blank counts as none.
-  { key: "miniStrands", label: "Mini light strands, if any" },
-  { key: "c7Bulbs", label: "C7 bulbs, if any" },
-  { key: "c9Feet", label: "Feet of C9 bulbs, if any (count the bulbs)" },
-  { key: "stakeFeet", label: "Feet of stake lighting, if any" },
+  { key: "miniStrands", label: "Mini strands" },
+  { key: "c7Bulbs", label: "C7 bulbs" },
+  { key: "c9Feet", label: "C9 feet" },
+  { key: "stakeFeet", label: "Stake feet" },
 ];
 /** fix = a service call (Jobber visit or job titled "SERVICE ..."), kept apart from installs and takedowns. */
 export type JobKind = "install" | "takedown" | "fix";
@@ -25,28 +25,28 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
     items: [
       // Required pictures (chris, 2026-10-08): whole house on arrival, each part as it is set, goodie bag at the door,
       // our yard sign out front, the whole finished job, and the timer. Every one is copied to Drive by customer.
-      { id: "arrival-photo", text: "Take a picture of the entire home on arrival", required: true, photo: true },
-      { id: "merch", text: "Wear company merchandise and your review tag" },
-      { id: "triangle-sign", text: "Bring the triangle sign and set it up (1099 crews bring their own)" },
-      { id: "ladder-wind", text: "On windy days, tie the ladder down at the gutter", required: true },
-      { id: "staples", text: "Staple only when necessary, on certain trees (big or slippery bark: one staple at the top, pressed halfway)" },
-      { id: "rubber-clamps", text: "Use big rubber clamps" },
-      { id: "white-house-cord", text: "On a white house, use white wire extension for wreaths and jumps across the siding" },
-      { id: "white-columns", text: "Use white wire minis on white columns" },
-      { id: "part-photos", text: "Take a picture of every item of the job as it is being set", required: true, photo: true, perPart: true },
-      { id: "timer", text: "Set timer", required: true, photo: true },
-      { id: "finished-photos", text: "Take pictures of the entire finished job", required: true, photo: true },
-      { id: "goodie-bag", text: "Leave a goodie bag at the front door and take a picture of it", required: true, photo: true },
-      { id: "yard-sign", text: "Put one of our special yard signs in front and take a picture of it", required: true, photo: true },
-      { id: "materials", text: "Enter the material used on this job (leave blank what you didn't use)", required: true, counts: MATERIAL_COUNTS },
-      { id: "review", text: "Ask for a Google review while wearing the review tag ($50)", noteLabel: "Customer said" },
-      { id: "cross-sell", text: "Offer cross-sells (crew member gets 15% of the upsell price)", noteLabel: "Upsell sold and price" },
+      { id: "arrival-photo", text: "Photo: whole house on arrival", required: true, photo: true },
+      { id: "merch", text: "Wear merch and review tag" },
+      { id: "triangle-sign", text: "Set up triangle sign", hint: "1099 crews bring their own." },
+      { id: "ladder-wind", text: "Windy? Tie ladder to gutter", required: true },
+      { id: "staples", text: "Staple only if needed", hint: "Big or slippery tree: one staple at the top, halfway in." },
+      { id: "rubber-clamps", text: "Use rubber clamps" },
+      { id: "white-house-cord", text: "White house: white wire cords" },
+      { id: "white-columns", text: "White columns: white wire minis" },
+      { id: "part-photos", text: "Photo: each item as you set it", required: true, photo: true, perPart: true },
+      { id: "timer", text: "Set timer", hint: "On 6 PM, off 11 PM or midnight. Send a pic to the group chat.", required: true, photo: true },
+      { id: "finished-photos", text: "Photo: whole finished job", required: true, photo: true },
+      { id: "goodie-bag", text: "Goodie bag at door + photo", required: true, photo: true },
+      { id: "yard-sign", text: "Yard sign out front + photo", required: true, photo: true },
+      { id: "materials", text: "Enter materials used", hint: "Leave blank what you didn't use.", required: true, counts: MATERIAL_COUNTS },
+      { id: "review", text: "Ask for Google review ($50)", noteLabel: "Customer said" },
+      { id: "cross-sell", text: "Offer upsells (15% to you)", noteLabel: "Upsell sold and price" },
     ],
   },
   takedown: {
     title: "Takedown SOP",
     items: [
-      { id: "ladder-wind", text: "On windy days, tie the ladder down at the gutter", required: true },
+      { id: "ladder-wind", text: "Windy? Tie ladder to gutter", required: true },
       { id: "no-tape", text: "No tape" },
       { id: "no-staples", text: "No staples" },
       { id: "female-ends", text: "Female the ends" },
@@ -62,7 +62,7 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
     title: "Service call (fix)",
     items: [
       { id: "arrival-photo", text: "Take a picture of the problem on arrival", required: true, photo: true },
-      { id: "ladder-wind", text: "On windy days, tie the ladder down at the gutter", required: true },
+      { id: "ladder-wind", text: "Windy? Tie ladder to gutter", required: true },
       { id: "work-done", text: "Write what you fixed", required: true, noteLabel: "What was wrong and what you did", noteRequired: true },
       { id: "after-photo", text: "Take a picture once it's fixed and lit", required: true, photo: true },
       { id: "timer", text: "Make sure the timer is set", required: true },
