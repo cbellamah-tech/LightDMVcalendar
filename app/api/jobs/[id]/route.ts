@@ -89,7 +89,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     // Per-part photos: one for each part of the job Jobber lists (roofline, trees, wreaths...).
     const parts = item.perPart ? await cachedJobParts(job.jobberJobId) : [];
-    const partsMissing = parts.filter((p) => !Object.values(e.parts ?? {}).some((x) => x.toLowerCase() === p.toLowerCase()));
+    const partsMissing = parts.map((p) => p.name).filter((p) => !Object.values(e.parts ?? {}).some((x) => x.toLowerCase() === p.toLowerCase()));
     if (typeof b.note === "string") e.note = b.note.slice(0, 500) || undefined;
     if (item.counts && b.counts && typeof b.counts === "object") {
       e.counts ??= {};
