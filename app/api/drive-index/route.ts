@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { OFFICE, requireRole } from "@/lib/auth";
 import { loadDriveIndex, saveDriveIndex, type DriveIndex } from "@/lib/drive";
-import { driveSyncStatus, syncDriveIndex } from "@/lib/driveSync";
+import { driveSyncStatus, syncDriveIndex, syncDriveMockups } from "@/lib/driveSync";
 import { googleStatus } from "@/lib/google";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (s instanceof NextResponse) return s;
   try {
     if (new URL(req.url).searchParams.get("sync")) {
-      const r = await syncDriveIndex(true);
+      const [r] = await Promise.all([syncDriveIndex(true), syncDriveMockups(true)]);
       if (r.error) return NextResponse.json({ error: r.error }, { status: 502 });
       return NextResponse.json(await summary(await loadDriveIndex()));
     }

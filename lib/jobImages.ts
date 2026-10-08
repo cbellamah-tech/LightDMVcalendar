@@ -3,19 +3,18 @@ import { kvGet, kvSet } from "./store";
 import { savePhoto } from "./photos";
 import { drivePhotoJpeg, googleStatus } from "./google";
 import type { DriveMatch } from "./drive";
-import { pdfPictures } from "./pdfPictures";
+import { rows } from "./jobberSchema";
 import type { DetailFile, JobDetail } from "./jobDetails";
 
 /* Copies a job's pictures into our own photo storage so crews see them without Jobber or Google sign-ins:
-   - photos on Jobber line items (Jobber's file links expire after a while),
-   - the mockups inside the signed quote PDF Jobber keeps on the quote (one per "Click Photo to Preview" line),
+   - photos on Jobber line items, if Jobber's API ever hands them out (no public version has so far, and its quote
+     PDF leaves them out too, so the designs come from Google Drive instead: lib/driveSync.ts),
    - last season's takedown and install photos from Drive (HEIC from the phones comes back as JPEG). */
 
 const sha = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 24);
 // Jobber's signed links change their query string each time; the path names the file.
 const stable = (url: string) => url.split("?")[0];
 const copyKey = (url: string) => `ldmv:imgcopy:${sha(stable(url))}`;
-const pdfKey = (url: string) => `ldmv:quotepdf2:${sha(stable(url))}`;
 export const driveCopyKey = (fileId: string) => `ldmv:driveimg:${fileId}`;
 const isOurs = (url: string) => url.startsWith("/") || /supabase\.co\/storage|blob\.vercel-storage\.com/.test(url);
 
@@ -34,29 +33,46 @@ async function copyUrl(url: string, name: string, folder: string): Promise<strin
   return saved;
 }
 
-type PdfRead = { urls: string[]; status: string };
-/** Mockups from the signed quote PDF, copied once per PDF. */
-async function quotePdfMockups(pdfUrl: string, folder: string): Promise<PdfRead> {
-  const k = pdfKey(pdfUrl);
-  const have = await kvGet<PdfRead | string[]>(k);
-  if (have && !Array.isArray(have)) return have;
-  const { jobberFile } = await import("./jobber");
-  const res = await jobberFile(pdfUrl);
-  const buf = Buffer.from(await res.arrayBuffer());
-  const pics = pdfPictures(buf).slice(0, 20);
-  const urls: string[] = [];
-  for (const [n, p] of pics.entries())
-    urls.push(await savePhoto(new File([new Uint8Array(p.data)], `mockup-${n + 1}.${p.type === "image/png" ? "png" : "jpg"}`, { type: p.type }), folder));
-  const r = { urls, status: `signed quote PDF read (${Math.round(buf.length / 1024)} KB, ${pics.length} picture${pics.length === 1 ? "" : "s"} in it)` };
-  await kvSet(k, r);
+/** The newest Jobber API version we look at for line item photos (the app itself stays on its tested version). */
+export const NEWEST_JOBBER_API = "2026-09-25";
+const PHOTO_FIELD = /image|photo|picture|attachment|file|media|thumbnail/i;
+export type LinePhotoCheck = { at: number; version: string; fields: string[]; error?: string };
+const CHECK = "ldmv:jobber:linephotocheck";
+
+/** Once a day: does Jobber's newest API version have a photo field on quote line items yet? */
+export async function linePhotoCheck(): Promise<LinePhotoCheck> {
+  const have = await kvGet<LinePhotoCheck>(CHECK);
+  if (have && have.version === NEWEST_JOBBER_API && Date.now() - have.at < 86400_000) return have;
+  const { gqlAt } = await import("./jobber");
+  let r: LinePhotoCheck;
+  try {
+    const d = await gqlAt<any>(`{ q: __type(name: "QuoteLineItem") { fields { name } } }`, {}, NEWEST_JOBBER_API);
+    r = { at: Date.now(), version: NEWEST_JOBBER_API, fields: (d.q?.fields ?? []).map((f: any) => String(f.name)).filter((n: string) => PHOTO_FIELD.test(n)) };
+  } catch (e: any) {
+    r = { at: Date.now(), version: NEWEST_JOBBER_API, fields: [], error: e.message };
+  }
+  await kvSet(CHECK, r);
   return r;
 }
 
-/** Lines the customer is shown a picture for ("Click Photo to Preview", "Reference Photo included", "shown in the design photo"). */
-const wantsPhoto = (l: { name: string; description?: string }) => /photo|preview|picture|mockup/i.test(`${l.name} ${l.description || ""}`);
+/** The quote's line item photos through the newest API version, by line name (only once Jobber has the field). */
+async function newestLinePhotos(quoteId: string, fields: string[]): Promise<Map<string, DetailFile[]>> {
+  const { gqlAt } = await import("./jobber");
+  const { filesOf } = await import("./jobDetails");
+  const q = (sel: string) => `query LdmvLinePhotos($id: EncodedId!) { quote(id: $id) { lineItems(first: 50) { nodes { name ${sel} } } } }`;
+  // A file object first; a plain URL field if Jobber made it a string.
+  const r = await gqlAt<any>(q(fields.map((f) => `${f} { url thumbnailUrl fileName contentType }`).join(" ")), { id: quoteId }, NEWEST_JOBBER_API)
+    .catch(() => gqlAt<any>(q(fields.join(" ")), { id: quoteId }, NEWEST_JOBBER_API));
+  const out = new Map<string, DetailFile[]>();
+  for (const li of rows(r.quote?.lineItems)) {
+    const files = filesOf(li, true);
+    if (files.length) out.set(String(li.name), files);
+  }
+  return out;
+}
 
 /** Copy the job's Jobber pictures into photo storage and point the detail at the copies. */
-export async function importJobImages(d: JobDetail, prev: JobDetail | null): Promise<JobDetail> {
+export async function importJobImages(d: JobDetail): Promise<JobDetail> {
   const folder = `jobber/${sha(d.quoteNumber || d.clientName || "job").slice(0, 12)}`;
   const started = Date.now();
   const copy = async (f: DetailFile): Promise<DetailFile> => {
@@ -64,35 +80,21 @@ export async function importJobImages(d: JobDetail, prev: JobDetail | null): Pro
     const u = await copyUrl(f.url, f.name, folder).catch(() => null);
     return u ? { ...f, url: u } : f;
   };
-  const lines = [];
-  for (const l of d.lines) lines.push({ ...l, images: await Promise.all(l.images.map(copy)) });
-  const notes = [];
-  for (const n of d.notes) notes.push({ ...n, files: await Promise.all(n.files.map(copy)) });
-  let out: JobDetail = { ...d, lines, notes };
-
-  const fromJobber = lines.reduce((t, l) => t + l.images.filter((f) => f.image).length, 0);
-  out.photoInfo = fromJobber ? `${fromJobber} line photo${fromJobber === 1 ? "" : "s"} from Jobber` : d.quotePdf ? "" : "no line photos from Jobber and no signed quote PDF on this quote yet";
-  // The signed quote's mockups, when Jobber's API gave no photo on the lines themselves.
-  if (d.quotePdf && !fromJobber) {
-    let fresh: PdfRead;
-    try { fresh = await quotePdfMockups(d.quotePdf, folder); }
-    catch (e: any) {
-      // Couldn't read the PDF this time: keep what the last pull found, and say why.
-      out.lines = out.lines.map((l) => ({ ...l, images: l.images.length ? l.images : prev?.lines.find((p) => p.name === l.name)?.images ?? [] }));
-      return { ...out, quoteMockups: prev?.quoteMockups, photoInfo: `couldn't read the signed quote PDF: ${e.message}` };
-    }
-    out.photoInfo = fresh.status;
-    const mockups = fresh.urls;
-    const photoLines = lines.map((l, i) => (wantsPhoto(l) ? i : -1)).filter((i) => i >= 0);
-    if (mockups.length && mockups.length === photoLines.length) {
-      // One picture per "Click Photo to Preview" line, in the quote's order.
-      photoLines.forEach((li, k) => { out.lines[li] = { ...out.lines[li], images: [{ name: "Mockup", url: mockups[k], image: true }] }; });
-      out = { ...out, quoteMockups: [] };
-    } else {
-      out = { ...out, quoteMockups: mockups };
+  let lines = d.lines;
+  // Line item photos from Jobber itself, the day its API offers them.
+  if (d.quoteId && !lines.some((l) => l.images.some((f) => f.image))) {
+    const check = await linePhotoCheck().catch(() => null);
+    if (check?.fields.length) {
+      const got = await newestLinePhotos(d.quoteId, check.fields).catch(() => new Map<string, DetailFile[]>());
+      lines = lines.map((l) => (got.get(l.name)?.length && !l.images.length ? { ...l, images: got.get(l.name)! } : l));
     }
   }
-  return out;
+  const outLines = [];
+  for (const l of lines) outLines.push({ ...l, images: await Promise.all(l.images.map(copy)) });
+  const notes = [];
+  for (const n of d.notes) notes.push({ ...n, files: await Promise.all(n.files.map(copy)) });
+  const fromJobber = outLines.reduce((t, l) => t + l.images.filter((f) => f.image).length, 0);
+  return { ...d, lines: outLines, notes, photoInfo: fromJobber ? `${fromJobber} line photo${fromJobber === 1 ? "" : "s"} from Jobber` : "" };
 }
 
 /** Copy the Drive photos matched to a job into photo storage (a few per call). Returns how many were new. */

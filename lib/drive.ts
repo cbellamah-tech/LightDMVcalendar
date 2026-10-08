@@ -45,7 +45,7 @@ export const indexedPhoto = (idx: DriveIndex, fileId: string) =>
 
 const norm = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 const lastName = (s: string) => norm(s).split(" ").filter((w) => w.length > 1).pop() || "";
-// Drop a middle initial so "Lauren H Grawert" matches "Lauren Grawert".
+// Drop a middle initial so "Jane Q Doe" matches "Jane Doe".
 const loose = (s: string) => norm(s).split(" ").filter((w) => w.length > 1).join(" ");
 
 export function driveFor(idx: DriveIndex, clientName: string, notesBins: string[] = []): DriveMatch {
