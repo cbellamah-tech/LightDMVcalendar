@@ -11,5 +11,7 @@ export async function GET() {
   if (s instanceof NextResponse) return s;
   const g = (await loadPack())?.install;
   if (!g) return NextResponse.json({ loaded: false });
-  return NextResponse.json({ loaded: true, ...g, ownerTodo: isOffice(s) ? g.ownerTodo : null });
+  // Quiz answers stay on the server; /api/install/quiz grades them.
+  const modules = g.modules?.map((m) => ({ ...m, quiz: m.quiz?.map(({ q, choices }) => ({ q, choices })) }));
+  return NextResponse.json({ loaded: true, ...g, modules, ownerTodo: isOffice(s) ? g.ownerTodo : null });
 }

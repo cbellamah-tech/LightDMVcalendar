@@ -9,7 +9,7 @@ export const getInstallProgress = async (uid: string): Promise<InstallProgress> 
 export const installPeople = async () => (await kvGet<string[]>(PEOPLE)) ?? [];
 
 /** One beat from an open lesson page: marks it seen and adds the seconds since the last beat (capped). */
-export async function recordInstall(uid: string, ev: { module: string; page: number; secs?: number; done?: boolean }) {
+export async function recordInstall(uid: string, ev: { module: string; page: number; secs?: number; done?: boolean; needsQuiz?: boolean }) {
   await kvUpdate<string[]>(PEOPLE, [], (ids) => (ids.includes(uid) ? ids : [...ids, uid]));
   return kvUpdate<InstallProgress>(KEY(uid), { modules: {} }, (p) => {
     p.modules ??= {};
@@ -17,7 +17,20 @@ export async function recordInstall(uid: string, ev: { module: string; page: num
     if (!m.seen.includes(ev.page)) m.seen.push(ev.page);
     const add = Math.max(0, Math.min(60, Math.round(Number(ev.secs) || 0)));
     m.secs[ev.page] = (m.secs[ev.page] ?? 0) + add;
-    if (ev.done && !m.done) m.done = Date.now();
+    if (ev.done && !m.done && (!ev.needsQuiz || m.quiz?.passed)) m.done = Date.now();
+    p.last = Date.now();
+  });
+}
+
+/** Grades a module quiz on the server (the browser never gets the answers) and keeps the best score. */
+export async function recordQuiz(uid: string, module: string, pct: number, passPct: number) {
+  await kvUpdate<string[]>(PEOPLE, [], (ids) => (ids.includes(uid) ? ids : [...ids, uid]));
+  return kvUpdate<InstallProgress>(KEY(uid), { modules: {} }, (p) => {
+    p.modules ??= {};
+    const m = (p.modules[module] ??= { seen: [], secs: {}, started: Date.now() });
+    const q = (m.quiz ??= { tries: 0, best: 0 });
+    q.tries += 1; q.best = Math.max(q.best, pct);
+    if (pct >= passPct && !q.passed) q.passed = Date.now();
     p.last = Date.now();
   });
 }
