@@ -7,7 +7,7 @@ import { api, NAVY } from "@/components/ui";
 import { Card, H1, imgSrc, money, Photo, Spinner } from "../parts";
 import { LineMockups, useMockups } from "../Mockups";
 
-type Line = { name: string; desc: string; qty: number; unit: number; total: number; cat: string; how: string };
+type Line = { name: string; desc: string; qty: number; unit: number; total: number; cat: string; how: string; design?: string | null };
 type Job = { id: string; season: string; photos: string[]; lines: Line[]; included: string[]; total: number; featured: boolean };
 
 // A photo shows the whole finished house, so a tile never pairs it with part of a price: each line gets one type
@@ -103,7 +103,14 @@ function TypeView({ label, tiles }: { label: string; tiles: Tile[] }) {
         {tiles.map((t) => (
           <button key={t.j.id} onClick={() => setOpen(t)} className="text-left rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imgSrc(t.j.photos[0])} alt={label} loading="lazy" className="w-full aspect-[4/3] object-cover bg-slate-900" />
+            {t.lines.every((x) => x.l.design) ? (
+              // Each line's own design: the picture matches exactly what the price buys.
+              <div className={`grid ${t.lines.length > 1 ? "grid-cols-2" : ""} gap-px bg-slate-200`}>
+                {t.lines.map((x) => <img key={x.i} src={x.l.design!} alt={x.l.name} loading="lazy" className="w-full aspect-[4/3] object-cover bg-slate-900" />)}
+              </div>
+            ) : <img src={imgSrc(t.j.photos[0])} alt={label} loading="lazy" className="w-full aspect-[4/3] object-cover bg-slate-900" />}
+            {t.lines.every((x) => x.l.design) ? <div className="px-2 pt-1 text-[10px] font-semibold text-green-700">Our design for this line</div>
+              : <div className="px-2 pt-1 text-[10px] text-slate-500">Finished house (no design picture yet)</div>}
             <div className="p-2">
               <div className="text-lg font-extrabold" style={{ color: NAVY }}>{money(t.total)}</div>
               {t.lines.length === 1 ? <div className="text-xs font-semibold text-slate-700 line-clamp-2">{t.lines[0].l.name}{t.lines[0].l.qty > 1 ? ` × ${t.lines[0].l.qty}` : ""}</div>
@@ -138,7 +145,9 @@ function LineSheet({ t, label, onClose }: { t: Tile; label: string; onClose: () 
             <div className="flex justify-between gap-3"><span className="font-semibold">{l.name}{l.qty > 1 ? ` × ${l.qty} at ${money(l.unit)}` : ""}</span><span className="font-bold">{money(l.total)}</span></div>
             {l.desc && <p className="text-sm text-slate-600 whitespace-pre-line">{l.desc}</p>}
             {l.how && <p className="text-xs text-slate-500">{l.how}</p>}
-            {counts && counts[i] > 0 && <LineMockups refId={`pq:${j.id}`} line={i} count={counts[i]} big />}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {l.design ? <img src={l.design} alt={`Design for ${l.name}`} className="w-full max-h-[28rem] object-contain rounded-lg border border-slate-200 bg-slate-900" />
+              : counts && counts[i] > 0 ? <LineMockups refId={`pq:${j.id}`} line={i} count={counts[i]} big /> : null}
           </div>
         ))}
         <div className="text-sm">
