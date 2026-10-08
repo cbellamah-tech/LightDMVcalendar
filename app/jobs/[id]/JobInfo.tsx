@@ -49,6 +49,12 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
       {lines.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
           <div className="font-bold flex items-center gap-2"><FileText size={16} /> What we're installing</div>
+          {!!d.quoteMockups?.length && (
+            <div className="pb-1">
+              <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">Mockups from the signed quote</div>
+              <Files files={d.quoteMockups.map((url, i) => ({ name: `Mockup ${i + 1}`, url, image: true }))} onView={onView} />
+            </div>
+          )}
           {shown.map((l, i) => (
             <div key={i} className="border-t border-slate-100 pt-2 first:border-0 first:pt-0">
               <div className="font-semibold text-sm">{l.quantity && l.quantity > 1 ? `${l.quantity} × ` : ""}{l.name}</div>
@@ -56,17 +62,12 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
               <Files files={l.images} onView={onView} />
             </div>
           ))}
-          {!!d.quoteMockups?.length && (
-            <div className="border-t border-slate-100 pt-2">
-              <div className="text-xs font-bold uppercase text-slate-400 mb-1.5">Mockups from the signed quote</div>
-              <Files files={d.quoteMockups.map((url, i) => ({ name: `Mockup ${i + 1}`, url, image: true }))} onView={onView} />
-            </div>
-          )}
           {lines.length > shown.length && (
             <button className="text-sm underline text-slate-600" onClick={() => setAllLines(true)}>Show all {lines.length}</button>
           )}
         </div>
       )}
+      {d.photoInfo && <p className="text-xs text-slate-400">Line photos: {d.photoInfo}.</p>}
       {d.error && <p className="text-xs text-slate-400">Couldn't refresh from Jobber just now ({d.error}).</p>}
     </div>
   );

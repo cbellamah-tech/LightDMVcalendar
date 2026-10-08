@@ -3,6 +3,7 @@ import { kvGet, kvSet } from "./store";
 import { savePhoto } from "./photos";
 import { drivePhotoJpeg, googleStatus } from "./google";
 import type { DriveMatch } from "./drive";
+import { pdfPictures } from "./pdfPictures";
 import type { DetailFile, JobDetail } from "./jobDetails";
 
 /* Copies a job's pictures into our own photo storage so crews see them without Jobber or Google sign-ins:
@@ -14,7 +15,7 @@ const sha = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 2
 // Jobber's signed links change their query string each time; the path names the file.
 const stable = (url: string) => url.split("?")[0];
 const copyKey = (url: string) => `ldmv:imgcopy:${sha(stable(url))}`;
-const pdfKey = (url: string) => `ldmv:quotepdf:${sha(stable(url))}`;
+const pdfKey = (url: string) => `ldmv:quotepdf2:${sha(stable(url))}`;
 export const driveCopyKey = (fileId: string) => `ldmv:driveimg:${fileId}`;
 const isOurs = (url: string) => url.startsWith("/") || /supabase\.co\/storage|blob\.vercel-storage\.com/.test(url);
 
@@ -32,46 +33,26 @@ async function copyUrl(url: string, name: string, folder: string): Promise<strin
   return saved;
 }
 
-/** The JPEG pictures embedded in a PDF (Jobber renders line item photos into the quote PDF as JPEG). */
-export function pdfJpegs(pdf: Buffer, minBytes = 12_000): Buffer[] {
-  const out: Buffer[] = [];
-  const seen = new Set<string>();
-  let i = 0;
-  while ((i = pdf.indexOf("/DCTDecode", i)) !== -1) {
-    const s = pdf.indexOf("stream", i);
-    if (s < 0) break;
-    let start = s + 6;
-    if (pdf[start] === 0x0d) start++;
-    if (pdf[start] === 0x0a) start++;
-    const e = pdf.indexOf("endstream", start);
-    if (e < 0) break;
-    const jpg = pdf.subarray(start, e);
-    i = e;
-    if (jpg[0] !== 0xff || jpg[1] !== 0xd8 || jpg.length < minBytes) continue; // not a plain JPEG, or a logo/icon
-    const h = sha(jpg.subarray(0, 4096).toString("base64") + jpg.length);
-    if (seen.has(h)) continue;
-    seen.add(h);
-    out.push(Buffer.from(jpg));
-  }
-  return out;
-}
-
+type PdfRead = { urls: string[]; status: string };
 /** Mockups from the signed quote PDF, copied once per PDF. */
-async function quotePdfMockups(pdfUrl: string, folder: string): Promise<string[] | null> {
+async function quotePdfMockups(pdfUrl: string, folder: string): Promise<PdfRead | null> {
   const k = pdfKey(pdfUrl);
-  const have = await kvGet<string[]>(k);
-  if (have) return have;
+  const have = await kvGet<PdfRead | string[]>(k);
+  if (have && !Array.isArray(have)) return have;
   const res = await fetch(pdfUrl, { cache: "no-store" }).catch(() => null);
   if (!res?.ok) return null;
-  const jpgs = pdfJpegs(Buffer.from(await res.arrayBuffer())).slice(0, 20);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const pics = pdfPictures(buf).slice(0, 20);
   const urls: string[] = [];
-  for (const [n, j] of jpgs.entries()) urls.push(await savePhoto(new File([new Uint8Array(j)], `mockup-${n + 1}.jpg`, { type: "image/jpeg" }), folder));
-  await kvSet(k, urls);
-  return urls;
+  for (const [n, p] of pics.entries())
+    urls.push(await savePhoto(new File([new Uint8Array(p.data)], `mockup-${n + 1}.${p.type === "image/png" ? "png" : "jpg"}`, { type: p.type }), folder));
+  const r = { urls, status: `signed quote PDF read (${Math.round(buf.length / 1024)} KB, ${pics.length} picture${pics.length === 1 ? "" : "s"} in it)` };
+  await kvSet(k, r);
+  return r;
 }
 
-/** Lines the customer is shown a picture for. */
-const wantsPhoto = (name: string) => /photo|preview|picture|mockup/i.test(name);
+/** Lines the customer is shown a picture for ("Click Photo to Preview", "Reference Photo included", "shown in the design photo"). */
+const wantsPhoto = (l: { name: string; description?: string }) => /photo|preview|picture|mockup/i.test(`${l.name} ${l.description || ""}`);
 
 /** Copy the job's Jobber pictures into photo storage and point the detail at the copies. */
 export async function importJobImages(d: JobDetail, prev: JobDetail | null): Promise<JobDetail> {
@@ -88,16 +69,19 @@ export async function importJobImages(d: JobDetail, prev: JobDetail | null): Pro
   for (const n of d.notes) notes.push({ ...n, files: await Promise.all(n.files.map(copy)) });
   let out: JobDetail = { ...d, lines, notes };
 
+  const fromJobber = lines.reduce((t, l) => t + l.images.filter((f) => f.image).length, 0);
+  out.photoInfo = fromJobber ? `${fromJobber} line photo${fromJobber === 1 ? "" : "s"} from Jobber` : d.quotePdf ? "" : "no line photos from Jobber and no signed quote PDF on this quote yet";
   // The signed quote's mockups, when Jobber's API gave no photo on the lines themselves.
-  if (d.quotePdf && !lines.some((l) => l.images.some((f) => f.image))) {
-    const fresh = await quotePdfMockups(d.quotePdf, folder).catch(() => null);
+  if (d.quotePdf && !fromJobber) {
+    const fresh = await quotePdfMockups(d.quotePdf, folder).catch((e) => ({ urls: [], status: `couldn't read the signed quote PDF (${e.message})` }));
     if (!fresh && prev) {
       // Couldn't read the PDF this time: keep what the last pull found.
       out.lines = out.lines.map((l) => ({ ...l, images: l.images.length ? l.images : prev.lines.find((p) => p.name === l.name)?.images ?? [] }));
-      return { ...out, quoteMockups: prev.quoteMockups };
+      return { ...out, quoteMockups: prev.quoteMockups, photoInfo: prev.photoInfo };
     }
-    const mockups = fresh ?? [];
-    const photoLines = lines.map((l, i) => (wantsPhoto(l.name) ? i : -1)).filter((i) => i >= 0);
+    out.photoInfo = fresh?.status ?? "couldn't download the signed quote PDF from Jobber";
+    const mockups = fresh?.urls ?? [];
+    const photoLines = lines.map((l, i) => (wantsPhoto(l) ? i : -1)).filter((i) => i >= 0);
     if (mockups.length && mockups.length === photoLines.length) {
       // One picture per "Click Photo to Preview" line, in the quote's order.
       photoLines.forEach((li, k) => { out.lines[li] = { ...out.lines[li], images: [{ name: "Mockup", url: mockups[k], image: true }] }; });
