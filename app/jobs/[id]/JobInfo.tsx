@@ -46,11 +46,10 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
         )}
       </div>
 
-      {(d.instructions || d.quoteMessage || d.notes.length > 0) && (
+      {(d.instructions || d.notes.length > 0) && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
           <div className="font-bold flex items-center gap-2"><StickyNote size={16} /> Notes</div>
           {d.instructions && <Note label="Job instructions" text={d.instructions} />}
-          {d.quoteMessage && <Note label="Message on the quote" text={d.quoteMessage} />}
           {d.notes.map((n, i) => (
             <div key={i}>
               <Note label={n.from === "quote" ? "Quote note" : "Job note"} text={n.message} />
