@@ -17,7 +17,7 @@ export type JobDetail = {
   notes: { from: "job" | "quote"; message: string; at?: string; files: DetailFile[] }[];
   clientTags: string[]; otherJobs: { jobNumber?: number; title?: string; createdAt?: string }[];
   repeat: boolean; repeatWhy?: string; bins: string[];
-  quoteMockups?: string[];
+  quoteMockups?: string[]; photoInfo?: string;
   drive: {
     bins: { bin: string; status: string; source: string }[];
     photos: DrivePhoto[];

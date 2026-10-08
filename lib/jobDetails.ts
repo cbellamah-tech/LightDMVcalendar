@@ -28,9 +28,10 @@ export type JobDetail = {
   quotePdf?: string;        // Jobber link to the signed quote PDF, server-side only (its mockups are copied out)
   quoteMockups?: string[];  // mockups copied out of the signed quote that couldn't be tied to one line
   imgv?: number;            // photo import version this detail was pulled with
+  photoInfo?: string;       // where the line photos came from (or why there are none), shown small on the job page
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
-const IMGV = 1;
+const IMGV = 2;
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
 export const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
