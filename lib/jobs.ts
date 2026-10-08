@@ -23,7 +23,10 @@ export type Job = {
   updatedAt: number;
 };
 
-export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string; counts?: Record<string, number> };
+export type CheckEntry = { done: boolean; by?: string; byName?: string; at?: number; photos: string[]; note?: string; counts?: Record<string, number>;
+  parts?: Record<string, string>;   // photo url -> part of the job it shows (per-part photos)
+  photoBy?: Record<string, string>; // photo url -> who took it
+};
 export type Checklist = { jobId: string; kind: JobKind; items: Record<string, CheckEntry>; completedAt?: number; completedBy?: string; rev: number };
 
 const JOBS = "ldmv:jobs";

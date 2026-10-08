@@ -2,6 +2,7 @@ import { kvGet, kvSet } from "./store";
 import { gql } from "./jobber";
 import { buildSelection, rows, Spec } from "./jobberSchema";
 import { driveFor, DriveIndex, DriveMatch } from "./drive";
+import { jobParts } from "./sops";
 
 /* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices. */
 
@@ -138,4 +139,11 @@ export async function refreshStaleDetails(jobberJobIds: string[], limit = 12) {
   const due = ages.filter((a) => Date.now() - a.at > MAX_AGE).sort((a, b) => a.at - b.at).slice(0, limit);
   for (const a of due) await fetchJobDetail(a.id);
   return due.length;
+}
+
+/** The parts of the job to photograph (from the saved Jobber detail; empty when it hasn't been pulled yet). */
+export async function cachedJobParts(jobberJobId?: string): Promise<string[]> {
+  if (!jobberJobId) return [];
+  const d = await kvGet<JobDetail>(key(jobberJobId));
+  return d ? jobParts(d.lines) : [];
 }

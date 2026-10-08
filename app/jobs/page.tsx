@@ -6,6 +6,7 @@ import { CheckCircle2, ExternalLink, Loader2, Wrench } from "lucide-react";
 import { api, fmtDay, fmtTime, Me, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../signs/types";
 import type { Job, Progress } from "./types";
+import DrivePhotos from "./DrivePhotos";
 
 type Row = Job & { progress: Progress; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean } };
 
@@ -52,6 +53,7 @@ export default function JobsPage() {
           These are sample jobs so you can try the checklist. Real jobs show up once Jobber is connected{office ? <> on the <Link className="underline" href="/settings/jobber">Jobber page</Link></> : ""}.
         </div>
       )}
+      {office && <DrivePhotos />}
       <section className="rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="font-extrabold text-amber-900 flex items-center gap-2"><Wrench size={18} /> Fixes (service calls){openFixes ? ` · ${openFixes} open` : ""}</h2>
