@@ -139,7 +139,7 @@ function CourseCard() {
   return (
     <Card className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="font-bold flex items-center gap-2" style={{ color: NAVY }}><Hammer size={18} /> Installer course</div>
+        <div className="font-bold flex items-center gap-2" style={{ color: NAVY }}><Hammer size={18} /> Installer Training</div>
         <Link href="/install" className="text-sm font-semibold text-slate-500">{c.done} of {c.total} done</Link>
       </div>
       <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${((c.done ?? 0) / Math.max(1, c.total ?? 1)) * 100}%` }} /></div>

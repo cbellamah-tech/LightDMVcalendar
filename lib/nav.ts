@@ -17,12 +17,12 @@ export const TABS: Record<string, Tab> = {
   signs: { href: "/signs", label: "Yard signs", text: "Sign routes: start one, drive, a photo at each stop.", icon: MapPin, roles: OFFICE },
   marketing: { href: "/marketing", label: "Marketing", text: "Leads by source, today's post, one-tap listings.", icon: Megaphone, roles: OFFICE },
   briefing: { href: "/briefing", label: "Briefing", text: "The owners' daily read on the business.", icon: Newspaper, roles: OWNER },
-  training: { href: "/training", label: "Quote course", text: "Learn to build a quote on real houses.", icon: GraduationCap, roles: OFFICE },
+  training: { href: "/training", label: "Quote Creation Training", short: "Quotes", text: "Learn to build a quote on real houses.", icon: GraduationCap, roles: OFFICE },
   costs: { href: "/costs", label: "Costs", text: "What the lights cost, what each job made, stock on hand.", icon: Receipt, roles: OWNER },
   insurance: { href: "/insurance", label: "Insurance", text: "Who's covered, what's due, every policy.", icon: ShieldCheck, roles: OWNER },
   people: { href: "/people", label: "People", text: "Add workers, set PINs, put people on crews.", icon: Users, roles: OFFICE },
-  install: { href: "/install", label: "Install", text: "The installer course: every step of an install and takedown.", icon: Hammer, roles: EVERYONE },
-  crewTraining: { href: "/install/team", label: "Crew training", short: "My crew", text: "Where each person is in the installer course; sign them off.", icon: UserCheck, roles: ["owner", "manager", "lead"] },
+  install: { href: "/install", label: "Installer Training", short: "Training", text: "Every step of an install and a takedown.", icon: Hammer, roles: EVERYONE },
+  crewTraining: { href: "/install/team", label: "Crew training", short: "My crew", text: "Where each person is in Installer Training; sign them off.", icon: UserCheck, roles: ["owner", "manager", "lead"] },
   jobber: { href: "/settings/jobber", label: "Jobber", text: "Jobber connection, sync and the Drive read.", icon: Settings, roles: OFFICE },
 };
 
