@@ -1,18 +1,18 @@
 import { kvGet, kvUpdate } from "./store";
 import type { DetailLine } from "./jobDetails";
 
-/* Light Design Hero mockups, as downloaded before they go on a Jobber quote: "S_Srivastava_Design1.png" is the first line
-   item's mockup for S. Srivastava, "..._Design1_AI.png" the combined AI picture of the whole house. Jobber's API doesn't
+/* Light Design Hero mockups, as downloaded before they go on a Jobber quote: "A_Name_Design1.png" is the first line
+   item's mockup for A. Name, "..._Design1_AI.png" the combined AI picture of the whole house. Jobber's API doesn't
    hand out line item photos, so an owner drops these files on the Jobber tab once; they're kept in photo storage and paired
    to each job by the customer's first initial and last name. Customer names stay in the database, never the code. */
 
 export type Mockup = { n: number; ai: boolean; url: string; file: string; at: number };
-type Library = Record<string, Mockup[]>; // "s srivastava" -> mockups
+type Library = Record<string, Mockup[]>; // "a name" -> mockups
 const KEY = "ldmv:mockups";
 
 const norm = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
-/** "S_Srivastava_Design1 (2).png" -> { who: "s srivastava", n: 1, ai: false } */
+/** "A_Name_Design1 (2).png" -> { who: "a name", n: 1, ai: false } */
 export function parseMockupName(file: string) {
   const m = file.match(/^([A-Za-z])_(.+?)_Design(\d+)(_AI)?(?:\s*\(\d+\))?\.(png|jpe?g|webp)$/i);
   if (!m) return null;

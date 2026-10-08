@@ -14,7 +14,7 @@ export async function GET() {
   return NextResponse.json({ known: await knownFiles(), customers: Object.keys(lib).length });
 }
 
-/** multipart: file (the picture, shrunk by the page), name (the original download's file name, e.g. S_Srivastava_Design1.png) */
+/** multipart: file (the picture, shrunk by the page), name (the original download's file name, e.g. A_Name_Design1.png) */
 export async function POST(req: Request) {
   const s = await requireRole(...OFFICE);
   if (s instanceof NextResponse) return s;
