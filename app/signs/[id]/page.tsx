@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Loader2, LocateFixed, MapPin, Navigation, Play, RefreshCw, Route as RouteIcon, Search, Square } from "lucide-react";
 import AddSignButton from "../AddSignButton";
+import MyPay from "../MyPay";
 import VisitSheet from "../VisitSheet";
 import { arrived, useGps } from "../useGps";
 import { ago, api, NAVY } from "@/components/ui";
@@ -30,6 +31,8 @@ export default function RoutePage({ params }: { params: { id: string } }) {
   const [fromErr, setFromErr] = useState("");
   const [added, setAdded] = useState("");
   const [sheet, setSheet] = useState<{ stop: Stop; auto: boolean } | null>(null);
+  const [payBump, setPayBump] = useState(0);
+  const autoFrom = useRef(false);
   const dismissed = useRef<Set<string>>(new Set());
   const sheetRef = useRef(sheet);
   sheetRef.current = sheet;
@@ -92,6 +95,13 @@ export default function RoutePage({ params }: { params: { id: string } }) {
       setSheet({ stop: best.s, auto: true });
     }
   }, [pos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ready to go: as soon as the route opens, find the phone and plan the best order from there.
+  useEffect(() => {
+    if (!data || run || from || autoFrom.current) return;
+    autoFrom.current = true;
+    takeMyLocation();
+  }, [data, run, from]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function takeMyLocation() {
     setFromErr(""); setFinding("gps");
@@ -237,10 +247,11 @@ export default function RoutePage({ params }: { params: { id: string } }) {
           ) : (
             <div className="font-bold text-green-700 flex items-center gap-2"><Check /> Every spot in {groupLabel.toLowerCase() === "whole route" ? "this route" : groupLabel} is logged. Tap Finish.</div>
           )}
-          <AddSignButton pos={pos} routeId={route.id} onAdded={(m) => { setAdded(m); load(); }} />
+          {data.me.role === "signs" && <MyPay compact bump={payBump} />}
+          <AddSignButton pos={pos} routeId={route.id} onAdded={(m) => { setAdded(m); load(); setPayBump((n) => n + 1); }} />
           {added && <p className="text-sm text-green-700">{added}</p>}
           {gpsErr && distNext != null && <div className="text-xs text-amber-700">{gpsErr}</div>}
-          <p className="text-xs text-slate-400">Keep this screen open while driving. Phones stop sharing location when the app is closed.</p>
+          <p className="text-xs text-slate-400">Keep this screen open while driving; it stays awake on its own. A website can't track GPS while the phone is locked or you're in Google Maps, so it picks your location back up the moment you come back here.</p>
         </div>
       )}
 
@@ -259,7 +270,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
               <button className="w-full text-left p-3 flex gap-3 items-center" onClick={() => setSheet({ stop: s, auto: false })}>
                 <span className="w-7 h-7 shrink-0 rounded-full text-white text-xs font-bold flex items-center justify-center"
                   style={{ background: running && doneInRun(s) ? STATUS_COLOR[v!.status] : !running && v ? STATUS_COLOR[v.status] : s.id === nextStop?.id ? NAVY : "#94A3B8" }}>
-                  {planned ? i + 1 : s.order}
+                  {(running ? doneInRun(s) : v && v.status !== "skipped") ? <Check size={16} strokeWidth={3} /> : planned ? i + 1 : s.order}
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="block font-semibold truncate">{s.name}</span>
@@ -277,7 +288,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
       {sheet && (
         <VisitSheet stop={sheet.stop} auto={sheet.auto} pos={pos} last={lastVisit[sheet.stop.id]}
           onClose={() => { dismissed.current.add(sheet.stop.id); setSheet(null); }}
-          onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); }} />
+          onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); setPayBump((n) => n + 1); }} />
       )}
     </div>
   );

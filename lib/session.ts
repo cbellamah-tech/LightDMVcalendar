@@ -2,7 +2,7 @@ import { envAny } from "./env";
 
 /* Signed session cookie. Uses Web Crypto so it works in middleware (edge) and route handlers. */
 
-export type Role = "owner" | "manager" | "lead" | "crew";
+export type Role = "owner" | "manager" | "lead" | "crew" | "signs"; // signs = yard sign placer: sign routes and his own pay only
 export type Session = { uid: string; name: string; role: Role; crew?: string; exp: number };
 
 export const COOKIE = "ldmv_session";

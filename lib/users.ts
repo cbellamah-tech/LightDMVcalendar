@@ -27,11 +27,18 @@ const SEED: User[] = [
   { id: "sayed", name: "Sayed", role: "lead", crew: "crew2", jobberName: "Sayed", active: true },
 ];
 
+// The yard sign placer login chris asked for on 2026-10-11, added once (an owner can rename it, change the PIN or remove it on People).
+const SIGN_PLACER: User = { id: "signplacer", name: "Sign placer", role: "signs", pinHash: "67cd4051b872331ca36597c98901b542:0c189c6321df297bacbca6cf42735e6e8c6c35219af7fd5170daaf83d86f041d", active: true };
+const SIGN_PLACER_ADDED = "ldmv:seed:signplacer";
+
 export async function listUsers(): Promise<User[]> {
-  const users = await kvGet<User[]>(KEY);
-  if (users) return users;
-  await kvSet(KEY, SEED);
-  return structuredClone(SEED);
+  let users = await kvGet<User[]>(KEY);
+  if (!users) { users = structuredClone(SEED); await kvSet(KEY, users); }
+  if (!(await kvGet<number>(SIGN_PLACER_ADDED))) {
+    if (!users.some((u) => u.id === SIGN_PLACER.id)) { users.push({ ...SIGN_PLACER }); await kvSet(KEY, users); }
+    await kvSet(SIGN_PLACER_ADDED, Date.now());
+  }
+  return users;
 }
 
 export async function saveUsers(users: User[]) {

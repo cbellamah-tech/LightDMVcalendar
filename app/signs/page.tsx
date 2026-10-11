@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Loader2, LocateFixed, Navigation, Upload } from "lucide-react";
 import { distanceM, fmtDist, mapsLink } from "@/lib/geo";
 import AddSignButton from "./AddSignButton";
+import MyPay from "./MyPay";
 import VisitSheet from "./VisitSheet";
 import { arrived, useGps } from "./useGps";
 import { ago, api, NAVY } from "@/components/ui";
@@ -25,15 +26,22 @@ export default function SignsPage() {
   const [sheet, setSheet] = useState<{ stop: Stop; auto: boolean } | null>(null);
   const [added, setAdded] = useState("");
   const [q, setQ] = useState("");
+  const [payBump, setPayBump] = useState(0);
   const dismissed = useRef<Set<string>>(new Set());
   const sheetRef = useRef(sheet);
   sheetRef.current = sheet;
 
   // GPS mode is remembered on this phone, so crews only turn it on once.
+  // The sign placer gets GPS on by default; he can still turn it off.
   useEffect(() => { try { if (localStorage.getItem("ldmv-gps") === "on") setGpsOn(true); } catch {} }, []);
+  const placer = data?.me.role === "signs";
+  useEffect(() => {
+    if (!placer) return;
+    try { if (localStorage.getItem("ldmv-gps") !== "off") setGpsOn(true); } catch { setGpsOn(true); }
+  }, [placer]);
   function toggleGps(on: boolean) {
     setGpsOn(on);
-    try { on ? localStorage.setItem("ldmv-gps", "on") : localStorage.removeItem("ldmv-gps"); } catch {}
+    try { localStorage.setItem("ldmv-gps", on ? "on" : "off"); } catch {}
   }
 
   // Spots near the phone, fetched from the server (there are thousands) when the truck has moved.
@@ -128,6 +136,13 @@ export default function SignsPage() {
         </div>
       </div>
 
+      {placer && <MyPay bump={payBump} />}
+      {placer && (
+        <p className="text-sm text-slate-600">
+          Pick a route below (closest first when GPS is on), tap <b>Open</b>, then <b>Start in this order</b>. Each spot needs a photo; tap <b>Add sign location</b> for a spot that isn't on the list.
+        </p>
+      )}
+
       <div className="bg-white rounded-xl border-2 p-4 space-y-3" style={{ borderColor: gpsOn ? "#1F9D55" : "#E2E8F0" }}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-bold"><LocateFixed size={18} className={gpsOn ? "text-green-700" : "text-slate-400"} /> GPS {gpsOn ? "on" : "off"}</div>
@@ -153,7 +168,7 @@ export default function SignsPage() {
                 </div>
               </div>
             )}
-            <AddSignButton pos={pos} className="w-full" onAdded={(m) => { setAdded(m); load(); nearFrom.current = null; }} />
+            <AddSignButton pos={pos} className="w-full" onAdded={(m) => { setAdded(m); load(); nearFrom.current = null; setPayBump((n) => n + 1); }} />
             {added && <p className="text-sm text-green-700">{added}</p>}
           </>
         )}
@@ -166,7 +181,10 @@ export default function SignsPage() {
         className="w-full border border-slate-300 rounded-lg px-3 py-2" />
 
       <div className="grid md:grid-cols-2 gap-3">
-        {data.routes.filter((r) => !q.trim() || `${r.name} ${r.id} ${r.state || ""}`.toLowerCase().includes(q.trim().toLowerCase())).map((r) => {
+        {data.routes.filter((r) => !q.trim() || `${r.name} ${r.id} ${r.state || ""}`.toLowerCase().includes(q.trim().toLowerCase()))
+          .map((r) => ({ ...r, away: pos ? distanceM(pos, r) : undefined }))
+          .sort((a, b) => (placer && a.away != null && b.away != null ? a.away - b.away : 0))
+          .map((r) => {
           const visited = r.visited;
           const last = r.lastAt;
           return (
@@ -175,7 +193,7 @@ export default function SignsPage() {
                 <div>
                   <div className="text-xs font-bold text-slate-400">{r.rank ? `#${r.rank} · ` : ""}{r.id}{r.state ? ` · ${r.state}` : ""} · {r.groups ? `${r.groups} groups` : ""}</div>
                   <div className="font-bold">{r.name}</div>
-                  <div className="text-sm text-slate-500">{visited}/{r.stops} signs out{last ? ` · last stop ${ago(last)}` : ""}</div>
+                  <div className="text-sm text-slate-500">{visited}/{r.stops} spots done{last ? ` · last stop ${ago(last)}` : ""}{r.away != null ? ` · ${fmtDist(r.away)} away` : ""}</div>
                 </div>
                 <Link href={`/signs/${r.id}`} className="shrink-0 rounded-lg px-3 py-2 text-white font-semibold text-sm flex items-center" style={{ background: NAVY }}>
                   Open <ChevronRight size={16} />
@@ -190,6 +208,7 @@ export default function SignsPage() {
                   onChange={(e) => assign(r.id, e.target.value)}>
                   <option value="">Not assigned (any crew can run it)</option>
                   {Object.entries(CREW_LABEL).map(([k, v]) => <option key={k} value={`crew:${k}`}>{v}</option>)}
+                  {(data.placers || []).map((u) => <option key={u.id} value={`user:${u.id}`}>{u.name}</option>)}
                 </select>
               ) : (
                 <div className="text-xs text-slate-500">{r.assignedCrew ? CREW_LABEL[r.assignedCrew] : r.assignedUser ? "Assigned to you" : "Open route"}</div>
@@ -203,7 +222,7 @@ export default function SignsPage() {
         <VisitSheet stop={sheet.stop} auto={sheet.auto} pos={pos} last={near?.lastVisit[sheet.stop.id]}
           routeName={data.routes.find((r) => r.id === sheet.stop.routeId)?.name}
           onClose={() => { dismissed.current.add(sheet.stop.id); setSheet(null); }}
-          onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); nearFrom.current = null; }} />
+          onSaved={() => { dismissed.current.add(sheet.stop.id); setSheet(null); load(); nearFrom.current = null; setPayBump((n) => n + 1); }} />
       )}
 
       {data.office && (

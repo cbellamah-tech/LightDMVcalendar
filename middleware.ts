@@ -10,6 +10,9 @@ const CREW_OK = ["/", "/jobs", "/api/jobs", "/install", "/api/install", "/api/me
 // Crew leads also see their crew's course progress and sign people off.
 const CREW_NEVER = ["/install/team", "/api/install/team", "/api/install/signoff"];
 
+// The yard sign placer sees the sign routes, his own pay and his photos, nothing else.
+const SIGNS_OK = ["/signs", "/api/signs", "/api/me", "/api/upload", "/api/photos", "/api/geocode"];
+
 // Owners only, not the manager either.
 const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs"];
 
@@ -26,6 +29,11 @@ export async function middleware(req: NextRequest) {
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+  if (s.role === "signs") {
+    if (SIGNS_OK.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && !pathname.startsWith("/api/signs/import") && !pathname.startsWith("/api/signs/assign")) return NextResponse.next();
+    if (isApi) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    return NextResponse.redirect(new URL("/signs", req.url));
   }
   if (s.role === "lead" || s.role === "crew") {
     const asset = !pathname.startsWith("/api/") && /\.(png|jpe?g|webp|svg|gif|ico)$/i.test(pathname); // course drawings and icons

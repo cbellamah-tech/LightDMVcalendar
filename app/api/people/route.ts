@@ -3,7 +3,7 @@ import { OFFICE, requireRole } from "@/lib/auth";
 import { hashPin, listUsers, saveUsers, slug, toPublic, User, validPin } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
-const ROLES = ["owner", "manager", "lead", "crew"];
+const ROLES = ["owner", "manager", "lead", "crew", "signs"];
 
 export async function GET() {
   const s = await requireRole(...OFFICE);

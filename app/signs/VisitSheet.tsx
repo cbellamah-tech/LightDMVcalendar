@@ -6,6 +6,8 @@ import PhotoButton from "@/components/PhotoButton";
 import { api } from "@/components/ui";
 import { distanceM, fmtDist } from "@/lib/geo";
 import { Stop, STATUS_COLOR, STATUS_LABEL, Visit } from "./types";
+import SignCount from "./SignCount";
+import { freshFix } from "./useGps";
 
 type Pos = { lat: number; lng: number; accuracyM: number };
 
@@ -15,6 +17,7 @@ export default function VisitSheet({ stop, auto, pos, last, routeName, onClose, 
   const [status, setStatus] = useState<Visit["status"]>(last && last.status !== "skipped" ? "still_there" : "placed");
   const [photo, setPhoto] = useState<string>("");
   const [note, setNote] = useState("");
+  const [signs, setSigns] = useState(stop.signs || 1);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const needPhoto = stop.photoRequired && status !== "skipped";
@@ -23,7 +26,9 @@ export default function VisitSheet({ stop, auto, pos, last, routeName, onClose, 
   async function save() {
     setBusy(true); setErr("");
     try {
-      await api("/api/signs/visit", { method: "POST", json: { stopId: stop.id, status, photoUrl: photo || undefined, note, ...(pos || {}) } });
+      // GPS goes with every check: the live reading, or a quick fresh one if GPS wasn't running.
+      const here = pos || (await freshFix(8000));
+      await api("/api/signs/visit", { method: "POST", json: { stopId: stop.id, status, photoUrl: photo || undefined, note, signs, ...(here || {}) } });
       onSaved();
     } catch (e: any) { setErr(e.message); setBusy(false); }
   }
@@ -51,6 +56,7 @@ export default function VisitSheet({ stop, auto, pos, last, routeName, onClose, 
             </button>
           ))}
         </div>
+        {(status === "placed" || status === "replaced") && <SignCount value={signs} onChange={setSigns} />}
         {photo ? (
           <div className="relative">
             <img src={photo} alt="Sign" className="w-full max-h-64 object-cover rounded-lg" />

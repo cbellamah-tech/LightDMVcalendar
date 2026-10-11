@@ -22,6 +22,7 @@ export type Stop = {
   radiusM: number;       // GPS arrival radius that triggers the photo prompt
   notes?: string;
   cluster?: string;      // a tight group of spots inside the route, worked in one go
+  signs?: number;        // signs that go at this spot (a stoplight gets one per corner)
   addedBy?: string;      // name of the crew member who added this spot in the field
   addedAt?: number;
 };
@@ -58,6 +59,8 @@ export type Visit = {
   distanceM?: number;    // how far from the stop the phone was when logged
   photoUrl?: string;
   note?: string;
+  signs?: number;        // signs put in the ground on this visit
+  pay?: number;          // what the sign placer earned for it
 };
 
 export type LivePos = { uid: string; name: string; lat: number; lng: number; accuracyM?: number; at: number; routeId?: string };
@@ -67,6 +70,7 @@ const ROUTES_REV = "ldmv:signs:routes:rev"; // bumped on every write so each ser
 const META = "ldmv:signs:meta";
 const VISITS = "ldmv:signs:visits"; // Record<stopId, Visit[]> newest first
 const LIVE = "ldmv:signs:live";     // Record<uid, LivePos>
+const PAY = "ldmv:signs:pay";       // Record<uid, PayEntry[]> newest first
 
 // Thousands of stops: read the big routes value only when another write has changed it.
 let cache: { rev: number; routes: Route[] } | null = null;
@@ -92,7 +96,7 @@ async function updateRoutes(fn: (routes: Route[]) => void) {
 export type ImportMeta = { importedAt: number; source: string; routes: number; stops: number; by?: string; bundle?: string };
 
 // Fingerprint of the bundled stop list, so a new list shipped in code replaces the old bundled one on its own.
-const BUNDLE = (() => { let h = 0; for (let i = 0; i < bundledCsv.length; i++) h = (h * 31 + bundledCsv.charCodeAt(i)) | 0; return `${bundledCsv.length}:${h}`; })();
+const BUNDLE = (() => { let h = 0; for (let i = 0; i < bundledCsv.length; i++) h = (h * 31 + bundledCsv.charCodeAt(i)) | 0; return `p2:${bundledCsv.length}:${h}`; })(); // p2: parser now reads the signs column
 const BUNDLED_SOURCE = "bundled stop list (data/yard-signs/yard_sign_stops.csv)";
 
 const truthy = (v: string) => /^(true|yes|1|y)$/i.test(v);
@@ -125,6 +129,7 @@ export function routesFromCsv(text: string): Route[] {
       state: r.state || undefined,
       photoRequired: r.photo_required === "" || r.photo_required == null ? true : truthy(r.photo_required),
       radiusM: num(r.arrival_radius_m) ?? 75,
+      signs: Math.max(1, Math.round(num(r.signs) ?? 1)),
       notes: r.notes || r.why_picked || r.why || undefined,
       // Prefer a readable group name over an id like R04-G2.
       cluster: (r.cluster_name || r.group_name || r.cluster || r.group || r.cluster_id || r.group_id || "").trim() || undefined,
@@ -204,7 +209,7 @@ export const routeVisibleTo = (r: Route, s: { uid: string; role: string; crew?: 
 
 /** A spot a crew added where they're standing. Joins the given route, or the route with the nearest stop.
  *  If a stop is already within 30 m, that stop is returned instead of making a duplicate. */
-export async function addStop(at: { lat: number; lng: number }, by: string, visible: (r: Route) => boolean, routeId?: string, name?: string) {
+export async function addStop(at: { lat: number; lng: number }, by: string, visible: (r: Route) => boolean, routeId?: string, name?: string, signs = 1) {
   let result: Stop | undefined, created = false;
   await updateRoutes((routes) => {
     const mine = routes.filter(visible);
@@ -227,6 +232,7 @@ export async function addStop(at: { lat: number; lng: number }, by: string, visi
       state: route.state,
       photoRequired: true,
       radiusM: 75,
+      signs,
       cluster: near?.s.routeId === route.id ? near.s.cluster : undefined,
       addedBy: by,
       addedAt: Date.now(),
@@ -236,4 +242,29 @@ export async function addStop(at: { lat: number; lng: number }, by: string, visi
   });
   if (!result) throw new Error("There's no route you can add a sign to.");
   return { stop: result, created };
+}
+
+/* Sign placer pay: $2 for every sign put in the ground with a photo, spots he adds himself included. */
+export const PAY_PER_SIGN = 2;
+export const paidStatus = (st: VisitStatus) => st === "placed" || st === "replaced";
+
+export type PayEntry = {
+  visitId: string; stopId: string; routeId: string; stopName: string; at: number;
+  signs: number; amount: number; photoUrl?: string; lat?: number; lng?: number; added?: boolean; name: string;
+};
+
+export const getPay = async () => (await kvGet<Record<string, PayEntry[]>>(PAY)) ?? {};
+
+/** Logs pay for a visit. Saving the same spot again within 12 hours replaces its entry, so a redo never pays twice. */
+export async function addPay(uid: string, e: PayEntry) {
+  await kvUpdate<Record<string, PayEntry[]>>(PAY, {}, (all) => {
+    const list = (all[uid] ?? []).filter((x) => !(x.stopId === e.stopId && Math.abs(e.at - x.at) < 12 * 3600_000));
+    all[uid] = [e, ...list].slice(0, 5000);
+  });
+}
+
+export async function renameStop(stopId: string, name: string) {
+  await updateRoutes((routes) => {
+    for (const r of routes) for (const st of r.stops) if (st.id === stopId) st.name = name;
+  });
 }

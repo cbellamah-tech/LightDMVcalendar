@@ -6,7 +6,7 @@ import { api, Me, NAVY } from "@/components/ui";
 import { CREW_LABEL } from "../signs/types";
 
 type Person = { id: string; name: string; role: string; crew?: string; phone?: string; jobberName?: string; active: boolean; hasPin: boolean };
-const ROLE_LABEL: Record<string, string> = { owner: "Owner", manager: "Manager", lead: "Crew lead", crew: "Crew" };
+const ROLE_LABEL: Record<string, string> = { owner: "Owner", manager: "Manager", lead: "Crew lead", crew: "Crew", signs: "Sign placer" };
 const blank: Person = { id: "", name: "", role: "crew", active: true, hasPin: false };
 
 export default function PeoplePage() {

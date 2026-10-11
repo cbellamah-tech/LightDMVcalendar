@@ -1,7 +1,7 @@
 export type Stop = {
   id: string; routeId: string; order: number; name: string; lat: number; lng: number; type: string;
   near?: string; nearM?: number; homesNearby?: number; state?: string; photoRequired: boolean; radiusM: number; notes?: string;
-  cluster?: string; addedBy?: string; addedAt?: number;
+  cluster?: string; signs?: number; addedBy?: string; addedAt?: number;
 };
 export type Route = { id: string; name: string; rank?: number; state?: string; stops: Stop[]; assignedCrew?: string; assignedUser?: string };
 export type RouteSummary = {
@@ -11,13 +11,14 @@ export type RouteSummary = {
 export type Visit = {
   id: string; stopId: string; routeId: string; by: string; byName: string; at: number;
   status: "placed" | "still_there" | "replaced" | "skipped"; lat?: number; lng?: number; accuracyM?: number;
-  distanceM?: number; photoUrl?: string; note?: string;
+  distanceM?: number; photoUrl?: string; note?: string; signs?: number; pay?: number;
 };
 export type LivePos = { uid: string; name: string; lat: number; lng: number; accuracyM?: number; at: number; routeId?: string };
 export type SignsData = {
   routes: RouteSummary[]; live: LivePos[]; office: boolean;
   meta?: { importedAt: number; source: string; routes: number; stops: number; by?: string } | null;
   me: { uid: string; name: string; role: string; crew?: string };
+  placers?: { id: string; name: string }[];
 };
 export type RouteData = { route: Route; lastVisit: Record<string, Visit>; me: SignsData["me"] };
 export type NearStop = Stop & { routeName: string; d: number };

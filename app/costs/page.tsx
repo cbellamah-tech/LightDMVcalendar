@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Calculator, Loader2, Package, Trash2, Upload } from "lucide-react";
 import { api, fmtDay, GREEN, NAVY, RED } from "@/components/ui";
+import SignPay from "./SignPay";
 
 /* Owners' Costs: what our materials cost, what each job used and made, and what's left in the warehouse. */
 
@@ -106,6 +107,8 @@ export default function CostsPage() {
           <PriceCheck uc={uc} s={s} />
         </>
       )}
+
+      <SignPay />
 
       <div className={card}>
         <h2 className={h2} style={{ color: NAVY }}>Job ledger</h2>

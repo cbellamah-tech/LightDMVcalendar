@@ -14,7 +14,7 @@ export const TABS: Record<string, Tab> = {
   today: { href: "/", label: "Today", text: "What's happening today.", icon: Home, roles: EVERYONE },
   jobs: { href: "/jobs", label: "Jobs", text: "Every install, takedown and fix, with the crew checklist and photos.", icon: ClipboardCheck, roles: EVERYONE },
   calendar: { href: "/calendar", label: "Calendar", text: "Chris and Liam's recurring task board.", icon: CalendarDays, roles: OWNER },
-  signs: { href: "/signs", label: "Yard signs", text: "Sign routes: start one, drive, a photo at each stop.", icon: MapPin, roles: OFFICE },
+  signs: { href: "/signs", label: "Yard signs", text: "Sign routes: start one, drive, a photo at each stop.", icon: MapPin, roles: ["owner", "manager", "signs"] },
   marketing: { href: "/marketing", label: "Marketing", text: "Leads by source, today's post, one-tap listings.", icon: Megaphone, roles: OFFICE },
   briefing: { href: "/briefing", label: "Briefing", text: "The owners' daily read on the business.", icon: Newspaper, roles: OWNER },
   training: { href: "/training", label: "Quote Creation Training", short: "Quotes", text: "Learn to build a quote on real houses.", icon: GraduationCap, roles: OFFICE },
@@ -33,6 +33,7 @@ const PRIMARY: Record<Role, (keyof typeof TABS)[]> = {
   manager: ["today", "jobs", "marketing", "signs"],
   lead: ["today", "jobs", "install", "crewTraining"],
   crew: ["today", "jobs", "install"],
+  signs: ["signs"],
 };
 
 /** Everything else, grouped by what it's for. A group a role can't see anything in disappears. */
@@ -52,4 +53,4 @@ export const moreGroups = (role: Role) => {
   return groupsFor(role).map((g) => ({ ...g, tabs: g.tabs.filter((t) => !inBar.has(t.href)) })).filter((g) => g.tabs.length);
 };
 
-export const ROLE_LABEL: Record<Role, string> = { owner: "Owner", manager: "Office", lead: "Crew lead", crew: "Crew" };
+export const ROLE_LABEL: Record<Role, string> = { owner: "Owner", manager: "Office", lead: "Crew lead", crew: "Crew", signs: "Sign placer" };

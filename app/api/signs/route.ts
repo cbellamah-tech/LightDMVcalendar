@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { getLive, getMeta, getRoutes, getVisits, routeVisibleTo } from "@/lib/signs";
+import { listUsers } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export async function GET() {
   if (s instanceof NextResponse) return s;
   const office = s.role === "owner" || s.role === "manager";
   const routes = await getRoutes(); // seeds from the bundled CSV on first use
-  const [visits, live, meta] = await Promise.all([getVisits(), getLive(), getMeta()]);
+  const [visits, live, meta, users] = await Promise.all([getVisits(), getLive(), getMeta(), office ? listUsers() : []]);
   const summaries = routes.filter((r) => routeVisibleTo(r, s)).map((r) => {
     let visited = 0, lastAt = 0, lat = 0, lng = 0;
     const groups = new Set<string>();
@@ -27,5 +28,5 @@ export async function GET() {
       stops: r.stops.length, groups: groups.size, visited, lastAt: lastAt || undefined, lat: lat / n, lng: lng / n,
     };
   });
-  return NextResponse.json({ routes: summaries, live: office ? Object.values(live) : [], meta, office, me: { uid: s.uid, name: s.name, role: s.role, crew: s.crew } });
+  return NextResponse.json({ routes: summaries, live: office ? Object.values(live) : [], meta, office, placers: users.filter((u) => u.role === "signs" && u.active).map((u) => ({ id: u.id, name: u.name })), me: { uid: s.uid, name: s.name, role: s.role, crew: s.crew } });
 }

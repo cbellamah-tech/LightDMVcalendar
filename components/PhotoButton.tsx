@@ -30,9 +30,9 @@ export async function uploadPhoto(file: File, folder: string): Promise<string> {
 }
 
 export default function PhotoButton({
-  folder, onUploaded, label = "Add photo", multiple = true, className = "", color = "#112E5B",
+  folder, onUploaded, onOpen, label = "Add photo", multiple = true, className = "", color = "#112E5B",
 }: {
-  folder: string; onUploaded: (urls: string[]) => void | Promise<void>;
+  folder: string; onUploaded: (urls: string[]) => void | Promise<void>; onOpen?: () => void;
   label?: string; multiple?: boolean; className?: string; color?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -42,7 +42,7 @@ export default function PhotoButton({
   return (
     <>
       <button type="button" disabled={busy}
-        onClick={() => input.current?.click()}
+        onClick={() => { onOpen?.(); input.current?.click(); }}
         className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-semibold text-white disabled:opacity-60 ${className}`}
         style={{ background: color }}>
         {busy ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}

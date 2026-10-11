@@ -2,7 +2,7 @@ export const NAVY = "#112E5B";
 export const RED = "#F10800";
 export const GREEN = "#1F9D55";
 
-export type Me = { uid: string; name: string; role: "owner" | "manager" | "lead" | "crew"; crew?: string };
+export type Me = { uid: string; name: string; role: "owner" | "manager" | "lead" | "crew" | "signs"; crew?: string };
 
 export async function api<T = any>(url: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const res = await fetch(url, {
