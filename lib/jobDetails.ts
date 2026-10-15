@@ -28,13 +28,14 @@ export type JobDetail = {
   bins: string[];           // bin numbers written in Jobber notes
   value?: number;           // pre-tax job total, server-side only (crew pay); withDrive drops it
   quoteId?: string;         // the Jobber quote the job came from
+  jobberUrl?: string;       // the quote (else the job) in Jobber, where the line item photos show
   quoteMockups?: string[];  // designs that aren't tied to one line (the AI whole-house picture, extra designs)
   imgv?: number;            // photo import version this detail was pulled with
   photoInfo?: string;       // where the line photos came from (or why there are none), shown small on the job page
   quoteLines?: { name: string; description?: string }[]; // the quote's lines in order (Light Design Hero designs follow them)
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
-const IMGV = 4;
+const IMGV = 5;
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
 export const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
@@ -45,10 +46,10 @@ export const LINE: Spec = {
 };
 const NOTES: Spec[string] = { first: 30, sel: { nodes: { sel: { message: true, createdAt: true, fileAttachments: FILES, attachments: FILES } } } };
 const JOB_SPEC: Spec = {
-  id: true, jobNumber: true, createdAt: true, instructions: true, total: true, amounts: { sel: { subtotal: true, total: true } },
+  id: true, jobNumber: true, createdAt: true, instructions: true, jobberWebUri: true, total: true, amounts: { sel: { subtotal: true, total: true } },
   lineItems: { first: 50, sel: { nodes: { sel: { ...LINE, totalPrice: true } } } },
   notes: NOTES,
-  quote: { sel: { id: true, quoteNumber: true, message: true, notes: NOTES, lineItems: { first: 50, sel: { nodes: { sel: LINE } } } } },
+  quote: { sel: { id: true, quoteNumber: true, jobberWebUri: true, message: true, notes: NOTES, lineItems: { first: 50, sel: { nodes: { sel: LINE } } } } },
   client: { sel: {
     id: true, name: true,
     tags: { first: 20, sel: { nodes: { sel: { label: true } } } },
@@ -133,7 +134,7 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
   return {
     // The quote's customer message (our service agreement) is for the customer, not the crew, so it is never sent.
     createdAt: j.createdAt, instructions: j.instructions && !isContract(j.instructions) ? j.instructions : undefined,
-    quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined, quoteId: quote.id || undefined,
+    quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined, quoteId: quote.id || undefined, jobberUrl: quote.jobberWebUri || j.jobberWebUri || undefined,
     lines, notes, clientName: client.name, clientTags: rows(client.tags).map((t: any) => t.label).filter(Boolean),
     otherJobs, repeat, repeatWhy, bins, value: jobValue(j),
     quoteLines: quoteLines.map((x: any) => ({ name: String(x.name || ""), description: x.description || undefined })),
