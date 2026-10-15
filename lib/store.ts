@@ -77,6 +77,50 @@ export async function kvSet<T>(key: string, value: T): Promise<void> {
   mem.set(key, structuredClone(value));
 }
 
+/** Many keys in one round trip (customer sync writes a page of records at once). */
+export async function kvSetMany(entries: [string, unknown][]): Promise<void> {
+  if (!entries.length) return;
+  if (sql) {
+    await ready();
+    for (let i = 0; i < entries.length; i += 500) {
+      const rows = entries.slice(i, i + 500).map(([key, value]) => ({ key, value: sql.json(value as any) }));
+      await sql`insert into ldmv_kv ${sql(rows as any, "key", "value")}
+        on conflict (key) do update set value = excluded.value, updated_at = now()`;
+    }
+    return;
+  }
+  if (redis) {
+    for (let i = 0; i < entries.length; i += 200) await redis.mset(Object.fromEntries(entries.slice(i, i + 200)));
+    return;
+  }
+  for (const [k, v] of entries) mem.set(k, structuredClone(v));
+}
+
+/** Every key starting with `prefix` and its value (the customer list is built from a few thousand records). */
+export async function kvGetPrefix<T>(prefix: string): Promise<[string, T][]> {
+  if (sql) {
+    await ready();
+    const rows = await sql`select key, value from ldmv_kv where key like ${prefix.replace(/[\\%_]/g, (c) => "\\" + c) + "%"}`;
+    return rows.map((r) => [r.key as string, r.value as T]);
+  }
+  if (redis) {
+    const keys: string[] = [];
+    let cursor: string | number = 0;
+    do {
+      const [next, batch]: [string | number, string[]] = await redis.scan(cursor, { match: `${prefix}*`, count: 1000 });
+      keys.push(...batch);
+      cursor = next;
+    } while (String(cursor) !== "0");
+    const out: [string, T][] = [];
+    for (let i = 0; i < keys.length; i += 200) {
+      const vals = await redis.mget<(T | null)[]>(...keys.slice(i, i + 200));
+      vals.forEach((v, j) => { if (v != null) out.push([keys[i + j], v]); });
+    }
+    return out;
+  }
+  return [...mem.entries()].filter(([k]) => k.startsWith(prefix)).map(([k, v]) => [k, structuredClone(v) as T]);
+}
+
 export async function kvDel(key: string): Promise<void> {
   if (sql) {
     await ready();

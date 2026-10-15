@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { checklistProgress, ensureSampleJobs, getChecklists, jobVisibleTo, type Job } from "@/lib/jobs";
 import { syncIfStale } from "@/lib/jobber";
+import { kickCustomers } from "@/lib/cxSync";
 import { listUsers } from "@/lib/users";
 import { kvGetMany } from "@/lib/store";
 import { JobDetail, withDrive } from "@/lib/jobDetails";
@@ -23,6 +24,7 @@ export async function GET(req: Request) {
   // Everything the list needs, read side by side; the Jobber sync (when due) runs after the answer is sent.
   const [all, users, idx, overrides, sheet] = await Promise.all([
     ensureSampleJobs(), listUsers(), loadDriveIndex(), getPayOverrides(), office ? fixSheetStatus() : null, syncIfStale().catch(() => {}),
+    kickCustomers(url.origin).catch(() => {}), // owners' customer database, refreshed in the background
   ]);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const from = url.searchParams.get("from") || new Date(today.getTime() - 86400_000).toISOString();

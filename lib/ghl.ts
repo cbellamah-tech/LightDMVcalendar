@@ -9,9 +9,21 @@ const BASE = "https://services.leadconnectorhq.com";
 const SNAP = "ldmv:ghl:snap";
 
 export const ghlConfigured = () => !!process.env.GHL_API_KEY?.trim() && !!process.env.GHL_LOCATION_ID?.trim();
-const loc = () => process.env.GHL_LOCATION_ID!.trim();
+export const loc = () => process.env.GHL_LOCATION_ID!.trim();
 
-async function ghl<T = any>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+export async function ghl<T = any>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await ghlOnce<T>(path, init);
+    } catch (e: any) {
+      // GoHighLevel allows about 100 calls per 10 seconds: wait it out and try again.
+      if (attempt >= 3 || !/\(429\)/.test(e.message)) throw e;
+      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+    }
+  }
+}
+
+async function ghlOnce<T = any>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: init?.method ?? "GET",
     headers: {
@@ -29,7 +41,7 @@ async function ghl<T = any>(path: string, init?: { method?: string; body?: unkno
 }
 
 /** The first array found under any of these keys, at any depth of 2. GHL wraps lists differently per endpoint. */
-function listIn(j: any, keys: string[]): any[] {
+export function listIn(j: any, keys: string[]): any[] {
   for (const k of keys) if (Array.isArray(j?.[k])) return j[k];
   for (const v of Object.values(j ?? {})) if (v && typeof v === "object") for (const k of keys) if (Array.isArray((v as any)[k])) return (v as any)[k];
   return [];

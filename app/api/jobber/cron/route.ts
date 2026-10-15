@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isConnected, jobberConfigured, syncJobber } from "@/lib/jobber";
 import { scanReviews } from "@/lib/reviews";
+import { kickCustomers } from "@/lib/cxSync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,6 +14,8 @@ export async function GET(req: Request) {
   if (!fromCron) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   // New Google reviews: credit the installer whose review card was tapped (needs only Google).
   const reviews = await scanReviews().catch((e) => ({ error: e.message }));
+  // The owners' customer database (Jobber and GoHighLevel), in the background.
+  await kickCustomers(new URL(req.url).origin, 0).catch(() => {});
   if (!jobberConfigured() || !(await isConnected())) return NextResponse.json({ skipped: "Jobber not connected", reviews });
   try {
     return NextResponse.json({ count: await syncJobber(40) });
