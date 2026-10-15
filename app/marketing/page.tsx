@@ -6,6 +6,8 @@ import { ago, api, fmtDay, NAVY } from "@/components/ui";
 import { Card, Dot, Feed, FeedItem, Light, LIGHT_WORD } from "./parts";
 import { ChannelName, Media, MediaBoard, SheetView } from "./media";
 import { Attribution, OrganicPaid } from "./dashboard";
+import { googleAdsScript } from "./adsScript";
+import { WebsiteGoogle } from "./web";
 
 export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
@@ -103,6 +105,8 @@ export default function Marketing() {
 
       <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} errors={d.ghl.errors} />
 
+      <WebsiteGoogle owner={owner} botBox={d.botBox} />
+
       <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} autopost={d.autopost} owner={owner} today={d.today} reload={load} />
 
       <Inbox inbox={d.inbox} onHide={hide} />
@@ -195,7 +199,7 @@ function Setup({ d, reload }: { d: Data; reload: () => void }) {
           ) : <p className="text-slate-600">Waiting on the GHL key in Vercel (GHL_API_KEY and GHL_LOCATION_ID).</p>}
         </div>
         <div className="rounded-lg border border-slate-200 p-3 space-y-2">
-          <div className="font-bold">Google (info@, the sheet, Drive photos)</div>
+          <div className="font-bold">Google (info@, the sheet, Drive photos, Search Console, Analytics)</div>
           {d.google.connected ? (
             <>
               <div className="text-green-700 font-semibold">Connected{d.google.email ? ` as ${d.google.email}` : ""}</div>
@@ -243,27 +247,6 @@ function adsLine(a: Data["ads"]) {
   return `Last 7 days: ${[part("Facebook", a.facebook), part("Google", a.google), part("Local Services", a.lsa)].filter(Boolean).join(" · ")}`;
 }
 
-function googleAdsScript(url: string, key: string) {
-  return `// Light DMV app: sends the last 30 days of Google Ads and Local Services numbers to the Marketing tab, daily.
-function main() {
-  var rows = AdsApp.search("SELECT segments.date, campaign.advertising_channel_type, metrics.cost_micros, metrics.clicks, " +
-    "metrics.impressions, metrics.conversions FROM campaign WHERE segments.date DURING LAST_30_DAYS");
-  var by = { google: {}, lsa: {} };
-  while (rows.hasNext()) {
-    var r = rows.next();
-    var src = r.campaign.advertisingChannelType === "LOCAL_SERVICES" ? "lsa" : "google";
-    var d = by[src][r.segments.date] = by[src][r.segments.date] || { day: r.segments.date, spend: 0, clicks: 0, impressions: 0, leads: 0 };
-    d.spend += Number(r.metrics.costMicros) / 1e6; d.clicks += Number(r.metrics.clicks);
-    d.impressions += Number(r.metrics.impressions); d.leads += Math.round(Number(r.metrics.conversions));
-  }
-  ["google", "lsa"].forEach(function (src) {
-    var days = Object.keys(by[src]).map(function (k) { return by[src][k]; });
-    if (!days.length) return;
-    UrlFetchApp.fetch("${url}/ads", { method: "post", contentType: "application/json",
-      headers: { Authorization: "Bearer ${key}" }, payload: JSON.stringify({ source: src, days: days }) });
-  });
-}`;
-}
 
 function AdsPanel({ ads, botBox }: { ads: Data["ads"]; botBox: Data["botBox"] }) {
   const [copied, setCopied] = useState(false);
@@ -288,7 +271,7 @@ function AdsPanel({ ads, botBox }: { ads: Data["ads"]; botBox: Data["botBox"] })
       )}
       {!ads.google.has && botBox && (
         <div className="text-xs text-slate-600 space-y-1">
-          <p><b>Pair Google (once the app is live on the real site):</b> in Google Ads go to Tools, Bulk actions, Scripts, press +, paste this, Authorize, then set Frequency to Daily. It covers Local Services too.</p>
+          <p><b>Pair Google:</b> in Google Ads go to Tools, Bulk actions, Scripts, press +, paste this, Authorize, then set Frequency to Daily. It covers Local Services and keywords too.</p>
           <button className="rounded-lg px-3 py-1.5 font-semibold border border-slate-300" onClick={() => {
             navigator.clipboard.writeText(googleAdsScript(botBox.url, botBox.key)).then(() => setCopied(true)).catch(() => {});
           }}>{copied ? "Copied" : "Copy the Google Ads script"}</button>
