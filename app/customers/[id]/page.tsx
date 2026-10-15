@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2, Mail, MapPin, MessageSquare, Phone, StickyNote, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2, Mail, MapPin, MessageSquare, Package, Phone, StickyNote, X } from "lucide-react";
 import { api, NAVY } from "@/components/ui";
 
 type Line = { name: string; description?: string; qty?: number; unit?: number; total?: number };
@@ -10,7 +10,9 @@ type Work = { id: string; num?: string; title?: string; date?: string; status?: 
 type Season = { year: number; total: number; tags: string[]; jobs: Work[]; quotes: Work[] };
 type Event = { id: string; at?: string; kind: string; dir?: "in" | "out"; text: string; from: string; group: "text" | "note" | "call" | "email" | "other" };
 type Photo = { url: string; label: string; year?: number; group: "design" | "install" | "takedown" | "crew" };
+type Bin = { bin: string; year?: number; status?: string; source: string };
 type Profile = {
+  bins: Bin[];
   id: string; name: string; aka: string[]; status: string; total: number; seasons: number[];
   phones: string[]; emails: string[]; addresses: string[]; tags: string[]; links: { label: string; url: string }[];
   seasons_: Season[]; photos: Photo[]; timeline: Event[]; jobberTexts: boolean; ghl: boolean; refreshing: boolean;
@@ -62,6 +64,18 @@ export default function CustomerPage({ params }: { params: { id: string } }) {
             <MapPin size={15} className="text-slate-400 shrink-0" />{x}
           </a>
         ))}
+        {p.bins.length > 0 && (
+          <div className="flex items-start gap-2 pt-1">
+            <Package size={15} className="text-slate-400 mt-0.5 shrink-0" />
+            <div className="flex flex-wrap gap-1">
+              {p.bins.map((b, i) => (
+                <span key={i} className="text-xs rounded px-2 py-0.5 bg-slate-100" title={b.source}>
+                  <b>Bin {b.bin}</b>{b.year ? ` · ${b.year}` : ""}{b.status ? ` · ${b.status}` : ""} <span className="text-slate-400">({b.source})</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {p.tags.length > 0 && <div className="flex flex-wrap gap-1 pt-1">{p.tags.map((t) => <span key={t} className="text-xs bg-slate-100 rounded px-2 py-0.5">{t}</span>)}</div>}
         {p.links.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
