@@ -49,6 +49,11 @@ export default function JobInfo({ d, onView }: { d: JobDetail; onView: (url: str
       {lines.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
           <div className="font-bold flex items-center gap-2"><FileText size={16} /> What we're installing</div>
+          {d.jobberUrl && (
+            <a href={d.jobberUrl} target="_blank" rel="noreferrer" className="inline-block rounded-lg px-4 py-2 font-semibold text-white text-sm" style={{ background: "#112E5B" }}>
+              See the line item photos in Jobber
+            </a>
+          )}
           <p className="text-xs text-slate-500">Line photos: {d.photoInfo || (d.error ? `couldn't reach Jobber (${d.error})` : "not checked yet, refresh in a minute")}.</p>
           {!!d.quoteMockups?.length && (
             <div className="pb-1">
