@@ -18,6 +18,7 @@ export type JobDetail = {
   clientTags: string[]; otherJobs: { jobNumber?: number; title?: string; createdAt?: string }[];
   repeat: boolean; repeatWhy?: string; bins: string[];
   quoteMockups?: string[]; photoInfo?: string;
+  jobberUrl?: string;
   drive: {
     bins: { bin: string; status: string; source: string }[];
     photos: DrivePhoto[];
