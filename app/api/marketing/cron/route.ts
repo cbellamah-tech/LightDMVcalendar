@@ -3,6 +3,8 @@ import { ensureRunnerFile, syncSheet } from "@/lib/marketingData";
 import { googleStatus } from "@/lib/google";
 import { autoPostNext } from "@/lib/autopost";
 import { syncMetaAds } from "@/lib/ads";
+import { refreshWebsite } from "@/lib/website";
+import { refreshInsights } from "@/lib/googleInsights";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -15,8 +17,10 @@ export async function GET(req: Request) {
   if (!fromCron) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   await autoPostNext().catch(() => null);
   await syncMetaAds(true).catch(() => null); // backup, in case the daily video finished while Auto-post was off
+  await refreshWebsite().catch(() => null); // new pages and blog posts on lightdmv.com
   if (!(await googleStatus()).connected) return NextResponse.json({ skipped: "Google not connected" });
   await ensureRunnerFile(true).catch(() => {});
+  await refreshInsights().catch(() => null);
   const r = await syncSheet("Daily auto-fill");
   return NextResponse.json(r);
 }

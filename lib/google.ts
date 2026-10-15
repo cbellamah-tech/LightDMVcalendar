@@ -15,14 +15,18 @@ const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.readonly", // job photos for the daily video
   "https://www.googleapis.com/auth/drive.file",     // the one small file the app writes (the video runner's key)
+  "https://www.googleapis.com/auth/webmasters.readonly", // Search Console: searches, clicks, keywords, pages
+  "https://www.googleapis.com/auth/analytics.readonly",  // Google Analytics: visitors, channels, leads
 ];
+export const SCOPE_SEARCH = "https://www.googleapis.com/auth/webmasters.readonly";
+export const SCOPE_ANALYTICS = "https://www.googleapis.com/auth/analytics.readonly";
 const TOKENS = "ldmv:google:tokens";
 
 // "2026 Marketing Campaign" in Light DMV's Drive (Marketing folder).
 export const SHEET_ID = process.env.MARKETING_SHEET_ID?.trim() || "1lTuCIn1YH_WE1IIp4V9diGEVuVREoTaNyL_dOZLYoj0";
 export const sheetUrl = () => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
 
-type Tokens = { access_token: string; refresh_token: string; expires_at: number; email?: string; connectedAt: number };
+type Tokens = { access_token: string; refresh_token: string; expires_at: number; email?: string; connectedAt: number; scope?: string };
 
 export const googleConfigured = () => !!process.env.GOOGLE_CLIENT_ID?.trim() && !!process.env.GOOGLE_CLIENT_SECRET?.trim();
 export const googleRedirect = (origin: string) => `${stableOrigin(origin)}/api/google/callback`;
@@ -34,6 +38,7 @@ export function googleAuthUrl(origin: string, state: string) {
   u.searchParams.set("response_type", "code");
   u.searchParams.set("scope", SCOPES.join(" "));
   u.searchParams.set("access_type", "offline");
+  u.searchParams.set("include_granted_scopes", "true");
   u.searchParams.set("prompt", "consent"); // always hand back a refresh token
   u.searchParams.set("login_hint", "info@lightdmv.com");
   u.searchParams.set("state", state);
@@ -48,7 +53,7 @@ async function token(params: Record<string, string>) {
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || !j.access_token) throw new Error(`Google sign-in failed (${res.status}): ${j.error_description || j.error || "no token"}`);
-  return j as { access_token: string; refresh_token?: string; expires_in: number; id_token?: string };
+  return j as { access_token: string; refresh_token?: string; expires_in: number; id_token?: string; scope?: string };
 }
 
 export async function googleExchange(code: string, origin: string) {
@@ -56,7 +61,22 @@ export async function googleExchange(code: string, origin: string) {
   if (!j.refresh_token) throw new Error("Google didn't hand back a long-lived key. Remove the app's access in your Google account and connect again.");
   let email: string | undefined;
   try { email = JSON.parse(Buffer.from(j.id_token!.split(".")[1], "base64url").toString()).email; } catch {}
-  await kvSet<Tokens>(TOKENS, { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in - 120) * 1000, email, connectedAt: Date.now() });
+  await kvSet<Tokens>(TOKENS, { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in - 120) * 1000, email, connectedAt: Date.now(), scope: j.scope });
+}
+
+/** What the saved Google connection may read (asked of Google once for connections made before scopes were saved). */
+export async function grantedScopes(): Promise<string[]> {
+  const t = await kvGet<Tokens>(TOKENS);
+  if (!t) return [];
+  if (t.scope === undefined) {
+    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(await googleAccessToken())}`, { cache: "no-store" });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || typeof j.scope !== "string") return [];
+    const cur = (await kvGet<Tokens>(TOKENS))!;
+    await kvSet<Tokens>(TOKENS, { ...cur, scope: j.scope });
+    return j.scope.split(" ");
+  }
+  return t.scope.split(" ");
 }
 
 export async function googleStatus() {
@@ -70,7 +90,7 @@ export async function googleAccessToken(): Promise<string> {
   if (!t) throw new Error("Google is not connected.");
   if (t.expires_at > Date.now()) return t.access_token;
   const j = await token({ grant_type: "refresh_token", refresh_token: t.refresh_token });
-  await kvSet<Tokens>(TOKENS, { ...t, access_token: j.access_token, expires_at: Date.now() + (j.expires_in - 120) * 1000 });
+  await kvSet<Tokens>(TOKENS, { ...t, access_token: j.access_token, expires_at: Date.now() + (j.expires_in - 120) * 1000, ...(j.scope ? { scope: j.scope } : {}) });
   return j.access_token;
 }
 
