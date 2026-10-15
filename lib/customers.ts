@@ -12,7 +12,7 @@ import { isAdminLine, lineTags } from "./cxItems";
 export type CxRow = {
   id: string; name: string; aka: string[]; address?: string; phone?: string; email?: string;
   seasons: number[]; total: number; lastAt: number; jobs: number; quotes: number;
-  status: "customer" | "quoted" | "lead"; jobber: boolean; ghl: boolean;
+  status: "customer" | "quoted" | "lead"; jobber: boolean; ghl: boolean; bins?: string[];
 };
 type Members = { jc: string[]; gc: string[]; jq: string[]; jj: string[] };
 
@@ -84,6 +84,8 @@ export async function buildCustomers(): Promise<number> {
   const groups = new Map<number, number[]>();
   ids.forEach((_, i) => { const r = find(i); (groups.get(r) ?? groups.set(r, []).get(r)!).push(i); });
 
+  const { loadDriveIndex, driveFor } = await import("./drive");
+  const driveIdx = await loadDriveIndex();
   const rows: CxRow[] = [];
   const members: [string, Members][] = [];
   for (const list of groups.values()) {
@@ -106,6 +108,7 @@ export async function buildCustomers(): Promise<number> {
       phone: [...js.flatMap((c) => c.phones), ...gs.flatMap((c) => c.phones)][0], email: [...js.flatMap((c) => c.emails), ...gs.flatMap((c) => c.emails)].find((e) => !OUR_EMAIL.test(e)),
       seasons, total, lastAt: Math.max(0, ...times), jobs: jobs.length, quotes: quotes.length,
       status: total > 0 || jobs.length ? "customer" : quotes.length ? "quoted" : "lead", jobber: js.length > 0, ghl: gs.length > 0,
+      bins: [...new Set(js.flatMap((c) => driveFor(driveIdx, c.name).bins.map((b) => b.bin)))],
     });
     members.push([MEMBERS + id, m]);
   }
@@ -153,6 +156,9 @@ export function searchRows(rows: CxRow[], q: string, status?: string): CxRow[] {
     if (status && status !== "all" && r.status !== status) return false;
     if (!words.length) return true;
     if (qd.length >= 4 && r.phone && digits(r.phone).includes(qd)) return true;
+    // "bin 418" or "418" finds whoever is in that bin.
+    const bin = q.match(/^\s*(?:bin|box)?\s*#?\s*(\d{1,4}[a-z]?)\s*$/i)?.[1];
+    if (bin && r.bins?.includes(bin)) return true;
     const hay = norm([r.name, ...r.aka, r.address, r.email].filter(Boolean).join(" "));
     return words.every((w) => hay.includes(w));
   });
@@ -167,7 +173,10 @@ export type CxSeason = {
 };
 export type CxEvent = { id: string; at?: string; kind: string; dir?: "in" | "out"; text: string; from: string; group: "text" | "note" | "call" | "email" | "other" };
 export type CxPhoto = { url: string; label: string; year?: number; group: "design" | "install" | "takedown" | "crew" };
-export type CxProfile = CxRow & {
+/** A storage bin: where it was listed (a Drive "Bins" sheet, or a Jobber note) and that list's year when it names one. */
+export type CxBin = { bin: string; year?: number; status?: string; source: string };
+export type CxProfile = Omit<CxRow, "bins"> & {
+  bins: CxBin[];
   phones: string[]; emails: string[]; addresses: string[]; tags: string[];
   links: { label: string; url: string }[];
   seasons_: CxSeason[]; photos: CxPhoto[]; timeline: CxEvent[];
@@ -222,7 +231,14 @@ export async function customerProfile(id: string): Promise<CxProfile | null> {
   const timeline = events.filter((e) => { const k = `${e.at?.slice(0, 16)}|${e.text.slice(0, 80)}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")).slice(0, 800);
 
-  const photos = await customerPhotos(clients, contacts, m.jj);
+  // Bin numbers written in any Jobber note or line ("bin 418", "box #58").
+  const noteText = [...clients.flatMap((c) => c.notes), ...quotes.flatMap((q) => [...q.notes, ...q.lines.map((l) => ({ text: `${l.name} ${l.description ?? ""}`, at: q.createdAt }))]),
+    ...jobs.flatMap((j) => [...j.notes, ...j.lines.map((l) => ({ text: `${l.name} ${l.description ?? ""}`, at: jobDate(j) }))])];
+  const noteBins: CxBin[] = noteText.flatMap((n) => [...n.text.matchAll(/\b(?:bin|box)\s*(?:#|no\.?|number)?\s*(\d{1,4})\b/gi)]
+    .map((x) => ({ bin: x[1], year: seasonOf(n.at) || undefined, source: "Jobber notes" })));
+  const { photos, bins: driveBins } = await customerPhotos(clients, contacts, m.jj);
+  const bins = [...driveBins, ...noteBins].filter((b, i, a) => a.findIndex((x) => x.bin === b.bin && x.year === b.year) === i)
+    .sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.bin.localeCompare(b.bin, undefined, { numeric: true }));
   const { getCxState } = await import("./cxSync");
   const textFields = (await getCxState()).jobberTextFields ?? [];
   const links = [
@@ -236,23 +252,26 @@ export async function customerProfile(id: string): Promise<CxProfile | null> {
     emails: [...new Set([...clients.flatMap((c) => c.emails), ...contacts.flatMap((c) => c.emails)].map((e) => e.toLowerCase()))],
     addresses: [...new Set([...jobs.map((j) => j.address), ...quotes.map((q) => q.address), ...clients.flatMap((c) => c.addresses), ...contacts.map((c) => c.address)].filter((a): a is string => !!a))],
     tags: [...new Set([...clients.flatMap((c) => c.tags), ...contacts.flatMap((c) => c.tags)])],
-    links, seasons_: seasons, photos, timeline,
+    links, seasons_: seasons, photos, timeline, bins,
     synced: { notesAt: ats(gns), textsAt: ats(gms) }, jobberTexts: textFields.length > 0, contactIds: m.gc,
   };
 }
 
 /** The photos the app already has for this customer: Light Design Hero designs and finished-install and takedown
     photos from Drive (matched by name, as on the job page), plus every photo the crews took on the app's checklists. */
-async function customerPhotos(clients: JClient[], contacts: GContact[], jobIds: string[]): Promise<CxPhoto[]> {
+async function customerPhotos(clients: JClient[], contacts: GContact[], jobIds: string[]): Promise<{ photos: CxPhoto[]; bins: CxBin[] }> {
   const [{ loadDriveIndex, driveFor }, { loadLibrary, mockupsFor }, { getJobs, getChecklists }] = await Promise.all([import("./drive"), import("./mockups"), import("./jobs")]);
   const [idx, lib, all] = await Promise.all([loadDriveIndex(), loadLibrary(), getJobs()]);
   const out: CxPhoto[] = [];
+  const bins: CxBin[] = [];
   const seen = new Set<string>();
   const add = (p: CxPhoto) => { if (!seen.has(p.url)) { seen.add(p.url); out.push(p); } };
   const names = [...new Set([...clients.map((c) => c.name), ...contacts.map((c) => c.name)])].filter((n) => n && n !== "Unnamed");
   for (const n of names) {
     for (const d of mockupsFor(lib, n)) add({ url: d.url, label: d.ai ? "Whole-house design" : `Design ${d.n}`, group: "design" });
     const match = driveFor(idx, n);
+    for (const x of match.photos) if (x.sure && x.bin) bins.push({ bin: x.bin, year: x.year || undefined, source: "Takedown photo" });
+    for (const b of match.bins) bins.push({ bin: b.bin, status: b.status || undefined, source: b.source, year: Number(b.source.match(/20\d\d/)?.[0]) || undefined });
     for (const p of match.installPhotos) add({ url: p.thumb, label: "Finished install", year: p.year || undefined, group: "install" });
     for (const p of match.photos.filter((x) => x.sure || match.bins.length === 0)) add({ url: p.thumb, label: p.bin ? `Takedown, bin ${p.bin}` : "Takedown", year: p.year || undefined, group: "takedown" });
   }
@@ -264,5 +283,5 @@ async function customerPhotos(clients: JClient[], contacts: GContact[], jobIds: 
     for (const [item, e] of Object.entries(c.items)) for (const url of e.photos ?? [])
       add({ url, label: `${j.kind === "takedown" ? "Takedown" : j.kind === "fix" ? "Service" : "Install"}: ${e.parts?.[url] || item.replace(/-/g, " ")}`, year: seasonOf(j.start) || undefined, group: "crew" });
   });
-  return out;
+  return { photos: out, bins };
 }

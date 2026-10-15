@@ -9,7 +9,7 @@ import { ago, api, NAVY } from "@/components/ui";
 
 type Row = {
   id: string; name: string; aka: string[]; address?: string; phone?: string; email?: string;
-  seasons: number[]; total: number; lastAt: number; jobs: number; quotes: number; status: "customer" | "quoted" | "lead"; jobber: boolean; ghl: boolean;
+  seasons: number[]; total: number; lastAt: number; jobs: number; quotes: number; status: "customer" | "quoted" | "lead"; jobber: boolean; ghl: boolean; bins?: string[];
 };
 type Cur = { done: boolean; count: number };
 type State = {
@@ -63,7 +63,7 @@ export default function CustomersPage() {
 
       <div className="relative">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(100); }} placeholder="Name, street, phone or email"
+        <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(100); }} placeholder="Name, street, phone, email or bin"
           className="w-full pl-10 pr-3 py-3 rounded-xl border border-slate-300 text-base" autoFocus />
       </div>
 
@@ -98,7 +98,7 @@ export default function CustomersPage() {
                       </div>
                       <div className="text-sm text-slate-500 truncate">{[r.address, r.phone].filter(Boolean).join(" · ") || r.email || "No address or phone"}</div>
                       <div className="text-xs text-slate-400">
-                        {r.seasons.length ? `${r.seasons.length} season${r.seasons.length > 1 ? "s" : ""}: ${[...r.seasons].sort().join(", ")}` : r.status === "quoted" ? `${r.quotes} quote${r.quotes > 1 ? "s" : ""}, not sold` : "Lead"}
+                        {r.bins?.length ? `Bin ${r.bins.join(", ")} · ` : ""}{r.seasons.length ? `${r.seasons.length} season${r.seasons.length > 1 ? "s" : ""}: ${[...r.seasons].sort().join(", ")}` : r.status === "quoted" ? `${r.quotes} quote${r.quotes > 1 ? "s" : ""}, not sold` : "Lead"}
                       </div>
                     </div>
                     {r.total > 0 && <div className="text-right font-bold" style={{ color: NAVY }}>{money(r.total)}</div>}
