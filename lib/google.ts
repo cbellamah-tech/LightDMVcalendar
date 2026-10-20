@@ -240,6 +240,38 @@ export async function writeSheet(cells: SheetCell[]): Promise<{ written: { range
   return { written, missingRows: [...missing] };
 }
 
+/** Add rows the sheet doesn't have yet (radio, iHeart emails...) under the row named in `after`, with the goal in
+ *  column B and each month's total as a sum of its 4 weeks. Rows already there are left exactly as they are. */
+export async function ensureSheetRows(rows: { row: string; after: string; goal?: string }[]): Promise<string[]> {
+  const meta = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`);
+  const props = meta.sheets?.[0]?.properties ?? {};
+  const tab = props.title ?? "Sheet1";
+  const added: string[] = [];
+  for (const want of rows) {
+    const colA = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`'${tab}'!A1:A60`)}`);
+    const names: string[] = (colA.values ?? []).map((r: string[]) => (r[0] ?? "").trim().toLowerCase());
+    if (names.includes(want.row.trim().toLowerCase())) continue;
+    const after = names.indexOf(want.after.trim().toLowerCase());
+    if (after < 0) continue;
+    await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`, {
+      method: "POST",
+      body: { requests: [{ insertDimension: { range: { sheetId: props.sheetId ?? 0, dimension: "ROWS", startIndex: after + 1, endIndex: after + 2 }, inheritFromBefore: true } }] },
+    });
+    const n = after + 2; // the new row's number
+    const line: string[] = [want.row, want.goal ?? ""];
+    for (let m = 7; m <= 12; m++) {
+      line.push("", "", "", "");
+      line.push(`=SUM(${sheetColumn(m, 1)}${n}:${sheetColumn(m, 4)}${n})`);
+    }
+    await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(`'${tab}'!A${n}:AF${n}`)}?valueInputOption=USER_ENTERED`, {
+      method: "PUT",
+      body: { values: [line] },
+    });
+    added.push(want.row);
+  }
+  return added;
+}
+
 /** The whole campaign sheet as text, for showing it on the Marketing tab. */
 export async function readSheetGrid(): Promise<{ title: string; rows: string[][] }> {
   const meta = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`);

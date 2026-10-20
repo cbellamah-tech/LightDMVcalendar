@@ -35,10 +35,10 @@ export type JobDetail = {
   quoteLines?: { name: string; description?: string }[]; // the quote's lines in order (Light Design Hero designs follow them)
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
-const IMGV = 5;
+const IMGV = 6;
 export type JobDetailView = JobDetail & { drive: DriveMatch };
 
-export const FILE: Spec = { fileName: true, name: true, url: true, contentType: true, thumbnailUrl: true };
+export const FILE: Spec = { fileName: true, name: true, url: true, downloadUrl: true, contentType: true, thumbnailUrl: true };
 export const FILES: Spec[string] = { first: 10, sel: { nodes: { sel: FILE } } };
 export const LINE: Spec = {
   name: true, description: true, quantity: true, textOnly: true,
@@ -85,7 +85,7 @@ async function jobQuery() {
 }
 
 export const toFile = (f: any, assumeImage = false): DetailFile | null => {
-  const url = f?.url || f?.thumbnailUrl;
+  const url = f?.url || f?.downloadUrl || f?.thumbnailUrl;
   if (!url) return null;
   const name = f.fileName || f.name || "file";
   const type = String(f.contentType || "");
@@ -93,7 +93,7 @@ export const toFile = (f: any, assumeImage = false): DetailFile | null => {
   return { name, url, image };
 };
 // Plain fields of a line or note; every other field holding a URL or files is an attachment.
-const PLAIN = new Set(["__typename", "id", "name", "description", "quantity", "textOnly", "totalPrice", "unitPrice", "message", "createdAt"]);
+const PLAIN = new Set(["__typename", "downloadUrl", "thumbnailUrl", "id", "name", "description", "quantity", "textOnly", "totalPrice", "unitPrice", "message", "createdAt"]);
 /** Every file on a Jobber line item or note, whichever field Jobber put it in. Line items are photos unless they say otherwise. */
 export const filesOf = (x: any, assumeImage = false): DetailFile[] => {
   const out: DetailFile[] = [];
@@ -199,18 +199,14 @@ export function withDrive(idx: DriveIndex, d: JobDetail | null, clientName: stri
   const repeat = base.repeat || drive.bins.length > 0 || drive.photos.length > 0 || drive.installPhotos.length > 0;
   const { value: _value, quoteLines: _ql, quoteId: _q, ...shown } = base; // never send the job's price to the browser
   delete (shown as any).quotePdf; // saved by an older version
-  if (lib) {
-    // Light Design Hero designs (from Google Drive), on the lines Jobber gave no photo for.
-    const who = clientName || base.clientName || "";
-    const mine = mockupsFor(lib, who);
+  if (lib && !shown.lines.some((l) => l.images.length) && !shown.quoteMockups?.length) {
+    // Designs added on the Jobber tab, when Jobber had no photo for the lines.
+    const mine = mockupsFor(lib, clientName || base.clientName || "");
     if (mine.length) {
       const { lines, extra } = attachMockups(shown.lines, mine, base.quoteLines);
       shown.lines = lines;
       shown.quoteMockups = extra;
-      shown.photoInfo = `${mine.length} Light Design Hero design${mine.length === 1 ? "" : "s"} for this customer`;
-    } else if (!shown.lines.some((l) => l.images.length)) {
-      shown.quoteMockups = [];
-      shown.photoInfo = `no Light Design Hero designs for ${who || "this customer"} in Google Drive yet`;
+      shown.photoInfo = `${mine.length} design${mine.length === 1 ? "" : "s"} added on the Jobber tab`;
     }
   }
   return { ...shown, drive, repeat, repeatWhy: base.repeatWhy || (repeat ? "On last season's bin list" : undefined) };

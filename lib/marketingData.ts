@@ -5,7 +5,8 @@ import { getAutoPost } from "./autopost";
 import { kvGet, kvSet } from "./store";
 import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
 import { getGhlSnap, ghlConfigured, leadSource, refreshGhl } from "./ghl";
-import { coldEmailReports, ColdReport, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
+import { coldEmailReports, ColdReport, ensureSheetRows, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
+import { Deal, dealDays, dealProgress, getDeals, radioSpotDays } from "./deals";
 import { getMedia, PLATFORMS, runnerKey } from "./media";
 import { stableOrigin } from "./jobber";
 import { laterOnce } from "./background";
@@ -82,11 +83,11 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
         return cur;
       });
   const googleP = googleStatus();
-  const [ghl, adDays, events, feedAll, autopost, drafts, ads, cold, mediaAll, lastFill, g, mail] = await Promise.all([
+  const [ghl, adDays, events, feedAll, autopost, drafts, ads, cold, mediaAll, lastFill, g, mail, deals] = await Promise.all([
     ghlP, allAdDays(), getEvents(), getFeed(), getAutoPost(), getDrafts(), adsSummary(), latestCold(), getMedia(), kvGet<FillResult>(FILL), googleP,
-    googleP.then((gs) => inbox(opts.refresh, gs)),
+    googleP.then((gs) => inbox(opts.refresh, gs)), getDeals(opts.refresh),
   ]);
-  const daily = await dailyCounts(ghl?.posts ?? [], adDays, events);
+  const daily = await dailyCounts(ghl?.posts ?? [], adDays, events, radioSpotDays(deals.deals));
   const totals = weekTotals(daily, week);
   const prev = weekTotals(daily, addDays(week, -7));
 
@@ -126,6 +127,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     autopost: autopost.on,
     drafts: { text: drafts, urls: POST_URL },
     attribution: ghl ? attribution(ghl.leads, ghl.opps ?? [], adDays, opts.days ?? 30, today) : null,
+    deals: { url: deals.url, error: deals.error, list: deals.deals.map((d) => dealProgress(d, today)) },
     ads,
     cold: { url: SMARTLEAD_URL, latest: cold },
     media: mediaAll.filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
@@ -141,7 +143,8 @@ export type FillResult = { at: number; week: string; by: string; written: { rang
 /** Cells touched by one week: each (month, sheet week) its days fall in, summed over the whole cell. */
 export async function fillSheet(week: string, by: string, dry = false): Promise<FillResult> {
   const ghl = ghlConfigured() ? await refreshGhl().catch(() => getGhlSnap()) : null;
-  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays());
+  const deals = (await getDeals()).deals;
+  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays(), undefined, radioSpotDays(deals));
   const cellsTouched = new Set<string>(); // "YYYY-MM|week"
   for (let i = 0; i < 7; i++) {
     const d = addDays(weekOf(week), i);
@@ -157,13 +160,14 @@ export async function fillSheet(week: string, by: string, dry = false): Promise<
       if (sheetWeek(d) === +wk) days.push(d);
     }
     for (const c of CHANNELS) {
-      const v = days.reduce((s, d) => s + (daily.get(`${c.id}|${d}`) ?? 0), 0);
+      const v = Math.round(days.reduce((s, d) => s + (daily.get(`${c.id}|${d}`) ?? 0), 0));
       // Only cells the app has numbers for: a blank week in the app never wipes what someone typed.
       if (v > 0) cells.push({ row: c.sheetRow, month: +ym.slice(5, 7), week: +wk, value: v });
     }
   }
   if (dry) return { at: Date.now(), week, by, written: cells.map((c) => ({ range: `${c.month}/${c.week}`, row: c.row, value: c.value })), missingRows: [] };
   try {
+    await ensureSheetRows(newRows(deals)).catch(() => []);
     const r = await writeSheet(cells);
     const res: FillResult = { at: Date.now(), week, by, ...r };
     await kvSet(FILL, res);
@@ -173,6 +177,18 @@ export async function fillSheet(week: string, by: string, dry = false): Promise<
     await kvSet(FILL, res);
     return res;
   }
+}
+
+/** Rows the 2026 sheet didn't start with, added under their section; goals come from the deals sheet. */
+function newRows(deals: Deal[]) {
+  const short = (d: string) => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`;
+  const goal = (id: string) => {
+    const d = deals.find((x) => x.channels.includes(id));
+    if (!d) return "";
+    if (id === "radio") return `~${Math.round(((d.spots / dealDays(d)) * 7) + d.bonusPerWeek)}/wk, ${short(d.start)} to ${short(d.end)}`;
+    return d.emails ? `${d.emails.toLocaleString("en-US")} total by ${short(d.end)}` : "";
+  };
+  return CHANNELS.filter((c) => c.insertAfter).map((c) => ({ row: c.sheetRow, after: c.insertAfter!, goal: goal(c.id) }));
 }
 
 export const channelIds = new Set<string>(CHANNELS.map((c) => c.id));

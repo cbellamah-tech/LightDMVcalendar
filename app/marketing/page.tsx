@@ -29,6 +29,11 @@ type Data = {
   platforms: { id: "facebook" | "instagram" | "linkedin" | "google"; label: string }[];
   lastFill: { at: number; week: string; by: string; written: { range: string; row: string; value: number }[]; missingRows: string[]; error?: string } | null;
   botBox: { url: string; key: string } | null;
+  deals: { url: string | null; error?: string; list: DealRow[] };
+};
+type DealRow = {
+  name: string; vendor: string; channels: string[]; start: string; end: string; cost: number; emails: number; status: string; notes: string;
+  daysTotal: number; daysDone: number; daysLeft: number; spotsTotal: number; spotsSoFar: number; spentSoFar: number;
 };
 
 const addDays = (d: string, k: number) => new Date(Date.parse(d) + k * 86400_000).toISOString().slice(0, 10);
@@ -104,6 +109,8 @@ export default function Marketing() {
       )}
 
       <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} errors={d.ghl.errors} />
+
+      <Deals deals={d.deals} a={d.attribution} days={days} sheetUrl={d.google.sheetUrl} />
 
       <WebsiteGoogle owner={owner} botBox={d.botBox} />
 
@@ -235,7 +242,7 @@ Header: Authorization: Bearer ${key}
 JSON body: {"bot": "<your name, e.g. SEO>", "title": "<one line result>", "body": "<details>", "link": "<https link if any>",
 "ask": "<a yes/no question for an owner, only if you need one>", "options": ["Yes", "No"],
 "counts": {"<channel>": <number done>}}
-Channels: google_posts, facebook_posts, instagram_posts, linkedin_posts, linkedin_engage, fb_groups, marketplace, craigslist, nextdoor, blog, cold_emails, door_hangers, tree_shop_cards, eddm, door_to_door, car_magnets, bing_posts.
+Channels: google_posts, facebook_posts, instagram_posts, linkedin_posts, linkedin_engage, fb_groups, marketplace, craigslist, nextdoor, blog, cold_emails, iheart_emails, door_hangers, tree_shop_cards, eddm, door_to_door, car_magnets, bing_posts.
 At the start of every run, GET ${url}?bot=<your name> with the same header and act on any answers to your questions.`;
 }
 
@@ -278,6 +285,42 @@ function AdsPanel({ ads, botBox }: { ads: Data["ads"]; botBox: Data["botBox"] })
         </div>
       )}
     </div>
+  );
+}
+
+/** Deals bought for a set run (iHeart radio and emails): where each stands today, and the leads it brought in.
+ *  The figures come from the "Light DMV marketing deals" sheet in Drive; edit them there. */
+function Deals({ deals, a, days, sheetUrl }: { deals: Data["deals"]; a: Attribution | null; days: number; sheetUrl: string }) {
+  if (!deals || (!deals.list.length && !deals.error)) return null;
+  const leadsOf = (chs: string[]) => (a?.rows ?? [])
+    .filter((r) => (chs.includes("radio") && r.id === "radio") || (chs.includes("iheart_emails") && r.id === "iheart_email"))
+    .reduce((n, r) => n + r.leads, 0);
+  const md = (x: string) => `${+x.slice(5, 7)}/${+x.slice(8, 10)}`;
+  const link = deals.url ?? sheetUrl;
+  return (
+    <Card title="Radio and other deals" right={<a href={link} target="_blank" rel="noreferrer" className="text-xs text-slate-500 inline-flex items-center gap-1">Deals sheet <ExternalLink size={12} /></a>}>
+      {deals.error && <p className="text-xs text-red-600 break-words">{deals.error}</p>}
+      {deals.list.map((x) => {
+        const leads = leadsOf(x.channels);
+        const live = x.daysDone > 0 && x.daysLeft > 0;
+        return (
+          <a key={x.name} href={link} target="_blank" rel="noreferrer" className="block rounded-lg bg-slate-50 p-3 text-sm space-y-1 hover:bg-slate-100">
+            <div className="flex items-center gap-2 flex-wrap">
+              <b className="flex-1">{x.name}</b>
+              <span className="text-xs text-slate-500">{md(x.start)} to {md(x.end)} · {x.daysLeft > 0 ? `${x.daysLeft} days left` : "finished"}</span>
+            </div>
+            {x.status && <div className="text-xs text-amber-700">{x.status}</div>}
+            <div className="flex gap-x-4 gap-y-1 flex-wrap text-xs text-slate-700 tabular-nums">
+              {x.spotsTotal > 0 && <span>Radio spots: {x.spotsSoFar} of {x.spotsTotal}{live ? " so far" : ""}</span>}
+              {x.emails > 0 && <span>Emails: {x.emails.toLocaleString()}</span>}
+              {x.cost > 0 && <span>Spent: {money(x.spentSoFar)} of {money(x.cost)}</span>}
+              <span>Leads (last {days} days): {leads}{leads && x.spentSoFar ? ` · ${money(Math.round(x.spentSoFar / leads))} a lead` : ""}</span>
+            </div>
+          </a>
+        );
+      })}
+      <p className="text-xs text-slate-500">Spots and spend so far are spread evenly over the run. Leads count when GoHighLevel's source or tags say radio, 97.1, WASH-FM or iHeart.</p>
+    </Card>
   );
 }
 
