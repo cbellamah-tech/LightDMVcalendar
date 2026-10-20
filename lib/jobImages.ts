@@ -4,7 +4,8 @@ import { savePhoto } from "./photos";
 import { drivePhotoJpeg, googleStatus } from "./google";
 import type { DriveMatch } from "./drive";
 import { rows } from "./jobberSchema";
-import type { DetailFile, JobDetail } from "./jobDetails";
+import type { DetailFile, DetailLine, JobDetail } from "./jobDetails";
+import { wantsPhoto } from "./mockups";
 
 /* Copies a job's pictures into our own photo storage so crews see them without Jobber or Google sign-ins:
    - photos on Jobber line items, if Jobber's API ever hands them out (no public version has so far, and its quote
@@ -89,12 +90,26 @@ export async function importJobImages(d: JobDetail): Promise<JobDetail> {
       lines = lines.map((l) => (got.get(l.name)?.length && !l.images.length ? { ...l, images: got.get(l.name)! } : l));
     }
   }
-  const outLines = [];
+  const outLines: DetailLine[] = [];
   for (const l of lines) outLines.push({ ...l, images: await Promise.all(l.images.map(copy)) });
   const notes = [];
   for (const n of d.notes) notes.push({ ...n, files: await Promise.all(n.files.map(copy)) });
   const fromJobber = outLines.reduce((t, l) => t + l.images.filter((f) => f.image).length, 0);
-  return { ...d, lines: outLines, notes, photoInfo: fromJobber ? `${fromJobber} line photo${fromJobber === 1 ? "" : "s"} from Jobber` : "" };
+  if (fromJobber) return { ...d, lines: outLines, notes, photoInfo: `${fromJobber} line photo${fromJobber === 1 ? "" : "s"} from Jobber` };
+
+  // Jobber's API can't read line item photos, but it can read photos attached to the quote's notes (Jobber API
+  // support's suggestion). Those go on the photo lines in quote order when the counts match, else above the list.
+  const notePics = notes.filter((n) => n.from === "quote").flatMap((n) => n.files.filter((f) => f.image));
+  if (!notePics.length) return { ...d, lines: outLines, notes, quoteMockups: [], photoInfo: "no photos attached to this quote's notes in Jobber" };
+  const photoLines = outLines.map((l, i) => (wantsPhoto(l) ? i : -1)).filter((i) => i >= 0);
+  const moved = new Set(notePics.map((f) => f.url));
+  const shownNotes = notes.map((n) => (n.from === "quote" ? { ...n, files: n.files.filter((f) => !moved.has(f.url)) } : n)).filter((n) => n.message.trim() || n.files.length);
+  const info = `${notePics.length} photo${notePics.length === 1 ? "" : "s"} from the quote's notes in Jobber`;
+  if (photoLines.length && photoLines.length === notePics.length) {
+    photoLines.forEach((li, k) => { outLines[li] = { ...outLines[li], images: [notePics[k]] }; });
+    return { ...d, lines: outLines, notes: shownNotes, quoteMockups: [], photoInfo: info };
+  }
+  return { ...d, lines: outLines, notes: shownNotes, quoteMockups: notePics.map((f) => f.url), photoInfo: info };
 }
 
 /** Copy the Drive photos matched to a job into photo storage (a few per call). Returns how many were new. */
