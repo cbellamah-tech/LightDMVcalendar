@@ -156,7 +156,7 @@ export function searchRows(rows: CxRow[], q: string, status?: string): CxRow[] {
     if (status && status !== "all" && r.status !== status) return false;
     if (!words.length) return true;
     if (qd.length >= 4 && r.phone && digits(r.phone).includes(qd)) return true;
-    // "bin 418" or "418" finds whoever is in that bin.
+    // "bin 12" or "12" finds whoever is in that bin.
     const bin = q.match(/^\s*(?:bin|box)?\s*#?\s*(\d{1,4}[a-z]?)\s*$/i)?.[1];
     if (bin && r.bins?.includes(bin)) return true;
     const hay = norm([r.name, ...r.aka, r.address, r.email].filter(Boolean).join(" "));
@@ -231,7 +231,7 @@ export async function customerProfile(id: string): Promise<CxProfile | null> {
   const timeline = events.filter((e) => { const k = `${e.at?.slice(0, 16)}|${e.text.slice(0, 80)}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")).slice(0, 800);
 
-  // Bin numbers written in any Jobber note or line ("bin 418", "box #58").
+  // Bin numbers written in any Jobber note or line ("bin 12", "box #7").
   const noteText = [...clients.flatMap((c) => c.notes), ...quotes.flatMap((q) => [...q.notes, ...q.lines.map((l) => ({ text: `${l.name} ${l.description ?? ""}`, at: q.createdAt }))]),
     ...jobs.flatMap((j) => [...j.notes, ...j.lines.map((l) => ({ text: `${l.name} ${l.description ?? ""}`, at: jobDate(j) }))])];
   const noteBins: CxBin[] = noteText.flatMap((n) => [...n.text.matchAll(/\b(?:bin|box)\s*(?:#|no\.?|number)?\s*(\d{1,4})\b/gi)]
