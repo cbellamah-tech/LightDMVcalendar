@@ -53,7 +53,7 @@ export const SOPS: Record<JobKind, { title: string; items: SopItem[] }> = {
       { id: "inlines", text: "Inlines" },
       { id: "phase-out-yellow", text: "Phase out the yellow-bottom lights" },
       { id: "phase-out-hd", text: "Phase out Home Depot lights" },
-      { id: "takedown-photos", text: "Take takedown pictures", required: true, photo: true },
+      { id: "takedown-photos", text: "Take takedown pictures", hint: "Send them to the group chat.", required: true, photo: true },
       { id: "cleanup", text: "Clean up after the job" },
       { id: "all-material", text: "Make sure we have all material before leaving" },
     ],
