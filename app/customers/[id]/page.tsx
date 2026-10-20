@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2, Mail, MapPin, MessageSquare, Package, Phone, StickyNote, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Loader2, Mail, MapPin, MessageSquare, Package, Phone, Sparkles, StickyNote, X } from "lucide-react";
 import { api, NAVY } from "@/components/ui";
 
 type Line = { name: string; description?: string; qty?: number; unit?: number; total?: number };
@@ -16,7 +16,9 @@ type Profile = {
   id: string; name: string; aka: string[]; status: string; total: number; seasons: number[];
   phones: string[]; emails: string[]; addresses: string[]; tags: string[]; links: { label: string; url: string }[];
   seasons_: Season[]; photos: Photo[]; timeline: Event[]; jobberTexts: boolean; ghl: boolean; refreshing: boolean;
+  summary: Summary | null; ai: boolean;
 };
+type Summary = { at: number; count: number; newest?: string; gist?: string; asked: string[]; promised: string[]; open: string[]; error?: string };
 
 const money = (n?: number) => (n == null ? "" : `$${Math.round(n).toLocaleString("en-US")}`);
 const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "");
@@ -49,6 +51,8 @@ export default function CustomerPage({ params }: { params: { id: string } }) {
         <h1 className="text-2xl font-extrabold" style={{ color: NAVY }}>{p.name}</h1>
         {p.aka.length > 0 && <p className="text-sm text-slate-500">Also in our records as {p.aka.join(", ")}</p>}
       </div>
+
+      <SummaryCard s={p.summary} ai={p.ai} refreshing={p.refreshing} messages={p.timeline.length} onKey={load} onAll={() => jump("messages")} />
 
       <div className="grid grid-cols-3 gap-2">
         <Stat label="All time" value={money(p.total) || "$0"} onClick={() => jump("seasons")} />
@@ -94,6 +98,64 @@ export default function CustomerPage({ params }: { params: { id: string } }) {
 
       <Timeline events={p.timeline} jobberTexts={p.jobberTexts} ghl={p.ghl} refreshing={p.refreshing} />
     </div>
+  );
+}
+
+function SummaryCard({ s, ai, refreshing, messages, onKey, onAll }: { s: Summary | null; ai: boolean; refreshing: boolean; messages: number; onKey: () => void; onAll: () => void }) {
+  if (!ai) return <KeyBox onSaved={onKey} />;
+  const groups = s ? ([["Asked for", s.asked], ["We promised", s.promised], ["Still open", s.open]] as const).filter(([, xs]) => xs.length) : [];
+  return (
+    <section className={`${card} space-y-2 border-l-4`} style={{ borderLeftColor: NAVY }}>
+      <div className="flex items-center gap-2 text-sm font-bold" style={{ color: NAVY }}><Sparkles size={16} /> Summary of their messages</div>
+      {!s ? (
+        <p className="text-sm text-slate-500 flex items-center gap-2">{refreshing ? <><Loader2 size={14} className="animate-spin" /> Reading their texts, emails and notes...</> : messages ? "Not written yet." : "No messages yet."}</p>
+      ) : s.count === 0 ? (
+        <p className="text-sm text-slate-500">No texts, emails or notes with this customer yet.</p>
+      ) : (
+        <>
+          {s.gist && <p className="text-sm">{s.gist}</p>}
+          {groups.map(([label, xs]) => (
+            <div key={label}>
+              <div className={`text-xs font-bold uppercase tracking-wide ${label === "Still open" ? "text-amber-700" : "text-slate-500"}`}>{label}</div>
+              <ul className="text-sm list-disc pl-5">{xs.map((x, i) => <li key={i}>{x}</li>)}</ul>
+            </div>
+          ))}
+          {!s.gist && !groups.length && !s.error && <p className="text-sm text-slate-500">Nothing to note.</p>}
+        </>
+      )}
+      {s?.error && <p className="text-xs text-amber-700">{s.error}</p>}
+      <div className="flex items-center justify-between text-xs text-slate-400 gap-2">
+        <span>{s && s.count > 0 ? `From ${s.count} message${s.count > 1 ? "s" : ""}${s.newest ? `, newest ${day(s.newest)}` : ""}.` : ""}{refreshing && s ? " Checking for new ones..." : ""}</span>
+        {messages > 0 && <button onClick={onAll} className="font-semibold shrink-0" style={{ color: NAVY }}>All messages</button>}
+      </div>
+    </section>
+  );
+}
+
+/** Shown until an owner saves a Claude key: one field, saved on the server, never shown again. */
+function KeyBox({ onSaved }: { onSaved: () => void }) {
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  async function save() {
+    setBusy(true); setMsg("");
+    try { await api("/api/customers/ai", { method: "POST", json: { key } }); setKey(""); onSaved(); }
+    catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <section className={`${card} space-y-2`}>
+      <div className="flex items-center gap-2 text-sm font-bold" style={{ color: NAVY }}><Sparkles size={16} /> Message summaries</div>
+      <p className="text-sm text-slate-600">Paste a Claude key once and every customer gets a few lines up here: what they asked for, what we promised, and what's still open, from their GoHighLevel and Jobber texts, emails and notes.</p>
+      <div className="flex gap-2">
+        <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-..." autoComplete="off"
+          className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-slate-300 text-sm" />
+        <button disabled={busy || !key.trim()} onClick={save} className="rounded-lg px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: NAVY }}>
+          {busy ? <Loader2 size={14} className="animate-spin" /> : "Save"}
+        </button>
+      </div>
+      {msg && <p className="text-xs text-red-600">{msg}</p>}
+      <p className="text-xs text-slate-400">Get one at console.anthropic.com under API keys. It's kept on the server and never shown again.</p>
+    </section>
   );
 }
 
@@ -200,8 +262,8 @@ function Timeline({ events, jobberTexts, ghl, refreshing }: { events: Event[]; j
   const [shown, setShown] = useState(60);
   const list = events.filter((e) => f === "all" || e.group === f || (f === "text" && e.group === "other"));
   return (
-    <section className="space-y-2">
-      <h2 className="text-lg font-extrabold">Texts, calls and notes</h2>
+    <section id="messages" className="space-y-2">
+      <h2 className="text-lg font-extrabold">Texts, calls, emails and notes</h2>
       <div className="flex gap-2 overflow-x-auto">
         {FEED.map(([k, label]) => {
           const n = k === "all" ? events.length : events.filter((e) => e.group === k || (k === "text" && e.group === "other")).length;
@@ -213,7 +275,7 @@ function Timeline({ events, jobberTexts, ghl, refreshing }: { events: Event[]; j
       </div>
       <p className="text-xs text-slate-400">
         {refreshing ? "Getting the newest from GoHighLevel... " : ""}
-        {jobberTexts ? "Jobber texts, " : ""}GoHighLevel texts, calls, emails and notes{ghl ? "" : " (no GoHighLevel contact matched)"}, plus every Jobber note.
+        {jobberTexts ? "Jobber texts, " : ""}GoHighLevel texts, calls, emails and notes{ghl ? "" : " (no GoHighLevel contact matched)"}, emails with info@lightdmv.com, plus every Jobber note.
         {!jobberTexts && " Jobber's API doesn't hand out its text messages, so texts sent from Jobber show only if they also went through GoHighLevel."}
       </p>
       {list.length === 0 ? <div className={`${card} text-sm text-slate-500`}>Nothing here yet.</div> : (
