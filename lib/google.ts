@@ -17,7 +17,9 @@ const SCOPES = [
   "https://www.googleapis.com/auth/drive.file",     // the one small file the app writes (the video runner's key)
   "https://www.googleapis.com/auth/webmasters.readonly", // Search Console: searches, clicks, keywords, pages
   "https://www.googleapis.com/auth/analytics.readonly",  // Google Analytics: visitors, channels, leads
+  "https://www.googleapis.com/auth/business.manage",     // Google Business Profile: views, calls, website clicks (read only here)
 ];
+export const SCOPE_BUSINESS = "https://www.googleapis.com/auth/business.manage";
 export const SCOPE_SEARCH = "https://www.googleapis.com/auth/webmasters.readonly";
 export const SCOPE_ANALYTICS = "https://www.googleapis.com/auth/analytics.readonly";
 const TOKENS = "ldmv:google:tokens";
