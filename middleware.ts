@@ -14,7 +14,7 @@ const CREW_NEVER = ["/install/team", "/api/install/team", "/api/install/signoff"
 const SIGNS_OK = ["/signs", "/api/signs", "/api/me", "/api/upload", "/api/photos", "/api/geocode"];
 
 // Owners only, not the manager either.
-const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs", "/customers", "/api/customers"];
+const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs", "/expenses", "/api/expenses", "/customers", "/api/customers"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
