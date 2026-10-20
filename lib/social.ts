@@ -142,7 +142,7 @@ export async function socialPage(force = false) {
 const MAX_VIDEO = 100 * 1024 * 1024;
 
 /** GoHighLevel needs a public link: copy the Drive file into the app's photo store once, then reuse the link. */
-async function publicCopy(item: DriveItem): Promise<{ url: string; contentType: string }> {
+export async function publicCopy(item: DriveItem): Promise<{ url: string; contentType: string }> {
   const copies = (await kvGet<Record<string, { url: string; contentType: string }>>(COPIES)) ?? {};
   if (copies[item.id]) return copies[item.id];
   const s = storage();
