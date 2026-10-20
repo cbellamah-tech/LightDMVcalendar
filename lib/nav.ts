@@ -1,6 +1,6 @@
 // Who sees which tab, in what order, and how the tabs group. The Shell (top bar, phone bar, More menu) and the
 // home page both read this, so a tab only has to be added here once. The middleware still does the real gating.
-import { CalendarDays, Contact, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, Receipt, Settings, ShieldCheck, Star, UserCheck, Users } from "lucide-react";
+import { CalendarDays, Wallet, Contact, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, Receipt, Settings, ShieldCheck, Star, UserCheck, Users } from "lucide-react";
 import type { Me } from "@/components/ui";
 
 export type Role = Me["role"];
@@ -20,6 +20,7 @@ export const TABS: Record<string, Tab> = {
   briefing: { href: "/briefing", label: "Briefing", text: "The owners' daily read on the business.", icon: Newspaper, roles: OWNER },
   training: { href: "/training", label: "Quote Creation Training", short: "Quotes", text: "Learn to build a quote on real houses.", icon: GraduationCap, roles: OFFICE },
   costs: { href: "/costs", label: "Costs", text: "What the lights cost, what each job made, stock on hand.", icon: Receipt, roles: OWNER },
+  expenses: { href: "/expenses", label: "Expenses", text: "Where the money goes: every expense, sorted into plain buckets.", icon: Wallet, roles: OWNER },
   insurance: { href: "/insurance", label: "Insurance", text: "Who's covered, what's due, every policy.", icon: ShieldCheck, roles: OWNER },
   people: { href: "/people", label: "People", text: "Add workers, set PINs, put people on crews.", icon: Users, roles: OFFICE },
   install: { href: "/install", label: "Installer Training", short: "Training", text: "Every step of an install and a takedown.", icon: Hammer, roles: EVERYONE },
@@ -41,7 +42,7 @@ const PRIMARY: Record<Role, (keyof typeof TABS)[]> = {
 const GROUPS: { title: string; tabs: (keyof typeof TABS)[] }[] = [
   { title: "Run the day", tabs: ["jobs", "calendar", "signs"] },
   { title: "Bring in work", tabs: ["customers", "marketing", "briefing", "training"] },
-  { title: "Money and papers", tabs: ["costs", "insurance"] },
+  { title: "Money and papers", tabs: ["expenses", "costs", "insurance"] },
   { title: "Team", tabs: ["people", "reviews", "install", "crewTraining", "jobber"] },
 ];
 

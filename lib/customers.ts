@@ -3,6 +3,7 @@ import { kvGet, kvGetMany, kvGetPrefix, kvSet, kvSetMany } from "./store";
 import { JC, JJ, JQ, jobberWebUrl, type CxLine, type CxMsg, type CxNote, type JClient, type JJob, type JQuote } from "./cxJobber";
 import { GC, GM, GN, ghlContactUrl, type GContact, type GMsgs, type GNotes } from "./cxGhl";
 import { isAdminLine, lineTags } from "./cxItems";
+import { EM, type CxEmails } from "./cxEmail";
 
 /* The owners' customer database: Jobber clients and GoHighLevel contacts merged into households (same phone, email
    or street address = one customer, so a couple with two quotes or a returning customer under a new name is never a
@@ -180,7 +181,7 @@ export type CxProfile = Omit<CxRow, "bins"> & {
   phones: string[]; emails: string[]; addresses: string[]; tags: string[];
   links: { label: string; url: string }[];
   seasons_: CxSeason[]; photos: CxPhoto[]; timeline: CxEvent[];
-  synced: { notesAt?: number; textsAt?: number }; jobberTexts: boolean; contactIds: string[];
+  synced: { notesAt?: number; textsAt?: number; emailsAt?: number }; jobberTexts: boolean; contactIds: string[];
 };
 
 const groupOf = (m: CxMsg | CxNote & { kind?: string }): CxEvent["group"] => {
@@ -197,9 +198,10 @@ export async function customerProfile(id: string): Promise<CxProfile | null> {
   const [rows, m] = await Promise.all([loadIndex(), kvGet<Members>(MEMBERS + id)]);
   const row = rows.find((r) => r.id === id);
   if (!row || !m) return null;
-  const [jcs, jqs, jjs, gcs, gms, gns] = await Promise.all([
+  const [jcs, jqs, jjs, gcs, gms, gns, ems] = await Promise.all([
     kvGetMany<JClient>(m.jc.map((x) => JC + x)), kvGetMany<JQuote>(m.jq.map((x) => JQ + x)), kvGetMany<JJob>(m.jj.map((x) => JJ + x)),
     kvGetMany<GContact>(m.gc.map((x) => GC + x)), kvGetMany<GMsgs>(m.gc.map((x) => GM + x)), kvGetMany<GNotes>(m.gc.map((x) => GN + x)),
+    kvGet<CxEmails>(EM + id),
   ]);
   const clients = jcs.filter(Boolean) as JClient[], quotes = jqs.filter(Boolean) as JQuote[], jobs = jjs.filter(Boolean) as JJob[];
   const contacts = gcs.filter(Boolean) as GContact[];
@@ -227,6 +229,7 @@ export async function customerProfile(id: string): Promise<CxProfile | null> {
   jobs.forEach((j) => j.notes.forEach((n, i) => push({ ...n, from: `Jobber job #${j.num ?? ""} note` }, `jjn:${j.id}:${i}`)));
   gms.forEach((x) => x?.msgs.forEach((t) => push(t, `gm:${t.id}`)));
   gns.forEach((x, k) => x?.notes.forEach((n, i) => push(n, `gn:${m.gc[k]}:${i}`)));
+  ems?.msgs.forEach((t) => push(t, t.id));
   const seen = new Set<string>();
   const timeline = events.filter((e) => { const k = `${e.at?.slice(0, 16)}|${e.text.slice(0, 80)}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? "")).slice(0, 800);
@@ -253,7 +256,7 @@ export async function customerProfile(id: string): Promise<CxProfile | null> {
     addresses: [...new Set([...jobs.map((j) => j.address), ...quotes.map((q) => q.address), ...clients.flatMap((c) => c.addresses), ...contacts.map((c) => c.address)].filter((a): a is string => !!a))],
     tags: [...new Set([...clients.flatMap((c) => c.tags), ...contacts.flatMap((c) => c.tags)])],
     links, seasons_: seasons, photos, timeline, bins,
-    synced: { notesAt: ats(gns), textsAt: ats(gms) }, jobberTexts: textFields.length > 0, contactIds: m.gc,
+    synced: { notesAt: ats(gns), textsAt: ats(gms), emailsAt: ems?.at }, jobberTexts: textFields.length > 0, contactIds: m.gc,
   };
 }
 

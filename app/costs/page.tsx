@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calculator, Loader2, Package, Trash2, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronRight, Loader2, Trash2, Upload } from "lucide-react";
 import { api, fmtDay, GREEN, NAVY, RED } from "@/components/ui";
-import SignPay from "./SignPay";
 
 /* Owners' Costs: what our materials cost, what each job used and made, and what's left in the warehouse. */
 
@@ -69,15 +68,16 @@ export default function CostsPage() {
   const logged = shown.filter((r) => r.logged);
   const priced = logged.filter((r) => r.sold);
   const sum = (f: (r: Row) => number) => priced.reduce((a, r) => a + f(r), 0);
-  const totSold = sum((r) => r.sold!.amount), totMat = sum((r) => r.materials), totCrew = sum((r) => r.crewPay), totRev = sum((r) => r.reviews || 0), totExp = sum((r) => r.expenses);
-  const totLeft = totSold - totMat - totCrew - totRev - totExp;
+  const season: Split = { sold: sum((r) => r.sold!.amount), materials: sum((r) => r.materials), crew: sum((r) => r.crewPay), other: sum((r) => (r.reviews || 0) + r.expenses) };
+  const stockValue = d.stock.reduce((a, x) => a + Math.max(0, x.value), 0);
+  const orderTotal = d.orders.reduce((a, o) => a + o.lines.reduce((b, l) => b + l.landed, 0), 0);
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-extrabold" style={{ color: NAVY }}>Costs</h1>
-          <p className="text-sm text-slate-500">Owners only. What our lights cost us, what each job used and made, and what's left in the warehouse.</p>
+          <p className="text-sm text-slate-500">Owners only. What a job costs us and what we keep. Tap any number to see where it comes from.</p>
         </div>
         <UploadButton onFile={upload} busy={busy} label={haveCosts ? "Add another order" : "Upload cost sheet"} />
       </div>
@@ -92,44 +92,27 @@ export default function CostsPage() {
         </div>
       )}
 
-      {haveCosts && (
-        <>
-          <div className={`grid grid-cols-2 gap-3 ${["md:grid-cols-5", "md:grid-cols-6", "md:grid-cols-7"][(totExp > 0 ? 1 : 0) + (totRev > 0 ? 1 : 0)]}`}>
-            <Tile label="Jobs with counts" value={`${logged.length} of ${shown.length}`} />
-            <Tile label="Sold (those jobs)" value={$(totSold)} />
-            <Tile label="Materials" value={$(totMat)} />
-            <Tile label={`Crew pay (${s.crewPct}%)`} value={$(totCrew)} />
-            {totRev > 0 && <Tile label="Review bonuses" value={$(totRev)} />}
-            {totExp > 0 && <Tile label="Crew expenses" value={$(totExp, true)} />}
-            <Tile label="Left over" value={priced.length ? `${$(totLeft)} · ${Math.round((totLeft / totSold) * 100)}%` : "-"} color={totLeft >= 0 ? GREEN : RED} />
-          </div>
-          <UnitEconomics uc={uc} s={s} />
-          <PriceCheck uc={uc} s={s} />
-        </>
-      )}
+      {haveCosts && <Glance uc={uc} s={s} priced={priced} season={season} />}
 
-      <SignPay />
-
-      <div className={card}>
-        <h2 className={h2} style={{ color: NAVY }}>Job ledger</h2>
+      <Fold id="jobs" title="Job by job" sum={`${logged.length} of ${shown.length} jobs counted`}>
         <p className="text-sm text-slate-500 mb-3">
-          Fills in by itself from each job checklist (feet of roofline, C7 bulbs, mini strands). Sold price comes from Jobber; tap it to fix. Expenses are the receipts crews enter when they close out a job; tap one to see it. Reviews are the $50 Google review bonuses.
+          Each job fills in from its crew checklist. The sold price comes from Jobber; tap it to fix. Tap a bonus or receipt to see it.
           {` Repeat customers reuse the lights in their bin, so only ${s.repeatNewPct}% new material (for breakage) is charged to them.`}
         </p>
         {shown.length === 0 ? <p className="text-slate-500 text-sm">No install jobs synced yet.</p> : (
           <div className="overflow-x-auto -mx-4 px-4">
             <table className="w-full text-sm min-w-[820px]">
               <thead className="text-left text-slate-500 border-b">
-                <tr><th className="py-2 pr-2">Date</th><th className="pr-2">Job</th><th className="pr-2 text-right">Roofline ft</th><th className="pr-2 text-right">C7</th>
-                  <th className="pr-2 text-right">Strands</th><th className="pr-2 text-right">Materials</th><th className="pr-2 text-right">Sold</th>
-                  <th className="pr-2 text-right">Crew pay</th><th className="pr-2 text-right">Reviews</th><th className="pr-2 text-right">Expenses</th><th className="text-right">Left</th></tr>
+                <tr><th className="py-2 pr-2">Date</th><th className="pr-2">Job</th><th className="pr-2 text-right">Roofline ft</th><th className="pr-2 text-right">C7 bulbs</th>
+                  <th className="pr-2 text-right">Mini strands</th><th className="pr-2 text-right">Lights and parts</th><th className="pr-2 text-right">Sold for</th>
+                  <th className="pr-2 text-right">Crew pay</th><th className="pr-2 text-right">Review bonus</th><th className="pr-2 text-right">Receipts</th><th className="text-right">We keep</th></tr>
               </thead>
               <tbody>
                 {shown.map((r) => (
                   <tr key={r.id} className="border-b last:border-0 align-top">
                     <td className="py-2 pr-2 whitespace-nowrap">{fmtDay(r.start)}</td>
                     <td className="pr-2">
-                      <div className="font-semibold">{r.jobNumber ? `#${r.jobNumber} ` : ""}{r.client || r.title}</div>
+                      <a href={`/jobs/${r.id}`} className="font-semibold hover:underline">{r.jobNumber ? `#${r.jobNumber} ` : ""}{r.client || r.title}</a>
                       <div className="text-xs text-slate-500">
                         {r.crew ? r.crew.replace("crew", "Crew ") : "No crew"}{r.repeat ? " · Repeat (bin)" : r.repeat === false ? " · New" : ""}
                         {r.missing.length > 0 && <span className="text-amber-700"> · no price for {r.missing.map((k) => NAMES[k]).join(", ")}</span>}
@@ -142,7 +125,7 @@ export default function CostsPage() {
                         <td className="pr-2 text-right">{r.logged.miniStrands ? n0(r.logged.miniStrands) : ""}{r.logged.stakeFt ? <div className="text-xs text-slate-500">{n0(r.logged.stakeFt)} ft stakes</div> : null}</td>
                         <td className="pr-2 text-right">{$(r.materials, true)}{r.fromBin && <div className="text-xs text-slate-500">bin + {s.repeatNewPct}% new</div>}</td>
                       </>
-                    ) : <td colSpan={4} className="pr-2 text-right text-slate-400">not counted yet</td>}
+                    ) : <td colSpan={4} className="pr-2 text-right text-slate-400">crew hasn't counted yet</td>}
                     <td className="pr-2 text-right"><SoldCell row={r} onSave={(amount) => post({ action: "sold", jobId: r.id, amount })} /></td>
                     <td className="pr-2 text-right">{r.sold ? $(r.crewPay) : ""}</td>
                     <td className="pr-2 text-right">{r.reviews ? <a href={`/jobs/${r.id}`} className="underline decoration-dotted">{$(r.reviews)}</a> : ""}</td>
@@ -156,21 +139,132 @@ export default function CostsPage() {
             </table>
           </div>
         )}
-      </div>
+      </Fold>
 
-      {haveCosts && <StockCard stock={d.stock} uc={uc} s={s} />}
-      {haveCosts && d.orders.map((o) => <OrderCard key={o.id} o={o} busy={busy} onSave={(order) => post({ action: "saveOrder", order })} onDelete={() => post({ action: "deleteOrder", id: o.id })} />)}
-      <SettingsCard s={s} busy={busy} onSave={(settings) => post({ action: "settings", settings })} />
+      {haveCosts && <Fold id="check" title="Check a quote before sending" sum="type the feet and strands"><PriceCheck uc={uc} s={s} /></Fold>}
+      {haveCosts && <Fold id="stock" title="Lights in the warehouse" sum={`worth ${$(stockValue)} at our cost`}><StockCard stock={d.stock} uc={uc} s={s} /></Fold>}
+      {haveCosts && (
+        <Fold id="orders" title="Supplier orders" sum={`${d.orders.length} order${d.orders.length > 1 ? "s" : ""} · ${$(orderTotal)} delivered`}>
+          <div className="space-y-4">
+            {d.orders.map((o) => <OrderCard key={o.id} o={o} busy={busy} onSave={(order) => post({ action: "saveOrder", order })} onDelete={() => post({ action: "deleteOrder", id: o.id })} />)}
+          </div>
+        </Fold>
+      )}
+      <Fold id="rules" title="How we count" sum={`crew ${s.crewPct}% · $${s.chargePerFt}/ft · $${s.chargePerStrand}/strand`}>
+        <SettingsCard s={s} busy={busy} onSave={(settings) => post({ action: "settings", settings })} />
+      </Fold>
     </div>
   );
 }
 
-function Tile({ label, value, color }: { label: string; value: string; color?: string }) {
+/** Opens a folded section and scrolls to it, so every number on top leads to its source. */
+function openTo(id: string) {
+  const el = document.getElementById(id) as HTMLDetailsElement | null;
+  if (!el) return;
+  el.open = true;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function Fold({ id, title, sum, children }: { id: string; title: string; sum: string; children: ReactNode }) {
   return (
-    <div className={card}>
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="text-xl font-extrabold" style={{ color: color ?? NAVY }}>{value}</div>
+    <details id={id} className={`${card} group scroll-mt-20`}>
+      <summary className="cursor-pointer list-none flex items-center gap-2">
+        <ChevronRight size={18} className="text-slate-400 transition-transform group-open:rotate-90" />
+        <span className="flex-1 flex flex-wrap items-baseline justify-between gap-x-3">
+          <span className="text-lg font-extrabold" style={{ color: NAVY }}>{title}</span>
+          <span className="text-sm text-slate-500">{sum}</span>
+        </span>
+      </summary>
+      <div className="mt-3">{children}</div>
+    </details>
+  );
+}
+
+type Split = { sold: number; materials: number; crew: number; other: number };
+
+/** Plain answer first: where the money from a job goes, and what each piece costs us. */
+function Glance({ uc, s, priced, season }: { uc: Data["unitCosts"]; s: Settings; priced: Row[]; season: Split }) {
+  const ft = perFoot(uc, s), strand = uc.mini?.perUnit ?? 0, ext = (uc.ext?.perUnit ?? 0) * s.extFtPerJob;
+  // A real average once jobs are counted and priced; until then a sample job at our standard prices.
+  const n = priced.length;
+  const job: Split = n
+    ? { sold: season.sold / n, materials: season.materials / n, crew: season.crew / n, other: season.other / n }
+    : (() => { const sold = 100 * s.chargePerFt + 4 * s.chargePerStrand; return { sold, materials: 100 * ft + 4 * strand + ext, crew: (sold * s.crewPct) / 100, other: 0 }; })();
+  const items = [
+    { what: "1 foot of roofline", cost: ft, charge: s.chargePerFt, note: "bulb, clip, wire and plugs" },
+    { what: "1 mini light strand", cost: strand, charge: s.chargePerStrand, note: "100 lights, 33 ft" },
+    { what: "Extension cord for a job", cost: ext, charge: 0, note: `${s.extFtPerJob} ft per job` },
+  ];
+  return (
+    <div className="grid lg:grid-cols-2 gap-4">
+      <div className={card}>
+        <h2 className={h2} style={{ color: NAVY }}>{n ? "Our average job" : "A typical job"}</h2>
+        <p className="text-sm text-slate-500 -mt-1 mb-3">
+          {n ? <button className="underline decoration-dotted" onClick={() => openTo("jobs")}>Average of {n} job{n > 1 ? "s" : ""} the crews counted</button>
+            : <>Example: 100 ft of roofline and 4 mini strands. <button className="underline decoration-dotted" onClick={() => openTo("check")}>Try your own</button></>}
+        </p>
+        <MoneyBar x={job} />
+        {n > 0 && (
+          <p className="text-sm text-slate-600 mt-3">
+            Season so far: sold <button className="font-bold underline decoration-dotted" onClick={() => openTo("jobs")}>{$(season.sold)}</button>,
+            we keep <button className="font-bold underline decoration-dotted" style={{ color: keep(season) >= 0 ? GREEN : RED }} onClick={() => openTo("jobs")}>{$(keep(season))}</button>.
+          </p>
+        )}
+      </div>
+      <div className={card}>
+        <h2 className={h2} style={{ color: NAVY }}>What things cost us</h2>
+        <ul className="divide-y">
+          {items.map((i) => (
+            <li key={i.what} className="py-2 flex items-baseline gap-3">
+              <span className="flex-1">
+                <span className="font-semibold">{i.what}</span>
+                <span className="block text-xs text-slate-500">{i.note}</span>
+              </span>
+              <button className="text-right" onClick={() => openTo("orders")}>
+                <span className="block text-xs text-slate-500">costs us</span>
+                <b className="underline decoration-dotted">{i.cost > 0 ? $u(i.cost) : "-"}</b>
+              </button>
+              {i.charge ? (
+                <button className="text-right w-20" onClick={() => openTo("rules")}>
+                  <span className="block text-xs text-slate-500">we charge</span>
+                  <b className="underline decoration-dotted">{$(i.charge)}</b>
+                </button>
+              ) : <span className="text-right w-20 text-xs text-slate-500">included</span>}
+            </li>
+          ))}
+        </ul>
+        {ft > 0 && <p className="text-sm mt-2" style={{ color: GREEN }}>Lights and parts are about {Math.round((ft / s.chargePerFt) * 100)}% of what we charge for roofline.</p>}
+      </div>
     </div>
+  );
+}
+
+const keep = (x: Split) => x.sold - x.materials - x.crew - x.other;
+
+/** One bar for where a job's money goes, with the dollar amounts under it. */
+function MoneyBar({ x }: { x: Split }) {
+  const parts = [
+    { label: "Lights and parts", v: x.materials, color: "#f59e0b" },
+    { label: "Crew pay", v: x.crew, color: "#3b82f6" },
+    { label: "Bonuses and receipts", v: x.other, color: "#94a3b8" },
+    { label: "We keep", v: Math.max(0, keep(x)), color: GREEN },
+  ].filter((p) => p.v > 0);
+  const pct = (v: number) => (x.sold > 0 ? Math.round((v / x.sold) * 100) : 0);
+  return (
+    <>
+      <div className="text-sm">We charge <b className="text-xl" style={{ color: NAVY }}>{$(x.sold)}</b></div>
+      <div className="flex h-4 rounded-full overflow-hidden mt-2 bg-slate-100">
+        {parts.map((p) => <div key={p.label} style={{ width: `${pct(p.v)}%`, background: p.color }} />)}
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+        {parts.map((p) => (
+          <div key={p.label} className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full shrink-0" style={{ background: p.color }} />
+            <span>{p.label} <b>{$(p.v)}</b> <span className="text-slate-500">{pct(p.v)}%</span></span>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -181,31 +275,6 @@ function UploadButton({ onFile, busy, label }: { onFile: (f: File) => void; busy
       <input type="file" accept=".json,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onFile(f); }} />
     </label>
-  );
-}
-
-function UnitEconomics({ uc, s }: { uc: Data["unitCosts"]; s: Settings }) {
-  const ft = perFoot(uc, s), strand = uc.mini?.perUnit ?? 0;
-  const items = [
-    { what: "1 ft of C9 roofline", cost: ft, charge: s.chargePerFt, note: "bulb, clip, socket wire and plugs" },
-    { what: "1 mini light strand", cost: strand, charge: s.chargePerStrand, note: "100 lights, 33 ft" },
-    { what: "9-10 ft pillar (2 strands)", cost: strand * 2, charge: s.chargePerStrand * 2, note: "" },
-    { what: "100 ft roofline job", cost: ft * 100 + (uc.ext?.perUnit ?? 0) * s.extFtPerJob, charge: s.chargePerFt * 100, note: `plus ${s.extFtPerJob} ft extension cord` },
-  ];
-  return (
-    <div className={card}>
-      <h2 className={h2} style={{ color: NAVY }}>What it costs us vs. what we charge</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {items.map((i) => (
-          <div key={i.what} className="rounded-lg bg-slate-50 p-3">
-            <div className="font-semibold">{i.what}</div>
-            <div className="text-sm mt-1">Costs us <b>{$u(i.cost)}</b> · we charge <b>{$(i.charge)}</b></div>
-            <div className="text-sm" style={{ color: GREEN }}>{i.cost > 0 ? `Materials are ${Math.round((i.cost / i.charge) * 100)}% of the price` : "Add prices to see this"}</div>
-            {i.note && <div className="text-xs text-slate-500 mt-1">{i.note}</div>}
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -222,9 +291,8 @@ function PriceCheck({ uc, s }: { uc: Data["unitCosts"]; s: Settings }) {
   }, [ft, c7, st, price, uc, s]);
   const inp = "w-full rounded-lg border border-slate-300 px-3 py-2";
   return (
-    <div className={card}>
-      <h2 className={`${h2} flex items-center gap-2`} style={{ color: NAVY }}><Calculator size={18} /> Price check</h2>
-      <p className="text-sm text-slate-500 mb-3">Before sending a quote, see what the job costs us and what's left after crew pay.</p>
+    <div>
+      <p className="text-sm text-slate-500 mb-3">See what a job costs us and what we keep after crew pay.</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <label className="text-sm">Feet of roofline<input className={inp} inputMode="decimal" value={ft} onChange={(e) => setFt(e.target.value)} /></label>
         <label className="text-sm">C7 bulbs<input className={inp} inputMode="decimal" value={c7} onChange={(e) => setC7(e.target.value)} /></label>
@@ -232,10 +300,10 @@ function PriceCheck({ uc, s }: { uc: Data["unitCosts"]; s: Settings }) {
         <label className="text-sm">Quote price<input className={inp} inputMode="decimal" placeholder={$(r.list)} value={price} onChange={(e) => setPrice(e.target.value)} /></label>
       </div>
       <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-        <div>Materials <b>{$(r.mat, true)}</b></div>
+        <div>Lights and parts <b>{$(r.mat, true)}</b></div>
         <div>Crew pay ({s.crewPct}%) <b>{$(r.crew)}</b></div>
         <div>Price <b>{$(r.sold)}</b>{price === "" && <span className="text-slate-500"> at ${s.chargePerFt}/ft, ${s.chargePerStrand}/strand</span>}</div>
-        <div style={{ color: r.left >= 0 ? GREEN : RED }}>Left <b>{$(r.left)}</b>{r.sold > 0 && ` (${Math.round((r.left / r.sold) * 100)}%)`}</div>
+        <div style={{ color: r.left >= 0 ? GREEN : RED }}>We keep <b>{$(r.left)}</b>{r.sold > 0 && ` (${Math.round((r.left / r.sold) * 100)}%)`}</div>
       </div>
       {r.noC7 && <p className="text-xs text-amber-700 mt-2">No C7 price yet; add a C7 line to an order to count them.</p>}
     </div>
@@ -248,8 +316,7 @@ function StockCard({ stock, uc, s }: { stock: Stock[]; uc: Data["unitCosts"]; s:
   const rooflineFt = Math.max(0, Math.min(get("c9") / s.bulbsPerFt, get("clip") / (s.bulbsPerFt * s.clipsPerBulb), get("wire")));
   const total = stock.reduce((a, x) => a + Math.max(0, x.value), 0);
   return (
-    <div className={card}>
-      <h2 className={`${h2} flex items-center gap-2`} style={{ color: NAVY }}><Package size={18} /> Stock on hand</h2>
+    <div>
       <p className="text-sm text-slate-600 mb-3">
         Enough for about <b>{n0(rooflineFt)} ft</b> of new C9 roofline and <b>{n0(get("mini"))}</b> mini strands. Stock is worth about <b>{$(total)}</b> at our cost.
       </p>
@@ -283,7 +350,7 @@ function OrderCard({ o, busy, onSave, onDelete }: { o: Order; busy: boolean; onS
     setEdit({ ...cur, lines: cur.lines.map((l, j) => (j === i ? { ...l, [k]: k === "description" || k === "key" ? v : Number(v) || 0 } : l)) });
   const cell = "w-24 rounded border border-slate-300 px-2 py-1 text-right";
   return (
-    <div className={card}>
+    <div className="rounded-lg border border-slate-200 p-3">
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <h2 className="text-lg font-extrabold" style={{ color: NAVY }}>{o.label}</h2>
@@ -307,7 +374,7 @@ function OrderCard({ o, busy, onSave, onDelete }: { o: Order; busy: boolean; onS
       <div className="overflow-x-auto -mx-4 px-4 mt-2">
         <table className="w-full text-sm min-w-[640px]">
           <thead className="text-left text-slate-500 border-b">
-            <tr><th className="py-2 pr-2">Item</th><th className="pr-2 text-right">Qty</th><th className="pr-2 text-right">C&F price</th><th className="pr-2 text-right">Amount</th><th className="pr-2 text-right">Landed cost</th><th className="text-right">Our cost each</th></tr>
+            <tr><th className="py-2 pr-2">Item</th><th className="pr-2 text-right">Qty</th><th className="pr-2 text-right">Price each</th><th className="pr-2 text-right">Sheet total</th><th className="pr-2 text-right">With shipping and duty</th><th className="text-right">Our cost each</th></tr>
           </thead>
           <tbody>
             {cur.lines.map((l, i) => (
@@ -323,14 +390,14 @@ function OrderCard({ o, busy, onSave, onDelete }: { o: Order; busy: boolean; onS
             <tr className="font-semibold">
               <td className="py-2 pr-2">Total</td><td /><td />
               <td className="pr-2 text-right">{$(cf, true)}</td><td className="pr-2 text-right">{$(landed, true)}</td>
-              <td className="text-right text-xs font-normal text-slate-500">landed is {Math.round((landed / cf - 1) * 100)}% over C&F</td>
+              <td className="text-right text-xs font-normal text-slate-500">shipping and duty add {Math.round((landed / cf - 1) * 100)}%</td>
             </tr>
           </tbody>
         </table>
       </div>
       {!!o.discountPct && (
         <p className="text-sm text-slate-600 mt-2">
-          Less {o.discountPct}% discount: {$((cf * o.discountPct) / 100, true)} off C&F. The cost per piece above follows the sheet and doesn't take the discount off.
+          Less {o.discountPct}% discount: {$((cf * o.discountPct) / 100, true)} off the sheet total. "Our cost each" doesn't take the discount off.
         </p>
       )}
     </div>
@@ -352,8 +419,7 @@ function SettingsCard({ s, busy, onSave }: { s: Settings; busy: boolean; onSave:
   ];
   const dirty = JSON.stringify(v) !== JSON.stringify(s);
   return (
-    <div className={card}>
-      <h2 className={h2} style={{ color: NAVY }}>How jobs are counted</h2>
+    <div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {fields.map((f) => (
           <label key={f.k} className="text-sm">{f.label}

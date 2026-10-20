@@ -69,6 +69,11 @@ export async function runPass(budgetMs = BUDGET): Promise<boolean> {
     s.builtAt = Date.now();
   }
   await kvSet(STATE, s);
+  // Then the message summaries of customers whose records just changed, with what's left of this run.
+  if (finished) {
+    const { summarizeChanged } = await import("./cxSummary");
+    await summarizeChanged(deadline).catch((e) => console.error("[cx summaries]", e?.message ?? e));
+  }
   // On an error, stop here: the next run (opening Customers or Jobs, or the daily cron) picks up where this one stopped.
   return !finished && !stuck && !failed;
 }
