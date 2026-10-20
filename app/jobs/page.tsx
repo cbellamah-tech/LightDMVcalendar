@@ -9,6 +9,7 @@ import type { CrewPay, Job, Progress } from "./types";
 import { dur } from "./types";
 import DrivePhotos from "./DrivePhotos";
 import Bring from "./Bring";
+import CrewNote from "./CrewNote";
 import type { BringItem } from "@/lib/materials";
 
 type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay; expenses?: number; reviews?: number; bring?: BringItem[] };
@@ -66,6 +67,7 @@ export default function JobsPage() {
         </div>
       )}
       {office && <DrivePhotos />}
+      {!sample && <CrewNote office={office} crew={crew} />}
       <section id="fixes" className="scroll-mt-16 rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-3 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="font-extrabold text-amber-900 flex items-center gap-2"><Wrench size={18} /> Fixes (service calls){openFixes ? ` · ${openFixes} open` : ""}</h2>
