@@ -100,6 +100,15 @@ export const getSitePages = async () => (await kvGet<Record<string, SitePage>>(P
 export const getSiteTags = () => kvGet<SiteTags>(TAGS);
 export const siteReadAt = async () => (await kvGet<number>(AT)) ?? 0;
 
+/** New blog posts and city pages per day, for the campaign sheet's blog row. Only pages whose launch day is
+ *  known (not "on the site by" the repo's first day) count. */
+export async function newPageDays(): Promise<{ day: string; n: number }[]> {
+  const by: Record<string, number> = {};
+  for (const p of Object.values(await getSitePages()))
+    if (p.publishedExact && ["blog", "city", "location"].includes(p.kind)) by[p.published] = (by[p.published] ?? 0) + 1;
+  return Object.entries(by).map(([day, n]) => ({ day, n }));
+}
+
 /** Re-read the sitemap, the homepage's tags, and titles/pictures for new pages (and up to 20 stale ones). */
 export async function refreshWebsite(): Promise<{ pages: number; added: string[]; error?: string }> {
   const today = etDay(Date.now());

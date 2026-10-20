@@ -282,6 +282,53 @@ export async function readSheetGrid(): Promise<{ title: string; rows: string[][]
   return { title: tab, rows: (v.values ?? []) as string[][] };
 }
 
+/* The 2026 sheet began as a copy of "2025 Marketing Schedule", so August to November held last year's numbers.
+   Once: every week cell that still equals the 2025 sheet's cell in the same row is emptied (real 2026 counts are
+   written over it right after), each month's total becomes the sum of its 4 weeks, and the week numbers on row 2
+   are set to 1 2 3 4 Total. */
+const SHEET_2025 = "1die92PqKYjjRy9BPrjDizFZRmBfz95Jpg5FeESFO6SE";
+const rowKey = (s: string) => (s ?? "").toLowerCase().replace(/\(automated\)/g, "").replace(/\s+/g, " ").trim();
+
+export async function clearCopied2025(): Promise<{ range: string; row: string; was: string }[]> {
+  const grid = async (id: string, render: "FORMATTED_VALUE" | "FORMULA") => {
+    const meta = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties.title`);
+    const tab = meta.sheets?.[0]?.properties?.title ?? "Sheet1";
+    const v = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${encodeURIComponent(`'${tab}'!A1:AF60`)}?valueRenderOption=${render}`);
+    return { tab, rows: (v.values ?? []) as string[][] };
+  };
+  const [old, now, formulas] = await Promise.all([grid(SHEET_2025, "FORMATTED_VALUE"), grid(SHEET_ID, "FORMATTED_VALUE"), grid(SHEET_ID, "FORMULA")]);
+  const oldRows = new Map(old.rows.map((r) => [rowKey(r[0]), r]));
+  const idx = (col: string) => [...col].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+  const cleared: { range: string; row: string; was: string }[] = [];
+  const data: { range: string; values: string[][] }[] = [];
+  const header: string[] = [];
+  for (let m = 7; m <= 12; m++) header.push("1", "2", "3", "4", "Total");
+  data.push({ range: `'${now.tab}'!C2:AF2`, values: [header] });
+  now.rows.forEach((r, i) => {
+    const name = (r[0] ?? "").trim();
+    if (i < 2 || !name || name.endsWith(":")) return; // title rows and section headings
+    const before = oldRows.get(rowKey(name));
+    for (let m = 7; m <= 12; m++) {
+      for (let w = 1; w <= 4; w++) {
+        const col = sheetColumn(m, w)!;
+        const cell = (r[idx(col)] ?? "").trim();
+        if (m >= 8 && m <= 11 && cell && before && cell === (before[idx(col)] ?? "").trim()) {
+          cleared.push({ range: `${col}${i + 1}`, row: name, was: cell });
+          data.push({ range: `'${now.tab}'!${col}${i + 1}`, values: [[""]] });
+        }
+      }
+      const total = colName(idx(sheetColumn(m, 4)!) + 1);
+      if (!String(formulas.rows[i]?.[idx(total)] ?? "").startsWith("="))
+        data.push({ range: `'${now.tab}'!${total}${i + 1}`, values: [[`=SUM(${sheetColumn(m, 1)}${i + 1}:${sheetColumn(m, 4)}${i + 1})`]] });
+    }
+  });
+  await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchUpdate`, {
+    method: "POST",
+    body: { valueInputOption: "USER_ENTERED", data },
+  });
+  return cleared;
+}
+
 /* ---------- Drive photos for the daily video ---------- */
 
 export type DrivePic = { id: string; name: string; createdTime: string; folder?: string; width?: number; height?: number };

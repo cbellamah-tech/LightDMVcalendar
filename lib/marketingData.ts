@@ -5,11 +5,12 @@ import { getAutoPost } from "./autopost";
 import { kvGet, kvSet } from "./store";
 import { BOXES, CHANNELS, ChannelId, CountEvent, channel, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
 import { getGhlSnap, ghlConfigured, leadSource, refreshGhl } from "./ghl";
-import { coldEmailReports, ColdReport, ensureSheetRows, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
+import { clearCopied2025, coldEmailReports, ColdReport, ensureSheetRows, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
 import { Deal, dealDays, dealProgress, getDeals, radioSpotDays } from "./deals";
 import { getMedia, PLATFORMS, runnerKey } from "./media";
 import { stableOrigin } from "./jobber";
 import { laterOnce } from "./background";
+import { newPageDays } from "./website";
 
 /* Everything the Marketing tab shows, in one read. */
 
@@ -87,7 +88,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     ghlP, allAdDays(), getEvents(), getFeed(), getAutoPost(), getDrafts(), adsSummary(), latestCold(), getMedia(), kvGet<FillResult>(FILL), googleP,
     googleP.then((gs) => inbox(opts.refresh, gs)), getDeals(opts.refresh),
   ]);
-  const daily = await dailyCounts(ghl?.posts ?? [], adDays, events, radioSpotDays(deals.deals));
+  const daily = await dailyCounts(ghl?.posts ?? [], adDays, events, radioSpotDays(deals.deals), await newPageDays());
   const totals = weekTotals(daily, week);
   const prev = weekTotals(daily, addDays(week, -7));
 
@@ -148,16 +149,20 @@ function marketplacePace(events: CountEvent[], today: string) {
 
 export type FillResult = { at: number; week: string; by: string; written: { range: string; row: string; value: number }[]; missingRows: string[]; error?: string };
 
-/** Cells touched by one week: each (month, sheet week) its days fall in, summed over the whole cell. */
-export async function fillSheet(week: string, by: string, dry = false): Promise<FillResult> {
+export const fillSheet = (week: string, by: string, dry = false) => fillWeeks([week], by, dry);
+
+/** Cells touched by these weeks: each (month, sheet week) their days fall in, summed over the whole cell. */
+export async function fillWeeks(weeks: string[], by: string, dry = false): Promise<FillResult> {
+  const week = weeks[weeks.length - 1];
   const ghl = ghlConfigured() ? await refreshGhl().catch(() => getGhlSnap()) : null;
   const deals = (await getDeals()).deals;
-  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays(), undefined, radioSpotDays(deals));
+  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays(), undefined, radioSpotDays(deals), await newPageDays());
   const cellsTouched = new Set<string>(); // "YYYY-MM|week"
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(weekOf(week), i);
-    if (d.startsWith("2026-")) cellsTouched.add(`${d.slice(0, 7)}|${sheetWeek(d)}`);
-  }
+  for (const w of weeks)
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(weekOf(w), i);
+      if (d.startsWith("2026-")) cellsTouched.add(`${d.slice(0, 7)}|${sheetWeek(d)}`);
+    }
   const cells: SheetCell[] = [];
   for (const key of cellsTouched) {
     const [ym, wk] = key.split("|");
@@ -202,12 +207,22 @@ function newRows(deals: Deal[]) {
 export const channelIds = new Set<string>(CHANNELS.map((c) => c.id));
 export const isChannel = (x: unknown): x is ChannelId => typeof x === "string" && channelIds.has(x);
 
-/** Daily: this week and last week into the sheet (a new week's first days also finish last week's cells). */
+/** Daily: every week since July 1 into the sheet, so late counts (a Smartlead report, a tap logged a day late)
+ *  land in their own week too. The first run empties the numbers copied over from the 2025 sheet. */
+const CLEARED_2025 = "ldmv:mkt:sheet2025cleared";
+const CAMPAIGN_START = "2026-07-01";
 export async function syncSheet(by: string) {
-  const thisWeek = weekOf(etDay(Date.now()));
-  const last = await fillSheet(addDays(thisWeek, -7), by);
-  const now = await fillSheet(thisWeek, by);
-  return { written: last.written.length + now.written.length, error: now.error || last.error };
+  if (!(await kvGet(CLEARED_2025))) {
+    try {
+      await kvSet(CLEARED_2025, { at: Date.now(), cleared: await clearCopied2025() });
+    } catch (e: any) {
+      return { written: 0, error: `Clearing the 2025 numbers: ${e.message}` };
+    }
+  }
+  const weeks: string[] = [];
+  for (let w = weekOf(CAMPAIGN_START); w <= weekOf(etDay(Date.now())); w = addDays(w, 7)) weeks.push(w);
+  const r = await fillWeeks(weeks, by);
+  return { written: r.written.length, error: r.error };
 }
 
 /* The daily video run finds the app through a small file this app keeps in Drive (only the production app
