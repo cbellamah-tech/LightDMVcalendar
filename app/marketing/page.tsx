@@ -12,6 +12,7 @@ import { LiveStats } from "./stats";
 import { SocialPosts } from "./social";
 import { MarketplaceCard, MarketplacePace } from "./marketplace";
 import { CraigslistAds } from "./craigslist";
+import { InstagramEngage } from "./engage";
 
 export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
@@ -120,6 +121,8 @@ export default function Marketing() {
       <SocialPosts />
 
       <MarketplaceCard media={d.media} draft={d.drafts.text.marketplace} pace={d.marketplace} reload={load} />
+
+      <InstagramEngage />
 
       <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} errors={d.ghl.errors} />
 

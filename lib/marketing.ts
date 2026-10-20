@@ -8,7 +8,7 @@ import { getVisits } from "./signs";
 
 export type ChannelId =
   | "google_posts" | "facebook_posts" | "fb_groups" | "marketplace" | "craigslist" | "linkedin_posts"
-  | "linkedin_engage" | "instagram_posts" | "nextdoor" | "blog" | "cold_emails" | "yard_signs"
+  | "linkedin_engage" | "instagram_engage" | "instagram_posts" | "nextdoor" | "blog" | "cold_emails" | "yard_signs"
   | "door_hangers" | "tree_shop_cards" | "eddm" | "door_to_door" | "car_magnets" | "bing_posts"
   | "fb_ads" | "google_ads" | "google_lsa" | "influencers" | "radio" | "iheart_emails";
 
@@ -43,6 +43,7 @@ export const CHANNELS: Channel[] = [
   { id: "linkedin_posts", label: "LinkedIn posts", sheetRow: "LinkedIn Posting", monthlyGoal: 4, box: "social", bot: "CMO", auto: "ghl", ghlPlatform: "linkedin", link: "https://www.linkedin.com/feed/" },
   { id: "bing_posts", label: "Bing Places posts", sheetRow: "Bing Posting", box: "social", link: "https://www.bingplaces.com/Dashboard" },
   { id: "linkedin_engage", label: "LinkedIn comments and follows", sheetRow: "LinkedIn Commenting Following", monthlyGoal: 100, box: "social", link: "https://www.linkedin.com/feed/" },
+  { id: "instagram_engage", label: "Instagram comments and follows", sheetRow: "Instagram Commenting Following", monthlyGoal: 100, box: "social", insertAfter: "LinkedIn Commenting Following", link: "https://www.instagram.com/" },
   { id: "fb_groups", label: "Facebook Groups posts", sheetRow: "Facebook Groups Posting", monthlyGoal: 10, box: "listings", link: "https://www.facebook.com/groups/feed/" },
   { id: "marketplace", label: "Marketplace listings", sheetRow: "FB marketplace posting", monthlyGoal: 5, box: "listings", link: "https://www.facebook.com/marketplace/you/selling" },
   { id: "craigslist", label: "Craigslist ads", sheetRow: "Craigslist Posting", monthlyGoal: 5, box: "listings", link: "https://accounts.craigslist.org/login/home" },
