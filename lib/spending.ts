@@ -26,7 +26,7 @@ export const CATS = {
   marketing: "Marketing and ads",
   insurance: "Insurance",
   vans: "Vans, gas and tolls",
-  software: "Software and subscriptions",
+  software: "Software and apps",
   rent: "Warehouse and rent",
   other: "Other",
 } as const;
