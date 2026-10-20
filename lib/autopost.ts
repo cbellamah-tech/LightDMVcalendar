@@ -4,20 +4,27 @@ import { expireGhlSnap, getGhlSnap, ghlConfigured, ghlPostNow } from "./ghl";
 
 /* Posting a media item through GoHighLevel, by hand (Post now) or on its own (Auto-post on). */
 
-export async function postMedia(m: MediaItem, want: Platform[], by: string, captions?: Partial<Record<Platform, string>>) {
+export type PostResult = { platform: string; ok: boolean; error?: string };
+
+/** One post per platform, to every connected (not expired) Social Planner account on it. */
+export async function postToPlatforms(media: { url: string; contentType: string }, want: Platform[], textFor: (p: Platform) => string) {
   const accounts = (await getGhlSnap())?.accounts ?? [];
-  const results: { platform: string; ok: boolean; error?: string }[] = [];
+  const results: PostResult[] = [];
   for (const p of want) {
     const ids = accounts.filter((a) => a.platform.includes(p) && !a.expired).map((a) => a.id);
-    const text = String(captions?.[p] ?? m.captions[p] ?? m.captions.facebook ?? m.title).slice(0, 3000);
     try {
       if (!ids.length) throw new Error(`No ${p} account connected in GoHighLevel's Social Planner.`);
-      await ghlPostNow(ids, text, [{ url: m.url, type: m.contentType }]);
+      await ghlPostNow(ids, textFor(p).slice(0, 3000), [{ url: media.url, type: media.contentType }]);
       results.push({ platform: p, ok: true });
     } catch (e: any) {
       results.push({ platform: p, ok: false, error: e.message });
     }
   }
+  return results;
+}
+
+export async function postMedia(m: MediaItem, want: Platform[], by: string, captions?: Partial<Record<Platform, string>>) {
+  const results = await postToPlatforms(m, want, (p) => String(captions?.[p] ?? m.captions[p] ?? m.captions.facebook ?? m.title));
   const ok = results.filter((r) => r.ok).map((r) => r.platform);
   const errors = results.filter((r) => !r.ok).map((r) => `${r.platform}: ${r.error}`).join("; ");
   await patchMedia(m.id, (x) => {

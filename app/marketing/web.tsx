@@ -23,10 +23,12 @@ type Source<T> = { data: T | null; need?: string; link?: string; error?: string;
 type AdKw = { text: string; match?: string; campaign?: string; clicks: number; impressions: number; cost: number; conversions: number };
 type Page = { path: string; url: string; kind: "blog" | "city" | "service" | "location" | "other"; service?: string; city?: string; title?: string; description?: string; image?: string; published: string; publishedExact: boolean };
 type Tag = { id: string; kind: string; found: boolean };
+type Draft = { pr: number; prUrl: string; title: string; kind: "blog" | "city" | "page"; path?: string; preview?: string; image?: string; date?: string; excerpt?: string; openedAt: string; draft: boolean };
 type Web = {
   site: string; at: number;
   pages: Page[];
   tags: { at: number; tags: Tag[]; error?: string } | null;
+  drafts: { configured: boolean; at: number; items: Draft[]; error?: string };
   google: { configured: boolean; connected: boolean; email?: string };
   insights: { at: number; search: Source<Search>; analytics: Source<Analytics> } | null;
   adKeywords: { at: number; days: number; keywords: AdKw[]; terms: AdKw[] } | null;
@@ -56,23 +58,23 @@ export function WebsiteGoogle({ owner, botBox }: { owner: boolean; botBox: { url
   );
   return (
     <>
+      <SitePages w={w} owner={owner} reload={() => load(true)} />
       <GoogleNumbers w={w} owner={owner} botBox={botBox} busy={busy} refresh={() => { setBusy(true); load(true).finally(() => setBusy(false)); }} />
-      <SitePages w={w} />
     </>
   );
 }
 
 /* ---------- Google numbers ---------- */
 
-function Delta({ now, prev, lowerIsBetter = false, suffix = "" }: { now: number; prev: number; lowerIsBetter?: boolean; suffix?: string }) {
+export function Delta({ now, prev, lowerIsBetter = false, suffix = "", flip = false, neutral = false }: { now: number; prev: number; lowerIsBetter?: boolean; suffix?: string; flip?: boolean; neutral?: boolean }) {
   if (!prev && !now) return null;
   const diff = now - prev;
   if (Math.abs(diff) < 0.05) return <span className="text-xs text-slate-400">same as before</span>;
   const good = lowerIsBetter ? diff < 0 : diff > 0;
   const pct = prev ? Math.round((Math.abs(diff) / prev) * 100) : null;
-  const Icon = (lowerIsBetter ? good : diff > 0) ? ArrowUp : ArrowDown; // a better Google spot reads as up
+  const Icon = (flip ? good : diff > 0) ? ArrowUp : ArrowDown; // flip: a better Google spot (a smaller number) reads as up
   return (
-    <span className={`text-xs font-semibold inline-flex items-center ${good ? "text-green-700" : "text-red-600"}`}>
+    <span className={`text-xs font-semibold inline-flex items-center ${neutral ? "text-slate-500" : good ? "text-green-700" : "text-red-600"}`}>
       <Icon size={12} />{suffix ? `${Math.abs(Math.round(diff * 10) / 10)}${suffix}` : pct !== null ? `${pct}%` : n0(Math.abs(diff))}
     </span>
   );
@@ -141,7 +143,7 @@ function GoogleNumbers({ w, owner, botBox, busy, refresh }: { w: Web; owner: boo
         <Tile label="Clicks from Google search" value={s ? n0(s.now.clicks) : "–"} active={panel === "clicks"} onClick={() => toggle("clicks")}
           sub={s && <><Delta now={s.now.clicks} prev={s.prev.clicks} /><span className="text-xs text-slate-400">{s.now.ctr}% click</span></>} />
         <Tile label="Average spot on Google" value={s ? `#${s.now.position}` : "–"} active={panel === "position"} onClick={() => toggle("position")}
-          sub={s && <Delta now={s.now.position} prev={s.prev.position} lowerIsBetter suffix={s.now.position < s.prev.position ? " spots higher" : " spots lower"} />} />
+          sub={s && <Delta now={s.now.position} prev={s.prev.position} lowerIsBetter flip suffix={s.now.position < s.prev.position ? " spots higher" : " spots lower"} />} />
         <Tile label="Website visitors" value={a ? n0(a.now.users) : "–"} active={panel === "visitors"} onClick={() => toggle("visitors")}
           sub={a && <><Delta now={a.now.users} prev={a.prev.users} /><span className="text-xs text-slate-400">{n0(a.now.sessions)} visits</span></>} />
         <Tile label="Leads from the website" value={a ? n0(a.now.keyEvents) : "–"} active={panel === "leads"} onClick={() => toggle("leads")}
@@ -335,7 +337,7 @@ function AdKeywords({ kw }: { kw: NonNullable<Web["adKeywords"]> }) {
   );
 }
 
-function Bars({ title, days }: { title: string; days: { day: string; v: number }[] }) {
+export function Bars({ title, days }: { title: string; days: { day: string; v: number }[] }) {
   const [hover, setHover] = useState<number | null>(null);
   if (!days.length) return null;
   const max = Math.max(1, ...days.map((d) => d.v));
@@ -382,65 +384,145 @@ function Tags({ w }: { w: Web }) {
 
 /* ---------- Website pages ---------- */
 
-const KIND: Record<Page["kind"], string> = { blog: "Blog post", city: "City page", service: "Service page", location: "Location", other: "Page" };
+const KIND: Record<Page["kind"] | Draft["kind"], string> = { blog: "Blog post", city: "City page", service: "Service page", location: "Location", other: "Page", page: "Page" };
 
-function SitePages({ w }: { w: Web }) {
+function SitePages({ w, owner, reload }: { w: Web; owner: boolean; reload: () => void }) {
   const [kind, setKind] = useState<"new" | "blog" | "city" | "all">("new");
   const [all, setAll] = useState(false);
   const clicks = useMemo(() => new Map((w.insights?.search.data?.pages ?? []).map((p) => [p.key, p])), [w]);
   const list = w.pages.filter((p) => kind === "all" ? true : kind === "new" ? (p.kind === "blog" || p.kind === "city") : p.kind === kind);
-  const shown = all ? list : list.slice(0, 6);
+  const [lead, ...rest] = list;
+  const shown = all ? rest : rest.slice(0, 6);
   const week = w.pages.filter((p) => p.publishedExact && daysAgo(p.published) < 7).length;
   const month = w.pages.filter((p) => p.publishedExact && daysAgo(p.published) < 30).length;
-  const blogs = w.pages.filter((p) => p.kind === "blog").length, cities = w.pages.filter((p) => p.kind === "city").length;
+  const waiting = w.drafts.items;
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-4">
+    <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-extrabold" style={{ color: NAVY }}>Website: new pages and blog posts</h2>
+          <h2 className="text-lg font-extrabold" style={{ color: NAVY }}>Website pages and blog posts</h2>
           <p className="text-xs text-slate-500">
-            {w.pages.length ? `${week} new this week, ${month} this month · ${blogs} blog posts, ${cities} city pages on ${w.site.replace(/^https?:\/\//, "")}` : "Reading the website..."}
-            {w.at ? ` · checked ${ago(w.at)}` : ""}
+            {waiting.length ? `${waiting.length} waiting to go live · ` : ""}{week} went live this week, {month} this month on {w.site.replace(/^https?:\/\//, "")}
+            {w.at ? ` · checked ${ago(w.at)}` : ""}. Tap any card to open the page.
           </p>
         </div>
-        <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm font-semibold" role="group" aria-label="Which pages">
-          {([["new", "Newest"], ["blog", "Blog"], ["city", "City pages"], ["all", "All"]] as const).map(([k, l]) => (
-            <button key={k} onClick={() => { setKind(k); setAll(false); }} aria-pressed={kind === k}
-              className={`px-3 py-1 rounded-md ${kind === k ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}>{l}</button>
-          ))}
-        </div>
       </div>
-      {!list.length ? <p className="text-sm text-slate-500">No pages read yet. They show after the next check of the website.</p> : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {shown.map((p) => <PageCard key={p.path} p={p} c={clicks.get(p.path)} />)}
+
+      <div className="space-y-2">
+        <div className="text-xs font-bold uppercase tracking-wide text-amber-700">Going live next</div>
+        {!w.drafts.configured ? <DraftsStep owner={owner} done={reload} />
+          : !waiting.length ? <p className="text-sm text-slate-500">Nothing waiting right now. New pages and blog drafts show here the moment they are written.</p>
+          : <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{waiting.map((d) => <DraftCard key={d.pr} d={d} />)}</div>}
+        {w.drafts.error && <p className="text-xs text-red-600">{w.drafts.error}</p>}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-xs font-bold uppercase tracking-wide text-green-700 flex-1">Live on the website</div>
+          <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm font-semibold" role="group" aria-label="Which pages">
+            {([["new", "Newest"], ["blog", "Blog"], ["city", "City pages"], ["all", "All"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => { setKind(k); setAll(false); }} aria-pressed={kind === k}
+                className={`px-3 py-1 rounded-md ${kind === k ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}>{l}</button>
+            ))}
+          </div>
         </div>
-      )}
-      {list.length > 6 && <button onClick={() => setAll(!all)} className="text-xs underline text-slate-600">{all ? "Show fewer" : `Show all ${list.length}`}</button>}
-      <p className="text-xs text-slate-500">Blog drafts are written on the 1st and 15th and wait for an OK before they go live. New pages show here the day they go live.</p>
+        {!lead ? <p className="text-sm text-slate-500">No pages read yet. They show after the next check of the website.</p> : (
+          <>
+            <PageCard p={lead} c={clicks.get(lead.path)} big />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {shown.map((p) => <PageCard key={p.path} p={p} c={clicks.get(p.path)} />)}
+            </div>
+          </>
+        )}
+        {rest.length > 6 && <button onClick={() => setAll(!all)} className="text-xs underline text-slate-600">{all ? "Show fewer" : `Show all ${list.length}`}</button>}
+      </div>
     </section>
   );
 }
 
-function PageCard({ p, c }: { p: Page; c?: Row }) {
+function Cover({ src, kind }: { src?: string; kind: string }) {
   const [broken, setBroken] = useState(false);
-  const fresh = p.publishedExact && daysAgo(p.published) < 7;
-  return (
-    <a href={p.url} target="_blank" rel="noreferrer" className="group rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition flex flex-col">
-      <div className="aspect-[16/9] bg-slate-100 relative">
-        {p.image && !broken
-          ? <img src={p.image} alt="" loading="lazy" onError={() => setBroken(true)} className="absolute inset-0 w-full h-full object-cover" />
-          : <div className="absolute inset-0 flex items-center justify-center text-slate-300"><Globe size={36} /></div>}
-        <span className="absolute top-2 left-2 text-[11px] font-bold rounded bg-white/90 px-1.5 py-0.5" style={{ color: NAVY }}>{KIND[p.kind]}{p.service && p.kind === "city" ? ` · ${p.service}` : ""}</span>
-        {fresh && <span className="absolute top-2 right-2 text-[11px] font-bold rounded bg-green-600 text-white px-1.5 py-0.5">New</span>}
+  return src && !broken
+    ? <img src={src} alt="" loading="lazy" onError={() => setBroken(true)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition duration-300" />
+    : (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-white/90" style={{ background: `linear-gradient(135deg, ${NAVY}, #1d4f8f)` }}>
+        <Globe size={34} /><span className="text-xs font-semibold">{kind}</span>
       </div>
-      <div className="p-3 space-y-1 flex-1 flex flex-col">
-        <div className="font-semibold text-sm leading-snug group-hover:underline">{p.title || p.city || pathOf(p.url)}</div>
-        {p.description && <p className="text-xs text-slate-500 line-clamp-2">{p.description}</p>}
-        <div className="mt-auto pt-1 flex items-center gap-2 text-xs text-slate-500">
-          <span className="flex-1">{p.publishedExact ? shortDay(p.published) : `Live by ${shortDay(p.published)}`}</span>
-          {c ? <span className="tabular-nums">{n0(c.clicks)} clicks · {n0(c.impressions)} shown</span> : <span className="text-slate-400">no Google clicks yet</span>}
+    );
+}
+
+function Pill({ tone, children }: { tone: "green" | "amber" | "white"; children: React.ReactNode }) {
+  const cls = tone === "green" ? "bg-green-600 text-white" : tone === "amber" ? "bg-amber-500 text-white" : "bg-white/95";
+  return <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 shadow-sm ${cls}`} style={tone === "white" ? { color: NAVY } : undefined}>{children}</span>;
+}
+
+function PageCard({ p, c, big }: { p: Page; c?: Row; big?: boolean }) {
+  const fresh = p.publishedExact && daysAgo(p.published) < 7;
+  const when = p.publishedExact ? `Live ${shortDay(p.published)}` : `Live by ${shortDay(p.published)}`;
+  return (
+    <a href={p.url} target="_blank" rel="noreferrer"
+      className={`group rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg transition bg-white ${big ? "grid md:grid-cols-[3fr_2fr]" : "flex flex-col"}`}>
+      <div className={`bg-slate-100 relative overflow-hidden ${big ? "aspect-[16/9] md:aspect-auto md:min-h-[260px]" : "aspect-[16/9]"}`}>
+        <Cover src={p.image} kind={KIND[p.kind]} />
+        <span className="absolute top-2 left-2 flex gap-1"><Pill tone="white">{KIND[p.kind]}{p.service && p.kind === "city" ? ` · ${p.service}` : ""}</Pill></span>
+        <span className="absolute bottom-2 left-2"><Pill tone={fresh ? "green" : "white"}>{fresh ? `New · ${when}` : when}</Pill></span>
+      </div>
+      <div className={`${big ? "p-5" : "p-3"} space-y-1.5 flex-1 flex flex-col`}>
+        {big && <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Latest</div>}
+        <div className={`${big ? "text-xl" : "text-sm"} font-bold leading-snug group-hover:underline`} style={{ color: NAVY }}>{p.title || p.city || pathOf(p.url)}</div>
+        {p.description && <p className={`text-slate-500 ${big ? "text-sm line-clamp-4" : "text-xs line-clamp-2"}`}>{p.description}</p>}
+        <div className="mt-auto pt-2 flex items-center gap-2 text-xs text-slate-500">
+          <span className="flex-1 truncate">{p.path}</span>
+          {c ? <span className="tabular-nums font-semibold text-slate-700">{n0(c.clicks)} Google clicks</span> : <span className="text-slate-400">no Google clicks yet</span>}
+          <ExternalLink size={12} className="shrink-0" />
         </div>
       </div>
     </a>
+  );
+}
+
+function DraftCard({ d }: { d: Draft }) {
+  return (
+    <div className="group rounded-xl border-2 border-amber-300 overflow-hidden bg-amber-50/40 flex flex-col">
+      <a href={d.preview || d.prUrl} target="_blank" rel="noreferrer" className="block aspect-[16/9] relative overflow-hidden bg-slate-100">
+        <Cover src={d.image} kind={KIND[d.kind]} />
+        <span className="absolute top-2 left-2"><Pill tone="white">{KIND[d.kind]}</Pill></span>
+        <span className="absolute bottom-2 left-2"><Pill tone="amber">Waiting for your OK</Pill></span>
+      </a>
+      <div className="p-3 space-y-1 flex-1 flex flex-col">
+        <a href={d.preview || d.prUrl} target="_blank" rel="noreferrer" className="text-sm font-bold leading-snug hover:underline" style={{ color: NAVY }}>{d.title}</a>
+        {d.excerpt && <p className="text-xs text-slate-500 line-clamp-2">{d.excerpt}</p>}
+        <div className="mt-auto pt-1 flex items-center gap-2 text-xs text-slate-500">
+          <span className="flex-1">Written {shortDay(d.openedAt)}{d.date && d.date !== d.openedAt ? ` · dated ${shortDay(d.date)}` : ""}. Goes live when approved.</span>
+        </div>
+        <div className="flex gap-3 text-xs font-semibold">
+          <a href={d.preview || d.prUrl} target="_blank" rel="noreferrer" className="underline">{d.preview ? "See the preview" : "See it"}</a>
+          <a href={d.prUrl} target="_blank" rel="noreferrer" className="underline text-slate-500">Approve on GitHub</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One paste: a read-only GitHub token for the website repo, so drafts waiting to go live show here. */
+function DraftsStep({ owner, done }: { owner: boolean; done: () => void }) {
+  const [token, setToken] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!owner) return <p className="text-sm text-slate-500">Shows once an owner connects the website's GitHub here.</p>;
+  async function save() {
+    setBusy(true); setMsg("");
+    try { const r = await api("/api/marketing/site-token", { method: "POST", json: { token } }); setMsg(`Connected. ${r.waiting} waiting to go live.`); setToken(""); done(); }
+    catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm space-y-2">
+      <p>To see pages before they go live, paste a read-only GitHub token for lightdmv-site once (<a className="underline" target="_blank" rel="noreferrer" href="https://github.com/settings/personal-access-tokens/new">make one here</a>: pick only lightdmv-site, Contents and Pull requests set to Read).</p>
+      <div className="flex gap-2">
+        <input value={token} onChange={(e) => setToken(e.target.value)} type="password" autoComplete="off" placeholder="github_pat_..." className="flex-1 min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 bg-white" />
+        <button disabled={busy || !token} onClick={save} className="rounded-lg px-3 py-1.5 text-white font-semibold disabled:opacity-50" style={{ background: NAVY }}>{busy ? "Checking..." : "Save"}</button>
+      </div>
+      {msg && <p className="text-xs">{msg}</p>}
+    </div>
   );
 }

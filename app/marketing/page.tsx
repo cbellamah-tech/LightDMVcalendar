@@ -8,6 +8,8 @@ import { ChannelName, Media, MediaBoard, SheetView } from "./media";
 import { Attribution, OrganicPaid } from "./dashboard";
 import { googleAdsScript } from "./adsScript";
 import { WebsiteGoogle } from "./web";
+import { LiveStats } from "./stats";
+import { SocialPosts } from "./social";
 
 export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
@@ -108,11 +110,15 @@ export default function Marketing() {
         </Card>
       )}
 
+      <LiveStats owner={owner} />
+
+      <WebsiteGoogle owner={owner} botBox={d.botBox} />
+
+      <SocialPosts />
+
       <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} errors={d.ghl.errors} />
 
       <Deals deals={d.deals} a={d.attribution} days={days} sheetUrl={d.google.sheetUrl} />
-
-      <WebsiteGoogle owner={owner} botBox={d.botBox} />
 
       <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} autopost={d.autopost} owner={owner} today={d.today} reload={load} />
 
@@ -273,8 +279,7 @@ function AdsPanel({ ads, botBox }: { ads: Data["ads"]; botBox: Data["botBox"] })
       <div className="flex gap-2 flex-wrap">{side("Facebook ads", ads.facebook)}{side("Google ads", ads.google)}{ads.lsa.has && side("Local Services", ads.lsa)}</div>
       {ads.error && <p className="text-xs text-red-600 break-words">{ads.error}</p>}
       {!ads.facebook.configured && (
-        <p className="text-xs text-slate-600"><b>Pair Facebook:</b> in Meta Business Settings, make a System User with the ad account assigned (view performance), generate a token with ads_read,
-          then add META_ADS_TOKEN and META_AD_ACCOUNT_ID (the number after act_) in Vercel, Production and Preview.</p>
+        <p className="text-xs text-slate-600"><b>Pair Facebook:</b> paste the ads token and ad account number in the Facebook Ads box under Live stats at the top of this tab.</p>
       )}
       {!ads.google.has && botBox && (
         <div className="text-xs text-slate-600 space-y-1">
