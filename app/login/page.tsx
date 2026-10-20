@@ -1,5 +1,6 @@
 "use client";
 
+import Lights from "@/components/Lights";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { NAVY } from "@/components/ui";
@@ -38,16 +39,22 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: NAVY }}>
-      <form onSubmit={submit} className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-xl">
-        <div>
-          <h1 className="text-2xl font-extrabold" style={{ color: NAVY }}>Light DMV</h1>
-          <p className="text-slate-500 text-sm">Sign in with your name and PIN.</p>
+    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden" style={{ background: "radial-gradient(120% 80% at 50% 0%, #1D4380 0%, #112E5B 45%, #0B1F3D 100%)" }}>
+      <Lights className="absolute top-0 left-0 w-full h-10 md:h-14" count={24} />
+      <form onSubmit={submit} className="relative bg-white rounded-3xl p-6 sm:p-7 w-full max-w-sm space-y-4 shadow-2xl">
+        <div className="flex items-center gap-3">
+          <span className="w-12 h-12 rounded-2xl grid place-items-center font-extrabold text-lg text-white shrink-0" style={{ background: "linear-gradient(135deg, #1D4380, #0B1F3D)" }}>
+            <span>L<span style={{ color: "#F5A524" }}>D</span></span>
+          </span>
+          <div>
+            <h1 className="text-2xl font-extrabold leading-tight" style={{ color: NAVY }}>Light DMV</h1>
+            <p className="text-slate-500 text-sm">Sign in with your name and PIN.</p>
+          </div>
         </div>
         <label className="block">
           <span className="text-sm font-semibold">Who are you?</span>
           <select value={userId} onChange={(e) => setUserId(e.target.value)} required
-            className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-white">
+            className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-3 bg-white">
             <option value="">Pick your name</option>
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
@@ -59,13 +66,13 @@ export default function Login() {
           <span className="text-sm font-semibold">{firstOwner ? "Choose a PIN (4 to 8 digits)" : "PIN"}</span>
           <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} required
             inputMode="numeric" autoComplete="current-password" type="password" maxLength={8}
-            className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2.5 tracking-widest text-lg" />
+            className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-3 tracking-widest text-lg" />
         </label>
         {firstOwner && (
           <label className="block">
             <span className="text-sm font-semibold">Owner setup code</span>
             <input value={setupCode} onChange={(e) => setSetupCode(e.target.value)} required type="password"
-              className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2.5" />
+              className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-3" />
             <span className="text-xs text-slate-500">The OWNER_SETUP_CODE value set in Vercel. Only needed once.</span>
           </label>
         )}
@@ -78,7 +85,7 @@ export default function Login() {
             ))}
           </div>
         )}
-        <button disabled={busy} className="w-full rounded-lg py-3 font-bold text-white flex justify-center gap-2" style={{ background: NAVY }}>
+        <button disabled={busy} className="w-full rounded-xl py-3.5 font-bold shadow-lift text-white flex justify-center gap-2" style={{ background: NAVY }}>
           {busy && <Loader2 className="animate-spin" size={20} />} Sign in
         </button>
       </form>

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronRight, Hammer, Loader2, MapPin, Navigation, UserCheck, Wrench } from "lucide-react";
+import { CheckCircle2, ChevronRight, ClipboardCheck, Hammer, Loader2, MapPin, Navigation, UserCheck, Wallet, Wrench } from "lucide-react";
 import { api, fmtDay, fmtTime, getMe, Me, NAVY } from "@/components/ui";
 import { groupsFor, ROLE_LABEL } from "@/lib/nav";
 import { CREW_LABEL } from "./signs/types";
 import type { CrewPay, Job, Progress } from "./jobs/types";
 import Bring from "./jobs/Bring";
+import Lights from "@/components/Lights";
 import type { BringItem } from "@/lib/materials";
 
 type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; pay?: CrewPay; bring?: BringItem[]; info?: { repeat: boolean } };
@@ -38,10 +39,11 @@ export default function Today() {
   if (!me) return <div className="p-6 text-slate-500 flex gap-2"><Loader2 className="animate-spin" /> Loading...</div>;
   const crewSide = me.role === "lead" || me.role === "crew";
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <div className="pt-1">
-        <h1 className="text-2xl font-extrabold" style={{ color: NAVY }}>{greeting()}, {me.name}</h1>
-        <p className="text-sm text-slate-500">
+    <div className="max-w-3xl mx-auto p-4 lg:p-8 space-y-4">
+      <div className="relative overflow-hidden rounded-2xl px-4 pt-8 pb-4 sm:px-5 sm:pt-9 sm:pb-5 text-white shadow-lift" style={{ background: "linear-gradient(135deg, #0B1F3D 0%, #112E5B 55%, #1D4380 100%)" }}>
+        <Lights className="absolute top-0 left-0 w-full h-8" />
+        <h1 className="text-2xl md:text-3xl font-extrabold">{greeting()}, {me.name}</h1>
+        <p className="text-sm text-white/70 mt-0.5">
           {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} · {ROLE_LABEL[me.role]}{crewSide && me.crew ? ` · ${CREW_LABEL[me.crew] ?? me.crew}` : ""}
         </p>
       </div>
@@ -73,8 +75,8 @@ function CrewHome({ me, data, err }: { me: Me; data: JobsData | null; err: strin
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <Stat href="#today-jobs" label="Jobs today" value={today.length ? `${today.length - left} of ${today.length} done` : "None"} />
-            <Stat href="#today-jobs" label="Your crew's pay today" value={pay ? money(pay) : "Not set"} green={!!pay} />
+            <Stat icon={ClipboardCheck} href="#today-jobs" label="Jobs today" value={today.length ? `${today.length - left} of ${today.length} done` : "None"} />
+            <Stat icon={Wallet} href="#today-jobs" label="Your crew's pay today" value={pay ? money(pay) : "Not set"} green={!!pay} />
           </div>
           {(() => {
             // The load list for the first day with installs: today, else the next day out.
@@ -212,10 +214,10 @@ function OfficeHome({ me, data, err }: { me: Me; data: JobsData | null; err: str
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat href="/jobs" label="Jobs today" value={String(today.length)} />
-            <Stat href="/jobs" label="On site now" value={String(onSite.length)} />
-            <Stat href="/jobs" label="Done" value={`${done.length} of ${today.length}`} />
-            <Stat href="/jobs#fixes" label="Open fixes" value={String(openFixes.length)} amber={openFixes.length > 0} />
+            <Stat icon={ClipboardCheck} href="/jobs" label="Jobs today" value={String(today.length)} />
+            <Stat icon={MapPin} href="/jobs" label="On site now" value={String(onSite.length)} />
+            <Stat icon={CheckCircle2} href="/jobs" label="Done" value={`${done.length} of ${today.length}`} />
+            <Stat icon={Wrench} href="/jobs#fixes" label="Open fixes" value={String(openFixes.length)} amber={openFixes.length > 0} />
           </div>
           {today.length > 0 && (
             <Card className="space-y-1">
@@ -245,15 +247,15 @@ function OfficeHome({ me, data, err }: { me: Me; data: JobsData | null; err: str
       )}
       {groupsFor(me.role).map((g) => (
         <section key={g.title} className="space-y-2">
-          <h2 className="text-xs font-bold uppercase text-slate-400 pt-2">{g.title}</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-[.12em] text-slate-400 pt-2 font-sans">{g.title}</h2>
           {/* Phone: small icon tiles, three across. Computer: two across with a line on what each is for. */}
           <div className="grid grid-cols-3 sm:grid-cols-2 gap-2">
             {g.tabs.map((t) => (
               <Link key={t.href} href={t.href}
                 className="bg-white rounded-xl p-3 border border-slate-200 hover:shadow-md transition flex flex-col items-center text-center gap-1 sm:flex-row sm:items-start sm:text-left sm:gap-3">
-                <t.icon size={22} style={{ color: NAVY }} className="shrink-0 sm:mt-0.5" />
+                <span className="w-10 h-10 rounded-xl grid place-items-center shrink-0 bg-[#112E5B]/[.07]" style={{ color: NAVY }}><t.icon size={20} /></span>
                 <span>
-                  <span className="font-bold block text-xs sm:text-base">{t.label}</span>
+                  <span className="font-bold block text-xs sm:text-base sm:pt-0.5">{t.label}</span>
                   <span className="text-sm text-slate-500 hidden sm:block">{t.text}</span>
                 </span>
               </Link>
@@ -290,11 +292,14 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
   return <div className={`rounded-xl border p-4 ${/\bborder-\w+-\d/.test(className) ? "" : "bg-white border-slate-200"} ${className}`}>{children}</div>;
 }
 
-function Stat({ href, label, value, green, amber }: { href: string; label: string; value: string; green?: boolean; amber?: boolean }) {
+function Stat({ href, label, value, green, amber, icon: Icon }: { href: string; label: string; value: string; green?: boolean; amber?: boolean; icon?: typeof Wrench }) {
   return (
-    <Link href={href} className={`rounded-xl border p-3 hover:shadow-md transition ${amber ? "bg-amber-50 border-amber-300" : "bg-white border-slate-200"}`}>
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
-      <div className={`text-xl font-extrabold ${green ? "text-green-700" : amber ? "text-amber-900" : ""}`} style={green || amber ? undefined : { color: NAVY }}>{value}</div>
+    <Link href={href} className={`group rounded-xl border p-3 hover:shadow-md transition flex flex-col gap-1 ${amber ? "bg-amber-50 border-amber-300" : "bg-white border-slate-200"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-slate-500">{label}</span>
+        {Icon && <span className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${green ? "bg-green-50 text-green-700" : amber ? "bg-amber-100 text-amber-800" : "bg-[#112E5B]/[.07] text-[#112E5B]"}`}><Icon size={15} /></span>}
+      </div>
+      <div className={`text-xl font-extrabold tabular-nums ${green ? "text-green-700" : amber ? "text-amber-900" : ""}`} style={green || amber ? undefined : { color: NAVY }}>{value}</div>
     </Link>
   );
 }

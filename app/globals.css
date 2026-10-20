@@ -1,12 +1,70 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* The look every page shares. Pages keep their own Tailwind classes; these rules lift them all at once
+   (cards get a soft shadow, headings use the brand font, inputs get one focus ring). */
+:root {
+  --navy: #112E5B;
+  --navy-dark: #0B1F3D;
+  --gold: #F5A524;
+  --bg: #F3F5F9;
+  --line: #E3E8EF;
+  --ink: #0F1B33;
+}
+
 html, body {
   margin: 0;
   padding: 0;
-  font-family: Montserrat, system-ui, -apple-system, sans-serif;
-  background: #F5F7FA;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 * { box-sizing: border-box; }
+a, button { -webkit-tap-highlight-color: transparent; }
+
+@layer base {
+  body { @apply font-sans; }
+  h1, h2, h3, .font-extrabold { font-family: var(--font-display), var(--font-body), system-ui, sans-serif; }
+  h1 { letter-spacing: -0.015em; }
+  ::selection { background: rgba(245, 165, 36, .35); }
+
+  /* One focus ring for every field and button, in brand navy. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea {
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--navy);
+    box-shadow: 0 0 0 3px rgba(17, 46, 91, .15);
+  }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--navy); }
+  button:disabled { cursor: not-allowed; }
+}
+
+@layer components {
+  /* Every white bordered card in the app gets a little depth. :where keeps it weaker than any page's own classes. */
+  :where(.rounded-lg, .rounded-xl, .rounded-2xl):where(.border, .border-2):where(.bg-white) {
+    box-shadow: 0 1px 2px rgba(15, 27, 51, .04), 0 2px 6px rgba(15, 27, 51, .05);
+  }
+  a:is(.rounded-lg, .rounded-xl, .rounded-2xl), button:is(.rounded-lg, .rounded-xl, .rounded-2xl) {
+    transition: box-shadow .15s, transform .1s, background-color .15s, border-color .15s, opacity .15s;
+  }
+  a:is(.rounded-lg, .rounded-xl, .rounded-2xl):not([aria-disabled="true"]):active,
+  button:is(.rounded-lg, .rounded-xl, .rounded-2xl):not(:disabled):active { transform: translateY(1px); }
+  .hover\:shadow-md:hover { box-shadow: 0 6px 20px rgba(15, 27, 51, .10), 0 2px 6px rgba(15, 27, 51, .06) !important; }
+
+  /* Page entrance, kept short so nothing feels slow. */
+  .page-in { animation: page-in .22s ease-out both; }
+  @keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .page-in { animation: none; } }
+
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+}
+
+/* Leaflet sets z-indexes up to 1000 inside the map; keep them inside the map so menus and sheets sit on top. */
+.leaflet-container { isolation: isolate; z-index: 0; }

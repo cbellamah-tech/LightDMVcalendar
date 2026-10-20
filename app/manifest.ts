@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Light DMV",
     start_url: "/",
     display: "standalone",
-    background_color: "#F5F7FA",
+    background_color: "#F3F5F9",
     theme_color: "#112E5B",
     icons: [{ src: "/icon", sizes: "512x512", type: "image/png" }],
   };
