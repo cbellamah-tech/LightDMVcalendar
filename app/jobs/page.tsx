@@ -113,21 +113,24 @@ function byDay(list: Row[], crew: string) {
 }
 
 function JobCard({ j, fix, office, gap }: { j: Row; fix?: boolean; office?: boolean; gap?: number }) {
+  // Marked complete in Jobber or finished in the app: grayed out and crossed off, but it stays in the list.
+  const closed = !!(j.completedAt || j.doneInJobber);
   return (
-    <Link href={`/jobs/${j.id}`} className={`block bg-white rounded-xl border p-4 hover:shadow-md ${fix ? "border-amber-300" : "border-slate-200"}`}>
+    <Link href={`/jobs/${j.id}`} className={`block rounded-xl border p-4 hover:shadow-md ${fix ? "border-amber-300" : "border-slate-200"} ${closed ? "bg-slate-100 opacity-60" : "bg-white"}`}>
       <div className="flex justify-between gap-2">
         <div className="min-w-0">
           <div className="text-xs font-bold text-slate-400">
             {fmtTime(j.start)} · {fix ? "Fix" : j.kind === "install" ? "Install" : "Takedown"} · {j.crew ? CREW_LABEL[j.crew] : j.assignedNames.join(", ") || "Unassigned"}
           </div>
           <div className="font-bold truncate flex items-center gap-2">
-            <span className="truncate">{j.client || j.title}</span>
+            <span className={`truncate ${closed ? "line-through text-slate-500" : ""}`}>{j.client || j.title}</span>
             {j.info && (j.info.repeat || j.info.known) && (
               <span className={`shrink-0 text-[11px] font-bold px-1.5 py-0.5 rounded ${j.info.repeat ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800"}`}>
                 {j.info.repeat ? `REPEAT${j.info.bins.length ? ` · BIN ${j.info.bins.join(", ")}` : ""}` : "NEW"}
               </span>
             )}
           </div>
+          {j.doneInJobber && !j.completedAt && <div className="text-xs font-semibold text-slate-500">Done in Jobber</div>}
           {fix && j.request && <div className="text-sm font-semibold text-amber-900">{j.request}</div>}
           <div className="text-sm text-slate-500 truncate">{j.address}</div>
           {office && (j.arrivedAt || j.completedAt) && (

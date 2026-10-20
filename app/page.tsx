@@ -16,6 +16,8 @@ type Team = { me: string; people: { uid: string; name: string; modules: { title:
 const money = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 const sameDay = (iso: string, d: Date) => new Date(iso).toDateString() === d.toDateString();
 const isDone = (j: Row) => !!j.completedAt || (j.kind === "fix" && !!j.doneInJobber);
+// Grayed out and crossed off: done in the app, or marked complete in Jobber (the app checklist stays open for photos).
+const isClosed = (j: Row) => isDone(j) || !!j.doneInJobber;
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 const directions = (address: string) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 
@@ -76,7 +78,7 @@ function CrewHome({ me, data, err }: { me: Me; data: JobsData | null; err: strin
             {today.length ? (
               <>
                 <h2 className="font-extrabold" style={{ color: NAVY }}>Today, in order</h2>
-                {today.map((j, i) => <CrewJob key={j.id} j={j} next={!isDone(j) && today.slice(0, i).every(isDone)} />)}
+                {today.map((j, i) => <CrewJob key={j.id} j={j} next={!isClosed(j) && today.slice(0, i).every(isClosed)} />)}
               </>
             ) : nextDay.length ? (
               <>
@@ -98,16 +100,18 @@ function CrewHome({ me, data, err }: { me: Me; data: JobsData | null; err: strin
 
 function CrewJob({ j, next }: { j: Row; next?: boolean }) {
   const done = isDone(j);
+  const closed = isClosed(j);
   const fix = j.kind === "fix";
   return (
-    <div className={`bg-white rounded-xl border p-4 space-y-2 ${next ? "border-2 border-[#112E5B]" : fix ? "border-amber-300" : "border-slate-200"} ${done ? "opacity-70" : ""}`}>
+    <div className={`rounded-xl border p-4 space-y-2 ${next ? "border-2 border-[#112E5B]" : fix ? "border-amber-300" : "border-slate-200"} ${closed ? "bg-slate-100 opacity-60" : "bg-white"}`}>
       <Link href={`/jobs/${j.id}`} className="block">
         <div className="flex justify-between gap-2">
           <div className="min-w-0">
             <div className="text-xs font-bold text-slate-400">
               {next ? <span className="text-[#112E5B]">NEXT · </span> : null}{fmtTime(j.start)} · {fix ? "Fix" : j.kind === "install" ? "Install" : "Takedown"}
             </div>
-            <div className="font-bold truncate">{j.client || j.title}</div>
+            <div className={`font-bold truncate ${closed ? "line-through text-slate-500" : ""}`}>{j.client || j.title}</div>
+            {j.doneInJobber && !done && <div className="text-xs font-semibold text-slate-500">Done in Jobber</div>}
             {fix && j.request && <div className="text-sm font-semibold text-amber-900">{j.request}</div>}
             <div className="text-sm text-slate-500 truncate">{j.address}</div>
             {j.pay?.amount != null && <div className="text-sm font-bold text-green-700">Your crew's pay {money(j.pay.amount)}</div>}
@@ -252,7 +256,7 @@ function OfficeHome({ me, data, err }: { me: Me; data: JobsData | null; err: str
 
 function CrewLine({ crew, list }: { crew: string; list: Row[] }) {
   const here = list.find((j) => j.arrivedAt && !j.completedAt);
-  const next = list.find((j) => !j.arrivedAt && !isDone(j));
+  const next = list.find((j) => !j.arrivedAt && !isClosed(j));
   const done = list.filter(isDone).length;
   return (
     <Link href={`/jobs?crew=${crew}`} className="flex items-center justify-between gap-2 py-2 border-t border-slate-100 first:border-t-0">
