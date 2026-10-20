@@ -302,7 +302,7 @@ export async function allSpending(): Promise<Spend[]> {
   for (const [uid, list] of Object.entries(signPay)) {
     const byMonth = new Map<string, { amount: number; signs: number; name: string }>();
     for (const e of list) { const k = etDay(e.at).slice(0, 7), v = byMonth.get(k) ?? { amount: 0, signs: 0, name: e.name }; v.amount += e.amount; v.signs += e.signs; byMonth.set(k, v); }
-    for (const [ym, v] of byMonth) add({ id: `sg_${uid}_${ym}`, day: ym === thisMonth ? today : monthEnd(ym), amount: v.amount, cat: "marketing", vendor: v.name, what: `Yard sign pay, ${MONTH_NAME(ym)} (${v.signs} signs)`, source: "signs", link: "/costs" });
+    for (const [ym, v] of byMonth) add({ id: `sg_${uid}_${ym}`, day: ym === thisMonth ? today : monthEnd(ym), amount: v.amount, cat: "marketing", vendor: v.name, what: `Yard sign pay, ${MONTH_NAME(ym)} (${v.signs} signs)`, source: "signs", link: "/signs" });
   }
   // Crew receipts at close-out.
   for (const [jobId, e] of Object.entries(receipts)) for (const x of e.items) {
