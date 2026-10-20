@@ -155,11 +155,10 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner,
   );
 }
 
-/* ---------- Marketplace and Craigslist: no API, so copy, open, post, tap Posted ---------- */
+/* ---------- Marketplace: no API, so copy, open, post, tap Posted (Craigslist has its own card, one ad per area) ---------- */
 
 const SITES: { id: Site; label: string; postUrl: string }[] = [
   { id: "marketplace", label: "Facebook Marketplace", postUrl: "https://www.facebook.com/marketplace/create/item" },
-  { id: "craigslist", label: "Craigslist", postUrl: "https://post.craigslist.org/" },
 ];
 
 function Listings({ m, reload }: { m: Media; reload: () => void }) {

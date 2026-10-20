@@ -10,6 +10,7 @@ import { googleAdsScript } from "./adsScript";
 import { WebsiteGoogle } from "./web";
 import { LiveStats } from "./stats";
 import { SocialPosts } from "./social";
+import { CraigslistAds } from "./craigslist";
 
 export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
@@ -121,6 +122,8 @@ export default function Marketing() {
       <Deals deals={d.deals} a={d.attribution} days={days} sheetUrl={d.google.sheetUrl} />
 
       <MediaBoard media={d.media} platforms={d.platforms} accounts={d.ghl.accounts} ghlOn={d.ghl.configured} autopost={d.autopost} owner={owner} today={d.today} reload={load} />
+
+      <CraigslistAds />
 
       <Inbox inbox={d.inbox} onHide={hide} />
 

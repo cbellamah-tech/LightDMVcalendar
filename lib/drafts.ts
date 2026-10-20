@@ -1,14 +1,14 @@
 import { kvGet, kvSet } from "./store";
 
-/* Ready-to-paste posts for the places with no posting API (Marketplace, Craigslist, Facebook Groups, Nextdoor,
-   LinkedIn comments, Bing). The daily run rewrites them each morning; these starters are used until it does. */
+/* Ready-to-paste posts for the places with no posting API (Marketplace, Facebook Groups, Nextdoor,
+   LinkedIn comments, Bing). The daily run rewrites them each morning; these starters are used until it does.
+   Craigslist has its own card with one ad per area (lib/craigslist.ts). */
 
 export type Draft = { title?: string; body: string; at?: number };
-export const DRAFT_CHANNELS = ["marketplace", "craigslist", "fb_groups", "nextdoor", "linkedin_engage", "bing_posts"] as const;
+export const DRAFT_CHANNELS = ["marketplace", "fb_groups", "nextdoor", "linkedin_engage", "bing_posts"] as const;
 export type DraftChannel = (typeof DRAFT_CHANNELS)[number];
 export const POST_URL: Record<DraftChannel, string> = {
   marketplace: "https://www.facebook.com/marketplace/create/item",
-  craigslist: "https://post.craigslist.org/",
   fb_groups: "https://www.facebook.com/groups/feed/",
   nextdoor: "https://nextdoor.com/news_feed/",
   linkedin_engage: "https://www.linkedin.com/feed/",
@@ -20,10 +20,6 @@ const STARTERS: Record<DraftChannel, Draft> = {
   marketplace: {
     title: "Professional Christmas Light Installation - DC, MD, VA",
     body: `Light DMV designs, installs and takes down your holiday lights.\nAll included: custom design, commercial-grade lights, timers, free maintenance all season, January takedown and storage.\nServing DC, Maryland and Northern Virginia. Fully insured.\n${CTA}`,
-  },
-  craigslist: {
-    title: "Christmas light installation - free quote (DC/MD/VA)",
-    body: `Light DMV installs holiday lights on homes and businesses across DC, Maryland and Virginia.\nWe bring the lights, hang them, keep them working all season and take them down in January.\nBook early, December fills up fast.\n${CTA}`,
   },
   fb_groups: {
     body: `Hi neighbors! We're Light DMV, a local crew that installs Christmas lights so you don't have to get on the ladder. Design, install, free fixes all season, and we take them down in January. Booking now for November. ${CTA}`,
