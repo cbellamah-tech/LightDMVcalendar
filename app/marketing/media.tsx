@@ -155,10 +155,9 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner,
   );
 }
 
-/* ---------- Craigslist: no API, so copy, open, post, tap Posted (Marketplace has its own card) ---------- */
+/* ---------- Per-reel listings: Marketplace and Craigslist each have their own card now, so none are listed here ---------- */
 
 const SITES: { id: Site; label: string; postUrl: string }[] = [
-  { id: "craigslist", label: "Craigslist", postUrl: "https://post.craigslist.org/" },
 ];
 
 function Listings({ m, reload }: { m: Media; reload: () => void }) {
