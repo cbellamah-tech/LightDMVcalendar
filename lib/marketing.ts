@@ -107,8 +107,9 @@ export async function undoCount(id: string) {
   await kvUpdate<CountEvent[]>(EVENTS, [], (all) => all.filter((e) => e.id !== id));
 }
 
-/** Per channel, per day: everything the app knows about. GHL posts, ad spend and radio spots are passed in by the caller. */
-export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = [], adSpend: { source: string; day: string; spend: number }[] = [], events?: CountEvent[], radioSpots: { day: string; n: number }[] = []) {
+/** Per channel, per day: everything the app knows about. GHL posts, ad spend, radio spots and new website pages
+ *  are passed in by the caller. */
+export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = [], adSpend: { source: string; day: string; spend: number }[] = [], events?: CountEvent[], radioSpots: { day: string; n: number }[] = [], newPages: { day: string; n: number }[] = []) {
   const out = new Map<string, number>(); // `${channel}|${day}`
   const add = (c: ChannelId, day: string, n: number) => out.set(`${c}|${day}`, (out.get(`${c}|${day}`) ?? 0) + n);
   const [evs, visits] = await Promise.all([events ?? getEvents(), getVisits()]);
@@ -124,6 +125,8 @@ export async function dailyCounts(ghlPosts: { platform: string; day: string }[] 
     if (c) add(c.id, a.day, Math.round(a.spend));
   }
   for (const r of radioSpots) add("radio", r.day, r.n);
+  // A bot reporting a blog post and the sitemap showing it are the same post: keep the larger count.
+  for (const p of newPages) out.set(`blog|${p.day}`, Math.max(out.get(`blog|${p.day}`) ?? 0, p.n));
   return out;
 }
 

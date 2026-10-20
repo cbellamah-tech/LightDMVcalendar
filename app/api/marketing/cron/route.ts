@@ -11,21 +11,23 @@ import { refreshLibrary, refreshSocialStats } from "@/lib/social";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Every morning (vercel.json): this week's and last week's counts go into the 2026 Marketing Campaign sheet. */
+/** Every morning (vercel.json): every week's counts since July go into the 2026 Marketing Campaign sheet first,
+ *  then the slower refreshes run (so a slow one running out of time never skips the sheet). */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization");
   const fromCron = secret ? auth === `Bearer ${secret}` : /vercel-cron/i.test(req.headers.get("user-agent") || "");
   if (!fromCron) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   await autoPostNext().catch(() => null);
+  await refreshWebsite().catch(() => null); // new pages and blog posts on lightdmv.com (the sheet's blog row)
+  const google = (await googleStatus()).connected;
+  const r = google ? await syncSheet("Daily auto-fill") : { skipped: "Google not connected" };
   await syncMetaAds(true).catch(() => null); // backup, in case the daily video finished while Auto-post was off
-  await refreshWebsite().catch(() => null); // new pages and blog posts on lightdmv.com
   await refreshSocialStats().catch(() => null); // yesterday's likes, views and posts per platform
-  if (!(await googleStatus()).connected) return NextResponse.json({ skipped: "Google not connected" });
+  if (!google) return NextResponse.json(r);
   await ensureRunnerFile(true).catch(() => {});
   await refreshInsights().catch(() => null);
   await refreshGbp().catch(() => null);
   await refreshLibrary().catch(() => null);
-  const r = await syncSheet("Daily auto-fill");
   return NextResponse.json(r);
 }
