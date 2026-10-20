@@ -4,11 +4,11 @@ import { addDays, etDay } from "./marketing";
 
 /* Organic vs paid, per source, from GoHighLevel's contacts and deals.
    chris's split (2026-10-08): Google Business, the website, phone calls and inbound email are organic;
-   Google ads, Meta ads and cold email are paid. Everything else free (yard signs, referrals, listings...) is organic too. */
+   Google ads, Meta ads and cold email are paid; so are iHeart's radio spots and emails (2026-10-19). Everything else free (yard signs, referrals, listings...) is organic too. */
 
 export type Kind = "organic" | "paid";
 export type SourceId =
-  | "google_ads" | "google_lsa" | "meta_ads" | "cold_email"
+  | "google_ads" | "google_lsa" | "meta_ads" | "cold_email" | "radio" | "iheart_email"
   | "gmb" | "website" | "calls" | "email" | "facebook" | "instagram" | "yard_signs" | "referral" | "returning"
   | "listings" | "direct_mail" | "reengaged" | "other";
 
@@ -17,6 +17,9 @@ export const SOURCES: { id: SourceId; label: string; kind: Kind; spend?: AdDay["
   { id: "google_lsa", label: "Google Local Services", kind: "paid", spend: "lsa", test: /\blsa\b|local service/ },
   { id: "google_ads", label: "Google ads", kind: "paid", spend: "google", test: /gclid|google ?ads|adwords|paid search|\bcpc\b|\bppc\b/ },
   { id: "meta_ads", label: "Meta ads", kind: "paid", spend: "facebook", test: /fbclid|lead ?form|facebook ads?\b|fb ads?\b|meta ads?\b|instagram ads?\b|paid social/ },
+  // iHeart: their emails before their radio spots, both before the plain "email" and "website" rules.
+  { id: "iheart_email", label: "iHeart email", kind: "paid", test: /iheart.{0,20}(e-?mail|acquisition)|(e-?mail|acquisition).{0,20}iheart/ },
+  { id: "radio", label: "Radio (iHeart 97.1)", kind: "paid", test: /radio|97\.1|wash[- ]?fm|iheart/ },
   // GoHighLevel's "Cold Leads" pipelines and tags are old leads texted again, not cold email: organic, and checked first.
   { id: "reengaged", label: "Old leads texted again", kind: "organic", test: /cold (permanent |bistro )?(lighting )?leads?|re-?engage|old leads?|first sms|second sms/ },
   { id: "cold_email", label: "Cold email", kind: "paid", test: /cold ?email|cold outreach|smartlead|headline theory|instantly|new lead:/ },

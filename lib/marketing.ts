@@ -10,7 +10,7 @@ export type ChannelId =
   | "google_posts" | "facebook_posts" | "fb_groups" | "marketplace" | "craigslist" | "linkedin_posts"
   | "linkedin_engage" | "instagram_posts" | "nextdoor" | "blog" | "cold_emails" | "yard_signs"
   | "door_hangers" | "tree_shop_cards" | "eddm" | "door_to_door" | "car_magnets" | "bing_posts"
-  | "fb_ads" | "google_ads" | "google_lsa" | "influencers";
+  | "fb_ads" | "google_ads" | "google_lsa" | "influencers" | "radio" | "iheart_emails";
 
 export type BoxId = "signs" | "social" | "listings" | "website" | "paid" | "cold";
 
@@ -21,7 +21,8 @@ export type Channel = {
   monthlyGoal?: number;   // from the sheet's "Monthly project goals" column
   box: BoxId;
   bot?: string;           // the bot that looks after it
-  auto?: "signs" | "ghl" | "smartlead" | "ads"; // counted without anyone tapping ("ads" = dollars spent)
+  auto?: "signs" | "ghl" | "smartlead" | "ads" | "deal"; // counted without anyone tapping ("ads" = dollars spent, "deal" = from the deals sheet)
+  insertAfter?: string;   // a row the campaign sheet didn't have: the app adds it under this row
   ghlPlatform?: string;   // GoHighLevel Social Planner platform name
   adSource?: "facebook" | "google" | "lsa";
   link?: string;          // where the thing itself lives: tapping its name opens this
@@ -51,7 +52,9 @@ export const CHANNELS: Channel[] = [
   { id: "google_ads", label: "Google ads ($ spent)", sheetRow: "Google Ads", box: "paid", bot: "Paid", auto: "ads", adSource: "google", link: "https://ads.google.com/aw/overview" },
   { id: "google_lsa", label: "Google Local Services ($ spent)", sheetRow: "Google LSA", box: "paid", bot: "Paid", auto: "ads", adSource: "lsa", link: "https://ads.google.com/localservices/" },
   { id: "influencers", label: "Local influencer sponsorships", sheetRow: "Local Influencer Sponsorships", box: "paid" },
+  { id: "radio", label: "Radio spots (iHeart 97.1 WASH-FM)", sheetRow: "Radio (iHeart 97.1 WASH-FM)", box: "paid", auto: "deal", insertAfter: "Local Influencer Sponsorships", link: "https://wash.iheart.com/" },
   { id: "cold_emails", label: "Cold emails", sheetRow: "Cold Emails", monthlyGoal: 5000, box: "cold", auto: "smartlead", link: "https://app.smartlead.ai/client-login" },
+  { id: "iheart_emails", label: "iHeart cold emails", sheetRow: "iHeart Cold Emails", box: "cold", insertAfter: "Cold Emails" },
 ];
 
 export const BOXES: { id: BoxId; title: string; line: string; bots: string[]; link?: string }[] = [
@@ -59,8 +62,8 @@ export const BOXES: { id: BoxId; title: string; line: string; bots: string[]; li
   { id: "social", title: "Social posts", line: "Facebook, Instagram, LinkedIn, Google, via GoHighLevel", bots: ["CMO", "SEO"] },
   { id: "listings", title: "One-tap listings", line: "Craigslist, Marketplace, FB Groups, Nextdoor", bots: [] },
   { id: "website", title: "Website and SEO", line: "LightDMV.com city pages, blog, reviews", bots: ["Website", "SEO"] },
-  { id: "paid", title: "Paid ads", line: "Facebook ads (Goohoo) and Google ads", bots: ["Paid"] },
-  { id: "cold", title: "Cold email", line: "Smartlead, run by the agency", bots: [], link: "https://app.smartlead.ai/client-login" },
+  { id: "paid", title: "Paid ads", line: "Facebook ads (Goohoo), Google ads and iHeart radio", bots: ["Paid"] },
+  { id: "cold", title: "Cold email", line: "Smartlead (the agency) and iHeart", bots: [], link: "https://app.smartlead.ai/client-login" },
 ];
 
 export const channel = (id: string) => CHANNELS.find((c) => c.id === id);
@@ -104,8 +107,8 @@ export async function undoCount(id: string) {
   await kvUpdate<CountEvent[]>(EVENTS, [], (all) => all.filter((e) => e.id !== id));
 }
 
-/** Per channel, per day: everything the app knows about. GHL posts and ad spend are passed in by the caller. */
-export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = [], adSpend: { source: string; day: string; spend: number }[] = [], events?: CountEvent[]) {
+/** Per channel, per day: everything the app knows about. GHL posts, ad spend and radio spots are passed in by the caller. */
+export async function dailyCounts(ghlPosts: { platform: string; day: string }[] = [], adSpend: { source: string; day: string; spend: number }[] = [], events?: CountEvent[], radioSpots: { day: string; n: number }[] = []) {
   const out = new Map<string, number>(); // `${channel}|${day}`
   const add = (c: ChannelId, day: string, n: number) => out.set(`${c}|${day}`, (out.get(`${c}|${day}`) ?? 0) + n);
   const [evs, visits] = await Promise.all([events ?? getEvents(), getVisits()]);
@@ -120,12 +123,13 @@ export async function dailyCounts(ghlPosts: { platform: string; day: string }[] 
     const c = CHANNELS.find((x) => x.adSource === a.source);
     if (c) add(c.id, a.day, Math.round(a.spend));
   }
+  for (const r of radioSpots) add("radio", r.day, r.n);
   return out;
 }
 
 export function weekTotals(daily: Map<string, number>, monday: string) {
   const days = daysOf(monday);
-  return Object.fromEntries(CHANNELS.map((c) => [c.id, days.reduce((s, d) => s + (daily.get(`${c.id}|${d}`) ?? 0), 0)])) as Record<ChannelId, number>;
+  return Object.fromEntries(CHANNELS.map((c) => [c.id, Math.round(days.reduce((s, d) => s + (daily.get(`${c.id}|${d}`) ?? 0), 0))])) as Record<ChannelId, number>;
 }
 
 /* ---------- Bot drop box ---------- */
