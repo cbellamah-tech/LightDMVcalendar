@@ -10,6 +10,7 @@ import { googleAdsScript } from "./adsScript";
 import { WebsiteGoogle } from "./web";
 import { LiveStats } from "./stats";
 import { SocialPosts } from "./social";
+import { MarketplaceCard, MarketplacePace } from "./marketplace";
 
 export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
@@ -28,6 +29,7 @@ type Data = {
   ads: { facebook: AdSide & { configured: boolean }; google: AdSide; lsa: AdSide; error?: string };
   cold: { url: string; latest: { day: string; sent: number; responses: number; positive: number } | null };
   media: Media[];
+  marketplace: MarketplacePace;
   platforms: { id: "facebook" | "instagram" | "linkedin" | "google"; label: string }[];
   lastFill: { at: number; week: string; by: string; written: { range: string; row: string; value: number }[]; missingRows: string[]; error?: string } | null;
   botBox: { url: string; key: string } | null;
@@ -115,6 +117,8 @@ export default function Marketing() {
       <WebsiteGoogle owner={owner} botBox={d.botBox} />
 
       <SocialPosts />
+
+      <MarketplaceCard media={d.media} draft={d.drafts.text.marketplace} pace={d.marketplace} reload={load} />
 
       <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} errors={d.ghl.errors} />
 
