@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { checklistProgress, ensureSampleJobs, getChecklist, jobVisibleTo, recordMaterials, saveChecklist } from "@/lib/jobs";
 import { jobParts, SOPS } from "@/lib/sops";
-import { cachedJobParts, getJobDetail, withDrive } from "@/lib/jobDetails";
+import { cachedJobParts, getJobDetail, jobBring, withDrive } from "@/lib/jobDetails";
 import { isConnected } from "@/lib/jobber";
+import { getBringRates } from "@/lib/bringRates";
 import { loadDriveIndex } from "@/lib/drive";
 import { loadLibrary } from "@/lib/mockups";
 import { listUsers } from "@/lib/users";
@@ -38,16 +39,19 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   ]);
   // Job details only on the first load. A saved copy shows at once; a stale one is refreshed from Jobber after the answer.
   let detail = null;
+  let bring = null;
   if (job.source === "jobber" && new URL(req.url).searchParams.get("detail") === "1") {
     const [connected, idx, lib] = await Promise.all([isConnected(), loadDriveIndex(), loadLibrary()]);
     const d = job.jobberJobId && connected ? await getJobDetail(job.jobberJobId, { stale: "background", have: cached }).catch(() => null) : null;
     detail = withDrive(idx, d, job.client, lib);
+    // What to load for an install, worked out from the line items.
+    if (job.kind === "install") bring = jobBring(d ?? cached, await getBringRates().catch(() => undefined));
   }
   const pay = payFor(job, cached, overrides);
   const parts = cached ? jobParts(cached.lines) : [];
   // Google review bonuses: the office sees how each was placed; a crew sees who earned it.
   const reviews = (bonuses[job.id] ?? []).map((b) => (isOffice(s) ? b : { ...b, how: undefined }));
-  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, pay, parts, reviews });
+  return NextResponse.json({ job, checklist, sop: SOPS[job.kind], progress: checklistProgress(checklist), detail, bring, pay, parts, reviews });
 }
 
 /* Body: { itemId, done?, addPhotos?: string[], part?: string (which part of the job the photos show), removePhoto?: string, note?, counts?: { c9Feet, c7Bulbs, miniStrands, stakeFeet } } or { complete: true } or { reopen: true } */
