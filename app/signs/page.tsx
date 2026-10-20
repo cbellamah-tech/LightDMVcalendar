@@ -7,6 +7,7 @@ import { ChevronRight, Loader2, LocateFixed, Navigation, Upload } from "lucide-r
 import { distanceM, fmtDist, mapsLink } from "@/lib/geo";
 import AddSignButton from "./AddSignButton";
 import MyPay from "./MyPay";
+import SignPay from "./SignPay";
 import VisitSheet from "./VisitSheet";
 import { arrived, useGps } from "./useGps";
 import { ago, api, NAVY } from "@/components/ui";
@@ -137,6 +138,7 @@ export default function SignsPage() {
       </div>
 
       {placer && <MyPay bump={payBump} />}
+      {data.me.role === "owner" && <SignPay />}
       {placer && (
         <p className="text-sm text-slate-600">
           Pick a route below (closest first when GPS is on), tap <b>Open</b>, then <b>Start in this order</b>. Each spot needs a photo; tap <b>Add sign location</b> for a spot that isn't on the list.
