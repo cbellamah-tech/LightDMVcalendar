@@ -38,7 +38,7 @@ export default function PeoplePage() {
           <h1 className="text-2xl font-extrabold" style={{ color: NAVY }}>People</h1>
           <p className="text-sm text-slate-500">Everyone signs in with their name and a PIN you set here.</p>
         </div>
-        <button onClick={() => setEdit({ ...blank })} className="rounded-lg px-3 py-2 text-white font-semibold flex items-center gap-1" style={{ background: NAVY }}>
+        <button onClick={() => setEdit({ ...blank })} className="rounded-lg px-3 py-2 text-white font-semibold flex items-center gap-1 whitespace-nowrap shrink-0" style={{ background: NAVY }}>
           <Plus size={16} /> Add person
         </button>
       </div>
