@@ -155,16 +155,15 @@ export function MediaBoard({ media, platforms, accounts, ghlOn, autopost, owner,
   );
 }
 
-/* ---------- Marketplace and Craigslist: no API, so copy, open, post, tap Posted ---------- */
+/* ---------- Craigslist: no API, so copy, open, post, tap Posted (Marketplace has its own card) ---------- */
 
 const SITES: { id: Site; label: string; postUrl: string }[] = [
-  { id: "marketplace", label: "Facebook Marketplace", postUrl: "https://www.facebook.com/marketplace/create/item" },
   { id: "craigslist", label: "Craigslist", postUrl: "https://post.craigslist.org/" },
 ];
 
 function Listings({ m, reload }: { m: Media; reload: () => void }) {
   const sites = SITES.filter((x) => m.listings?.[x.id]);
-  const [site, setSite] = useState<Site>(sites[0]?.id ?? "marketplace");
+  const [site, setSite] = useState<Site>(sites[0]?.id ?? "craigslist");
   const l = m.listings?.[site];
   const [title, setTitle] = useState(l?.title ?? "");
   const [body, setBody] = useState(l?.body ?? "");

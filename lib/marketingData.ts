@@ -3,7 +3,7 @@ import { adsSummary, allAdDays } from "./ads";
 import { attribution } from "./attribution";
 import { getAutoPost } from "./autopost";
 import { kvGet, kvSet } from "./store";
-import { BOXES, CHANNELS, ChannelId, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
+import { BOXES, CHANNELS, ChannelId, CountEvent, channel, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
 import { getGhlSnap, ghlConfigured, leadSource, refreshGhl } from "./ghl";
 import { coldEmailReports, ColdReport, ensureSheetRows, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
 import { Deal, dealDays, dealProgress, getDeals, radioSpotDays } from "./deals";
@@ -131,9 +131,17 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     ads,
     cold: { url: SMARTLEAD_URL, latest: cold },
     media: mediaAll.filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
+    marketplace: marketplacePace(events, today),
     platforms: PLATFORMS,
     lastFill,
   };
+}
+
+/** When the last Marketplace listing went up and how many this month, so the tab can say when a fresh one is due. */
+function marketplacePace(events: CountEvent[], today: string) {
+  const mine = events.filter((e) => e.channel === "marketplace");
+  const month = mine.filter((e) => e.day.slice(0, 7) === today.slice(0, 7)).reduce((s, e) => s + e.n, 0);
+  return { lastAt: mine[0]?.at ?? null, month, goal: channel("marketplace")?.monthlyGoal ?? 0 };
 }
 
 /* ---------- Weekly sheet fill ---------- */
