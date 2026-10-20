@@ -9,6 +9,8 @@ import { CREW_LABEL } from "../../signs/types";
 import type { Checklist, CrewPay, Job, JobDetail, Progress, ReviewBonus as Bonus, SopItem } from "../types";
 import { dur } from "../types";
 import JobInfo from "./JobInfo";
+import Bring from "../Bring";
+import type { Bring as BringList } from "@/lib/materials";
 import PayLine from "./PayLine";
 import Expenses from "./Expenses";
 import ReviewBonus from "./ReviewBonus";
@@ -23,9 +25,10 @@ export default function JobPage({ params }: { params: { id: string } }) {
   const [viewer, setViewer] = useState("");
   const busy = useRef(0);
   const [detail, setDetail] = useState<JobDetail | null>(null);
+  const [bring, setBring] = useState<BringList | null>(null);
   // Jobber notes, line items and Drive bin/photos: once per visit (the checklist re-polls below).
   useEffect(() => {
-    api<{ detail: JobDetail | null }>(`/api/jobs/${params.id}?detail=1`).then((r) => setDetail(r.detail)).catch(() => {});
+    api<{ detail: JobDetail | null; bring?: BringList | null }>(`/api/jobs/${params.id}?detail=1`).then((r) => { setDetail(r.detail); setBring(r.bring ?? null); }).catch(() => {});
   }, [params.id]);
 
   const load = useCallback(() => {
@@ -88,6 +91,7 @@ export default function JobPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
+      {bring && <Bring lists={[bring.items]} repeatBins={detail?.repeat ? detail.drive.bins.map((b) => b.bin) : undefined} />}
       {detail && <JobInfo d={detail} onView={setViewer} />}
 
       <div className="flex items-center justify-between">

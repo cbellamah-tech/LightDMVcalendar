@@ -8,8 +8,10 @@ import { CREW_LABEL } from "../signs/types";
 import type { CrewPay, Job, Progress } from "./types";
 import { dur } from "./types";
 import DrivePhotos from "./DrivePhotos";
+import Bring from "./Bring";
+import type { BringItem } from "@/lib/materials";
 
-type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay; expenses?: number; reviews?: number };
+type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; info?: { repeat: boolean; bins: string[]; known: boolean }; pay?: CrewPay; expenses?: number; reviews?: number; bring?: BringItem[] };
 
 const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
@@ -91,6 +93,7 @@ export default function JobsPage() {
             <span>{fmtDay(jobs[0].start)}</span>
             <DayPay jobs={jobs} office={office} />
           </h3>
+          <DayBring jobs={jobs} />
           {jobs.map((j) => <JobCard key={j.id} j={j} office={office} gap={office ? gapBefore(j, jobs) : undefined} />)}
         </section>
       ))}
@@ -154,6 +157,21 @@ function JobCard({ j, fix, office, gap }: { j: Row; fix?: boolean; office?: bool
         <div className="h-full bg-green-600" style={{ width: `${(j.progress.done / Math.max(1, j.progress.total)) * 100}%` }} />
       </div>
     </Link>
+  );
+}
+
+/** The day's load list, one per crew: the materials of all its installs added up. */
+function DayBring({ jobs }: { jobs: Row[] }) {
+  const crews = new Map<string, Row[]>();
+  for (const j of jobs) if (j.kind === "install") { const k = j.crew || "none"; crews.set(k, [...(crews.get(k) || []), j]); }
+  if (!crews.size) return null;
+  return (
+    <>
+      {[...crews].map(([crew, list]) => (
+        <Bring key={crew} fold lists={list.map((j) => j.bring)} repeatJobs={list.filter((j) => j.info?.repeat).length}
+          title={`What to bring${crews.size > 1 || crew !== "none" ? ` · ${crew === "none" ? "no crew" : CREW_LABEL[crew] || crew}` : ""} (${list.length} install${list.length > 1 ? "s" : ""})`} />
+      ))}
+    </>
   );
 }
 

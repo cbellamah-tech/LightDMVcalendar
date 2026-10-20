@@ -7,8 +7,10 @@ import { api, fmtDay, fmtTime, getMe, Me, NAVY } from "@/components/ui";
 import { groupsFor, ROLE_LABEL } from "@/lib/nav";
 import { CREW_LABEL } from "./signs/types";
 import type { CrewPay, Job, Progress } from "./jobs/types";
+import Bring from "./jobs/Bring";
+import type { BringItem } from "@/lib/materials";
 
-type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; pay?: CrewPay };
+type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; pay?: CrewPay; bring?: BringItem[]; info?: { repeat: boolean } };
 type JobsData = { jobs: Row[]; fixes: Row[] };
 type Course = { loaded: boolean; total?: number; done?: number; next?: { n: number; title: string; started: boolean } | null };
 type Team = { me: string; people: { uid: string; name: string; modules: { title: string; done: number | null; signedOff: unknown }[] }[] };
@@ -74,6 +76,15 @@ function CrewHome({ me, data, err }: { me: Me; data: JobsData | null; err: strin
             <Stat href="#today-jobs" label="Jobs today" value={today.length ? `${today.length - left} of ${today.length} done` : "None"} />
             <Stat href="#today-jobs" label="Your crew's pay today" value={pay ? money(pay) : "Not set"} green={!!pay} />
           </div>
+          {(() => {
+            // The load list for the first day with installs: today, else the next day out.
+            const day = today.some((j) => j.kind === "install") ? today : nextDay;
+            const installs = day.filter((j) => j.kind === "install");
+            return installs.length ? (
+              <Bring fold lists={installs.map((j) => j.bring)} repeatJobs={installs.filter((j) => j.info?.repeat).length}
+                title={`What to bring ${day === today ? "today" : fmtDay(installs[0].start)} (${installs.length} install${installs.length > 1 ? "s" : ""})`} />
+            ) : null;
+          })()}
           <section id="today-jobs" className="space-y-2 scroll-mt-16">
             {today.length ? (
               <>

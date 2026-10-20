@@ -4,6 +4,7 @@ import { buildSelection, fieldsMatching, fieldType, rows, Spec } from "./jobberS
 import { driveFor, DriveIndex, DriveMatch } from "./drive";
 import { jobParts, JobPart } from "./sops";
 import { attachMockups, mockupsFor, type Mockup } from "./mockups";
+import { bringFor, type Bring, type Rates } from "./materials";
 type MockupLibrary = Record<string, Mockup[]>;
 
 /* What a crew needs on site, pulled from the Jobber job, its quote and the client. Never prices:
@@ -33,6 +34,7 @@ export type JobDetail = {
   imgv?: number;            // photo import version this detail was pulled with
   photoInfo?: string;       // where the line photos came from (or why there are none), shown small on the job page
   quoteLines?: { name: string; description?: string }[]; // the quote's lines in order (Light Design Hero designs follow them)
+  linePrices?: number[];    // each line's total, server-side only: sizes the "What to bring" amounts
 };
 /** Bump to re-pull every saved detail once (it was saved before photos were copied in). */
 const IMGV = 6;
@@ -136,7 +138,7 @@ function parse(j: any): Omit<JobDetail, "fetchedAt"> {
     createdAt: j.createdAt, instructions: j.instructions && !isContract(j.instructions) ? j.instructions : undefined,
     quoteNumber: quote.quoteNumber ? String(quote.quoteNumber) : undefined, quoteId: quote.id || undefined, jobberUrl: quote.jobberWebUri || j.jobberWebUri || undefined,
     lines, notes, clientName: client.name, clientTags: rows(client.tags).map((t: any) => t.label).filter(Boolean),
-    otherJobs, repeat, repeatWhy, bins, value: jobValue(j),
+    otherJobs, repeat, repeatWhy, bins, value: jobValue(j), linePrices: rows(j.lineItems).map((li: any) => Number(li.totalPrice) || 0),
     quoteLines: quoteLines.map((x: any) => ({ name: String(x.name || ""), description: x.description || undefined })),
   };
 }
@@ -197,7 +199,7 @@ export function withDrive(idx: DriveIndex, d: JobDetail | null, clientName: stri
   const base = d ?? { fetchedAt: 0, lines: [], notes: [], clientTags: [], otherJobs: [], repeat: false, bins: [] };
   const drive = driveFor(idx, clientName || base.clientName || "", base.bins);
   const repeat = base.repeat || drive.bins.length > 0 || drive.photos.length > 0 || drive.installPhotos.length > 0;
-  const { value: _value, quoteLines: _ql, quoteId: _q, ...shown } = base; // never send the job's price to the browser
+  const { value: _value, linePrices: _lp, quoteLines: _ql, quoteId: _q, ...shown } = base; // never send the job's price to the browser
   delete (shown as any).quotePdf; // saved by an older version
   if (lib && !shown.lines.some((l) => l.images.length) && !shown.quoteMockups?.length) {
     // Designs added on the Jobber tab, when Jobber had no photo for the lines.
@@ -237,4 +239,11 @@ export async function cachedJobParts(jobberJobId?: string): Promise<JobPart[]> {
   if (!jobberJobId) return [];
   const d = await kvGet<JobDetail>(key(jobberJobId));
   return d ? jobParts(d.lines) : [];
+}
+
+/** What to load for an install, from the saved Jobber lines (amounts only, never the prices behind them).
+    rates: from getBringRates (lib/bringRates.ts); without them only what the quote writes out is counted. */
+export function jobBring(d: JobDetail | null | undefined, rates?: Rates): Bring | null {
+  if (!d?.lines.length) return null;
+  return bringFor(d.lines.map((l, i) => ({ name: l.name, description: l.description, quantity: l.quantity, price: d.linePrices?.[i] })), rates);
 }
