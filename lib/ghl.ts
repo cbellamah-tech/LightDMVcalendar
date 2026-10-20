@@ -47,7 +47,7 @@ export function listIn(j: any, keys: string[]): any[] {
   return [];
 }
 
-export type GhlAccount = { id: string; platform: string; name: string; expired?: boolean };
+export type GhlAccount = { id: string; platform: string; name: string; expired?: boolean; profileId?: string };
 export type GhlPost = { platform: string; day: string; text: string; status: string };
 export type GhlLead = { id: string; name: string; source: string; tags: string[]; day: string; at: number; phone?: string; email?: string; attr?: string };
 /** One deal, slimmed down for attribution: where it came from, how far it got, what it's worth. */
@@ -62,6 +62,7 @@ async function accounts(): Promise<GhlAccount[]> {
     platform: String(a.platform ?? a.type ?? "unknown").toLowerCase(),
     name: String(a.name ?? a.displayName ?? a.platform ?? ""),
     expired: !!(a.isExpired ?? a.expired),
+    profileId: a.profileId ? String(a.profileId) : undefined,
   }));
 }
 
@@ -159,6 +160,7 @@ async function pipeline(opps: GhlOpp[] = []): Promise<GhlStage[]> {
 }
 
 export const getGhlSnap = () => kvGet<GhlSnap>(SNAP);
+export const ghlAccounts = () => accounts();
 
 /** chris (2026-10-08): every lead from Instagram carries the "instagram" tag in GoHighLevel.
    Instagram DMs (conversations) plus contacts whose source says Instagram; adds the tag where it's missing. */

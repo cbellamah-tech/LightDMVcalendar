@@ -357,3 +357,63 @@ export async function writeRunnerFile(text: string) {
   });
   if (!res.ok) throw new Error(`Couldn't save the runner key to Drive (${res.status})`);
 }
+
+/* ---------- Drive library for the Post screen ---------- */
+
+export type DriveItem = { id: string; name: string; kind: "photo" | "video"; createdTime: string; folder?: string; folderName?: string; seconds?: number; bytes?: number; mimeType: string };
+
+/* Hiring interview recordings, screen recordings and paperwork live in the same Drive: they never reach the Post screen.
+   Only files Light DMV's own account owns (interview recordings are shared in by the staffing agency). */
+const NOT_MARKETING = /interview|mock call|recording|screen ?shot|screenshot|receipt|invoice|insurance|license|licence|w-?9|1099|w-?2|passport|id card|statement|contract|signature/i;
+
+/** Photos and videos in Drive (owned by info@, last two years), newest first, with their folder names. */
+export async function driveLibrary(limitEach = 300): Promise<DriveItem[]> {
+  const since = new Date(Date.now() - 730 * 86400_000).toISOString();
+  const fields = encodeURIComponent("nextPageToken,files(id,name,mimeType,createdTime,parents,size,videoMediaMetadata(durationMillis))");
+  const list = async (kind: "image" | "video") => {
+    const out: any[] = [];
+    let page = "";
+    while (out.length < limitEach) {
+      const q = encodeURIComponent(`mimeType contains '${kind}/' and trashed = false and 'me' in owners and createdTime > '${since}'`);
+      const j = await gapi(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=200&fields=${fields}${page ? `&pageToken=${encodeURIComponent(page)}` : ""}`);
+      out.push(...(j.files ?? []));
+      if (!j.nextPageToken) break;
+      page = j.nextPageToken;
+    }
+    return out.slice(0, limitEach);
+  };
+  const files = [...(await list("image")), ...(await list("video"))];
+  const folders = new Map<string, string>();
+  for (const id of new Set(files.map((f) => f.parents?.[0]).filter(Boolean)))
+    folders.set(id, await gapi(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=name`).then((f) => String(f.name ?? "")).catch(() => ""));
+  return files
+    .map((f): DriveItem => ({
+      id: f.id, name: f.name, mimeType: f.mimeType, kind: /^video\//.test(f.mimeType) ? "video" : "photo", createdTime: f.createdTime,
+      folder: f.parents?.[0], folderName: (folders.get(f.parents?.[0]) ?? "").trim() || undefined,
+      seconds: f.videoMediaMetadata?.durationMillis ? Math.round(Number(f.videoMediaMetadata.durationMillis) / 1000) : undefined,
+      bytes: f.size ? Number(f.size) : undefined,
+    }))
+    .filter((f) => !NOT_MARKETING.test(`${f.name} ${f.folderName ?? ""}`))
+    .sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+}
+
+/** A small JPEG preview of a Drive photo or video. */
+export async function driveThumb(id: string, w = 400): Promise<Response> {
+  const f = await gapi(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=thumbnailLink,mimeType`);
+  if (!f.thumbnailLink || !/^(image|video)\//.test(f.mimeType)) throw new Error("Drive has no preview for it yet.");
+  const url = String(f.thumbnailLink).replace(/=s\d+$/, `=s${Math.min(2400, Math.max(100, w))}`);
+  const res = await fetch(url, { headers: { authorization: `Bearer ${await googleAccessToken()}` }, cache: "no-store" });
+  if (!res.ok) throw new Error(`Drive preview failed (${res.status})`);
+  return res;
+}
+
+/** The whole file from Drive, refusing anything over `max` bytes. */
+export async function driveFileBytes(id: string, max: number): Promise<ArrayBuffer> {
+  const f = await gapi(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=size`);
+  if (Number(f.size) > max) throw new Error(`The file is over ${Math.round(max / 1048576)} MB.`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`, {
+    headers: { authorization: `Bearer ${await googleAccessToken()}` }, cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Drive download failed (${res.status})`);
+  return res.arrayBuffer();
+}

@@ -6,6 +6,7 @@ import { syncMetaAds } from "@/lib/ads";
 import { refreshWebsite } from "@/lib/website";
 import { refreshInsights } from "@/lib/googleInsights";
 import { refreshGbp } from "@/lib/gbp";
+import { refreshLibrary, refreshSocialStats } from "@/lib/social";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,10 +20,12 @@ export async function GET(req: Request) {
   await autoPostNext().catch(() => null);
   await syncMetaAds(true).catch(() => null); // backup, in case the daily video finished while Auto-post was off
   await refreshWebsite().catch(() => null); // new pages and blog posts on lightdmv.com
+  await refreshSocialStats().catch(() => null); // yesterday's likes, views and posts per platform
   if (!(await googleStatus()).connected) return NextResponse.json({ skipped: "Google not connected" });
   await ensureRunnerFile(true).catch(() => {});
   await refreshInsights().catch(() => null);
   await refreshGbp().catch(() => null);
+  await refreshLibrary().catch(() => null);
   const r = await syncSheet("Daily auto-fill");
   return NextResponse.json(r);
 }

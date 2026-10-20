@@ -9,6 +9,7 @@ import { Attribution, OrganicPaid } from "./dashboard";
 import { googleAdsScript } from "./adsScript";
 import { WebsiteGoogle } from "./web";
 import { LiveStats } from "./stats";
+import { SocialPosts } from "./social";
 
 export type Ch = { id: string; label: string; box: string; sheetRow: string; bot?: string; auto?: string; link?: string; monthlyGoal?: number; done: number; lastWeek: number; goal: number; light: Light };
 type Box = { id: string; title: string; line: string; bots: string[]; link?: string; done: number; goal: number; light: Light; channels: string[] };
@@ -112,6 +113,8 @@ export default function Marketing() {
       <LiveStats owner={owner} />
 
       <WebsiteGoogle owner={owner} botBox={d.botBox} />
+
+      <SocialPosts />
 
       <OrganicPaid a={d.attribution} at={d.ghl.at} days={days} setDays={setDays} connected={d.ghl.configured} errors={d.ghl.errors} />
 
