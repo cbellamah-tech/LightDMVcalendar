@@ -3,19 +3,20 @@
 import { useEffect, useState } from "react";
 import { api, fmtDay, fmtTime, NAVY } from "@/components/ui";
 import { mapsLink } from "@/lib/geo";
-import type { PayPerson } from "../signs/MyPay";
+import type { PayPerson } from "./MyPay";
 
 /** Yard sign placer pay: $2 a sign placed with a photo. Every number opens the signs behind it. */
 export default function SignPay() {
   const [d, setD] = useState<{ perSign: number; people: PayPerson[] } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   useEffect(() => { api("/api/signs/pay").then(setD).catch(() => {}); }, []);
-  if (!d) return null;
+  // Nothing to show until the sign placer logs a first sign.
+  if (!d || d.people.length === 0) return null;
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4">
       <h2 className="text-lg font-extrabold mb-1" style={{ color: NAVY }}>Yard sign pay</h2>
       <p className="text-sm text-slate-500 mb-3">${d.perSign} for each sign the sign placer puts in with a photo, spots he added himself included. Tap a person for every sign, its photo and where it is.</p>
-      {d.people.length === 0 ? <p className="text-sm text-slate-500">No signs logged yet.</p> : d.people.map((p) => (
+      {d.people.map((p) => (
         <div key={p.uid} className="border-t first:border-t-0 py-2">
           <button onClick={() => setOpen(open === p.uid ? null : p.uid)} className="w-full text-left flex flex-wrap gap-x-4 gap-y-1 items-baseline">
             <span className="font-bold">{p.name}</span>

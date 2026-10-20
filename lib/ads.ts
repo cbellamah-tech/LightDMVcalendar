@@ -9,7 +9,27 @@ export type AdDay = { source: AdSource; day: string; spend: number; clicks: numb
 const DAYS = "ldmv:mkt:ads";
 const META_AT = "ldmv:mkt:ads:meta-at";
 
-export const metaConfigured = () => !!(process.env.META_ADS_TOKEN?.trim() && process.env.META_AD_ACCOUNT_ID?.trim());
+/* Facebook ads login: Vercel env (META_ADS_TOKEN, META_AD_ACCOUNT_ID) or pasted once by an owner in the app's Setup. */
+const META_KEY = "ldmv:mkt:meta";
+type MetaCreds = { token: string; account: string; by?: string; at?: number };
+export async function metaCreds(): Promise<MetaCreds | null> {
+  const t = process.env.META_ADS_TOKEN?.trim(), a = process.env.META_AD_ACCOUNT_ID?.trim();
+  if (t && a) return { token: t, account: a.replace(/^act_/, "") };
+  const k = await kvGet<MetaCreds>(META_KEY);
+  return k?.token && k.account ? k : null;
+}
+export const metaConfigured = async () => !!(await metaCreds());
+/** Save a pasted token after checking it can read the ad account. */
+export async function saveMetaCreds(token: string, account: string, by: string) {
+  const acct = account.trim().replace(/^act_/, "");
+  if (!/^\d{5,20}$/.test(acct)) throw new Error("The ad account ID is the number after act_ in Ads Manager.");
+  const r = await fetch(`https://graph.facebook.com/v21.0/act_${acct}?fields=name`, { headers: { Authorization: `Bearer ${token.trim()}` }, cache: "no-store" });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Facebook said: ${j?.error?.message ?? r.status}`);
+  await kvSet<MetaCreds>(META_KEY, { token: token.trim(), account: acct, by, at: Date.now() });
+  await kvSet(META_AT, 0);
+  return { name: j.name as string | undefined };
+}
 const n = (x: unknown) => (Number.isFinite(Number(x)) ? Math.max(0, Number(x)) : 0);
 
 export async function recordAds(rows: AdDay[]) {
@@ -25,16 +45,17 @@ const LEAD_ACTIONS = ["lead", "onsite_conversion.lead_grouped", "offsite_convers
 
 /** Last 30 days from Meta, at most once an hour (or forced by the daily cron). */
 export async function syncMetaAds(force = false) {
-  if (!metaConfigured()) return { skipped: "META_ADS_TOKEN / META_AD_ACCOUNT_ID not set" };
+  const creds = await metaCreds();
+  if (!creds) return { skipped: "no Facebook ads token yet" };
   const last = (await kvGet<number>(META_AT)) ?? 0;
   if (!force && Date.now() - last < 60 * 60_000) return { skipped: "fresh" };
-  const acct = process.env.META_AD_ACCOUNT_ID!.trim().replace(/^act_/, "");
+  const acct = creds.account;
   const u = new URL(`https://graph.facebook.com/v21.0/act_${acct}/insights`);
   u.searchParams.set("fields", "spend,clicks,impressions,actions");
   u.searchParams.set("date_preset", "last_30d");
   u.searchParams.set("time_increment", "1");
   u.searchParams.set("limit", "100");
-  const r = await fetch(u, { headers: { Authorization: `Bearer ${process.env.META_ADS_TOKEN!.trim()}` }, cache: "no-store" });
+  const r = await fetch(u, { headers: { Authorization: `Bearer ${creds.token}` }, cache: "no-store" });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(`Facebook ads: ${j?.error?.message ?? r.status}`);
   const rows: AdDay[] = (j.data ?? []).map((d: any) => {
@@ -63,7 +84,7 @@ export async function adsSummary() {
   if (!all.length) {
     await syncMetaAds().catch((e) => { error = e.message; });
     all = Object.values((await kvGet<Record<string, AdDay>>(DAYS)) ?? {});
-  } else if (metaConfigured() && Date.now() - ((await kvGet<number>(META_AT)) ?? 0) >= 60 * 60_000) {
+  } else if ((await metaConfigured()) && Date.now() - ((await kvGet<number>(META_AT)) ?? 0) >= 60 * 60_000) {
     // Saved numbers show at once; Facebook is re-read (at most hourly) after the page has its answer.
     const { laterOnce } = await import("./background");
     await laterOnce("meta-ads", () => syncMetaAds(), 60_000);
@@ -73,5 +94,5 @@ export async function adsSummary() {
     const rows = all.filter((r) => r.source === s);
     return { has: rows.length > 0, week: sum(rows.filter((r) => r.day > weekAgo)), month: sum(rows.filter((r) => r.day.startsWith(month))) };
   };
-  return { facebook: { ...by("facebook"), configured: metaConfigured() }, google: by("google"), lsa: by("lsa"), error };
+  return { facebook: { ...by("facebook"), configured: await metaConfigured() }, google: by("google"), lsa: by("lsa"), error };
 }
