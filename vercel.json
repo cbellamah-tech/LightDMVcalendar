@@ -7,6 +7,10 @@
     {
       "path": "/api/marketing/cron",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/marketing/linkedin/cron",
+      "schedule": "0 14 * * *"
     }
   ]
 }
