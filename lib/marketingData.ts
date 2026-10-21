@@ -164,12 +164,14 @@ export async function fillWeeks(weeks: string[], by: string, dry = false): Promi
       if (d.startsWith("2026-")) cellsTouched.add(`${d.slice(0, 7)}|${sheetWeek(d)}`);
     }
   const cells: SheetCell[] = [];
+  const today = etDay(Date.now());
   for (const key of cellsTouched) {
     const [ym, wk] = key.split("|");
     const days: string[] = [];
     for (let dd = 1; dd <= 31; dd++) {
       const d = `${ym}-${String(dd).padStart(2, "0")}`;
       if (etDay(new Date(`${d}T12:00:00Z`)) !== d) continue; // not a real date (Feb 30 etc.)
+      if (d > today) continue; // booked radio spots count once they've aired, not ahead of time
       if (sheetWeek(d) === +wk) days.push(d);
     }
     for (const c of CHANNELS) {
