@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronRight, ClipboardCheck, Hammer, Loader2, MapPin, Navigation, UserCheck, Wallet, Wrench } from "lucide-react";
+import { CheckCircle2, ChevronRight, ClipboardCheck, Filter, Hammer, Loader2, MapPin, Navigation, PhoneMissed, UserCheck, Wallet, Wrench } from "lucide-react";
 import { api, fmtDay, fmtTime, getMe, Me, NAVY } from "@/components/ui";
 import { groupsFor, ROLE_LABEL } from "@/lib/nav";
 import { CREW_LABEL } from "./signs/types";
@@ -10,6 +10,7 @@ import type { CrewPay, Job, Progress } from "./jobs/types";
 import Bring from "./jobs/Bring";
 import Lights from "@/components/Lights";
 import type { BringItem } from "@/lib/materials";
+import type { Cleanup } from "@/lib/pipelineCleanup";
 
 type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; pay?: CrewPay; bring?: BringItem[]; info?: { repeat: boolean } };
 type JobsData = { jobs: Row[]; fixes: Row[] };
@@ -245,6 +246,8 @@ function OfficeHome({ me, data, err }: { me: Me; data: JobsData | null; err: str
           )}
         </>
       )}
+      <CallsCard />
+      <PipelineCleanupCard />
       {groupsFor(me.role).map((g) => (
         <section key={g.title} className="space-y-2">
           <h2 className="text-[11px] font-bold uppercase tracking-[.12em] text-slate-400 pt-2 font-sans">{g.title}</h2>
@@ -264,6 +267,52 @@ function OfficeHome({ me, data, err }: { me: Me; data: JobsData | null; err: str
         </section>
       ))}
     </>
+  );
+}
+
+/** The weekly GoHighLevel cleanup reminder: shows from Monday until someone taps "Done for this week". */
+function PipelineCleanupCard() {
+  const [c, setC] = useState<Cleanup | null>(null);
+  useEffect(() => { api<Cleanup>("/api/marketing/pipeline-cleanup").then(setC).catch(() => {}); }, []);
+  if (!c?.configured || c.done || !c.total) return null;
+  const count = (k: string) => c.groups.filter((g) => g.kind === k).reduce((t, g) => t + g.deals.length, 0);
+  const parts = [["master", "Master pipeline"], ["Waiting on info", "Waiting on info"], ["Follow up", "Follow up"]]
+    .map(([k, label]) => [label, count(k)] as const).filter(([, n]) => n > 0);
+  return (
+    <Link href="/marketing/cleanup" className="block"><Card className="border-amber-300 bg-amber-50/60 hover:shadow-md space-y-1">
+      <div className="font-extrabold text-amber-900 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2"><Filter size={16} /> Weekly pipeline cleanup: {c.total} deal{c.total === 1 ? "" : "s"}</span>
+        <ChevronRight size={18} />
+      </div>
+      <div className="text-sm">{parts.map(([label, n]) => `${label} ${n}`).join(" · ")}</div>
+    </Card></Link>
+  );
+}
+
+type CallSum = { configured: boolean; owed?: number; notTried?: number; today?: { missed: number; callsIn: number; avgCallbackMin: number | null } };
+
+/** Missed callers nobody has reached yet, from the Calls page. Hidden when GoHighLevel isn't connected. */
+function CallsCard() {
+  const [c, setC] = useState<CallSum | null>(null);
+  useEffect(() => {
+    const load = () => api<CallSum>("/api/calls?summary=1").then(setC).catch(() => {});
+    load();
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, []);
+  if (!c?.configured || !c.today) return null;
+  const urgent = (c.notTried ?? 0) > 0;
+  const t = c.today;
+  return (
+    <Link href="/calls" className="block"><Card className={`hover:shadow-md flex items-center gap-3 ${urgent ? "border-red-300 bg-red-50/60" : ""}`}>
+      <PhoneMissed size={20} className={urgent ? "text-red-600" : "text-slate-400"} />
+      <span className="flex-1 text-sm">
+        <b>{c.owed ? `${c.owed} missed caller${c.owed > 1 ? "s" : ""} to call back` : "No missed callers waiting"}</b>
+        {urgent ? ` (${c.notTried} not tried yet)` : ""}
+        <span className="block text-slate-500">Today: {t.callsIn} calls in, {t.missed} missed{t.avgCallbackMin !== null ? `, called back in ${t.avgCallbackMin < 60 ? `${t.avgCallbackMin} min` : `${Math.round(t.avgCallbackMin / 6) / 10} hr`} on average` : ""}</span>
+      </span>
+      <ChevronRight size={18} />
+    </Card></Link>
   );
 }
 

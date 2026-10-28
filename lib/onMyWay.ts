@@ -22,7 +22,7 @@ const CLIENT_SPEC = {
 } as const;
 
 let selCache: string | null = null;
-async function clientFor(jobberJobId: string) {
+export async function clientFor(jobberJobId: string) {
   selCache ||= (await buildSelection(gql, "Client", CLIENT_SPEC as any)) || "{ id name phones { number } }";
   const d = await gql<{ job: { client?: any } | null }>(`query LdmvOmw($id: EncodedId!) { job(id: $id) { client ${selCache} } }`, { id: jobberJobId });
   return d.job?.client ?? null;

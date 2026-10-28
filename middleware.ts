@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE, verifySession } from "./lib/session";
 
-// The bot drop box checks its own key; the crons check CRON_SECRET; the callbacks check the session themselves; /r/ is a review card tapped by a customer's phone.
-const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/marketing/linkedin/cron", "/api/jobs/crew-notes/cron", "/api/marketing/runner/", "/api/google/callback", "/api/customers/run", "/api/public/", "/manifest.webmanifest", "/icon", "/r/"];
-const OWNER_ONLY = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/people", "/api/people", "/settings", "/api/jobber", "/marketing", "/api/marketing", "/api/google", "/briefing", "/reviews", "/api/reviews"];
+// The bot drop box checks its own key; the crons check CRON_SECRET; the callbacks check the session themselves; /r/ is a review card tapped by a customer's phone; /t/ is a customer's live tracker link.
+const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/bots/cron", "/api/marketing/linkedin/cron", "/api/jobs/crew-notes/cron", "/api/marketing/runner/", "/api/google/callback", "/api/customers/run", "/api/public/", "/manifest.webmanifest", "/icon", "/r/", "/t/", "/api/t/"];
+const OWNER_ONLY = ["/tracker", "/api/track", "/calendar", "/api/board", "/insurance", "/api/insurance", "/people", "/api/people", "/settings", "/api/jobber", "/marketing", "/api/marketing", "/api/google", "/briefing", "/reviews", "/api/reviews", "/calls", "/api/calls"];
 
 // Crew leads and crew see their home page, their own jobs and the install course, nothing else.
 const CREW_OK = ["/", "/jobs", "/api/jobs", "/install", "/api/install", "/api/me", "/api/upload", "/api/photos", "/api/training/img"];
@@ -14,7 +14,7 @@ const CREW_NEVER = ["/install/team", "/api/install/team", "/api/install/signoff"
 const SIGNS_OK = ["/signs", "/api/signs", "/api/me", "/api/upload", "/api/photos", "/api/geocode"];
 
 // Owners only, not the manager either.
-const STRICT_OWNER = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs", "/expenses", "/api/expenses", "/customers", "/api/customers"];
+const STRICT_OWNER = ["/bots", "/api/bots", "/calendar", "/api/board", "/insurance", "/api/insurance", "/costs", "/api/costs", "/expenses", "/api/expenses", "/customers", "/api/customers"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

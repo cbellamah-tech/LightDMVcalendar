@@ -5,14 +5,16 @@ import "leaflet/dist/leaflet.css";
 
 export type MapPoint = {
   id: string; lat: number; lng: number; color: string; label: string; popup?: string; radiusM?: number; big?: boolean;
+  num?: string; // drawn as a numbered pin instead of a dot (the tracker's stops)
 };
+export type MapLine = { pts: [number, number][]; color: string; dashed?: boolean };
 
 /** Leaflet map with circle markers (no image assets needed). Loaded client-side only. */
 export default function SignMap({
-  points, me, line, height = 420, onPick, fitKey,
+  points, me, line, lines, height = 420, onPick, fitKey,
 }: {
   points: MapPoint[]; me?: { lat: number; lng: number; accuracyM?: number } | null;
-  line?: [number, number][]; height?: number | string; onPick?: (id: string) => void; fitKey?: string;
+  line?: [number, number][]; lines?: MapLine[]; height?: number | string; onPick?: (id: string) => void; fitKey?: string;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
@@ -43,11 +45,15 @@ export default function SignMap({
     if (!Lf || !layer.current) return;
     layer.current.clearLayers();
     if (line && line.length > 1) Lf.polyline(line, { color: "#112E5B", weight: 3, opacity: 0.5, dashArray: "6 6" }).addTo(layer.current);
+    for (const l of lines ?? []) if (l.pts.length > 1) Lf.polyline(l.pts, { color: l.color, weight: 3, opacity: l.dashed ? 0.5 : 0.8, dashArray: l.dashed ? "6 6" : undefined }).addTo(layer.current);
     for (const p of points) {
       if (p.radiusM) Lf.circle([p.lat, p.lng], { radius: p.radiusM, color: p.color, weight: 1, fillOpacity: 0.08 }).addTo(layer.current);
-      const m = Lf.circleMarker([p.lat, p.lng], {
-        radius: p.big ? 11 : 8, color: "#fff", weight: 2, fillColor: p.color, fillOpacity: 1,
-      }).addTo(layer.current);
+      const m = p.num
+        ? Lf.marker([p.lat, p.lng], { icon: Lf.divIcon({ className: "", iconSize: [24, 24], iconAnchor: [12, 12],
+            html: `<div style="width:24px;height:24px;border-radius:9999px;background:${p.color};color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);font:700 11px/20px system-ui;text-align:center">${p.num}</div>` }) }).addTo(layer.current)
+        : Lf.circleMarker([p.lat, p.lng], {
+          radius: p.big ? 11 : 8, color: "#fff", weight: 2, fillColor: p.color, fillOpacity: 1,
+        }).addTo(layer.current);
       m.bindTooltip(p.label, { direction: "top", offset: [0, -6] });
       if (p.popup) m.bindPopup(p.popup);
       if (onPick) m.on("click", () => onPick(p.id));
