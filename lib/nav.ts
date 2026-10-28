@@ -1,6 +1,6 @@
 // Who sees which tab, in what order, and how the tabs group. The Shell (top bar, phone bar, More menu) and the
 // home page both read this, so a tab only has to be added here once. The middleware still does the real gating.
-import { Bot, CalendarDays, Filter, Wallet, Contact, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, PhoneCall, Receipt, Settings, ShieldCheck, Star, UserCheck, Users } from "lucide-react";
+import { Bot, CalendarDays, Filter, Wallet, Truck, Contact, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, PhoneCall, Receipt, Settings, ShieldCheck, Star, UserCheck, Users } from "lucide-react";
 import type { Me } from "@/components/ui";
 
 export type Role = Me["role"];
@@ -13,6 +13,7 @@ const EVERYONE: Role[] = ["owner", "manager", "lead", "crew"];
 export const TABS: Record<string, Tab> = {
   today: { href: "/", label: "Today", text: "What's happening today.", icon: Home, roles: EVERYONE },
   jobs: { href: "/jobs", label: "Jobs", text: "Every install, takedown and fix, with the crew checklist and photos.", icon: ClipboardCheck, roles: EVERYONE },
+  tracker: { href: "/tracker", label: "Santa tracker", short: "Tracker", text: "Where each crew is, the day's route and every customer's ETA.", icon: Truck, roles: OFFICE },
   calendar: { href: "/calendar", label: "Calendar", text: "Chris and Liam's recurring task board.", icon: CalendarDays, roles: OWNER },
   signs: { href: "/signs", label: "Yard signs", text: "Sign routes: start one, drive, a photo at each stop.", icon: MapPin, roles: ["owner", "manager", "signs"] },
   customers: { href: "/customers", label: "Customers", text: "Every customer: what they had each year, what they paid, photos, texts and notes.", icon: Contact, roles: OWNER },
@@ -43,7 +44,7 @@ const PRIMARY: Record<Role, (keyof typeof TABS)[]> = {
 
 /** Everything else, grouped by what it's for. A group a role can't see anything in disappears. */
 const GROUPS: { title: string; tabs: (keyof typeof TABS)[] }[] = [
-  { title: "Run the day", tabs: ["jobs", "calendar", "signs"] },
+  { title: "Run the day", tabs: ["jobs", "tracker", "calendar", "signs"] },
   { title: "Bring in work", tabs: ["calls", "customers", "marketing", "cleanup", "briefing", "bots", "training"] },
   { title: "Money and papers", tabs: ["expenses", "costs", "insurance"] },
   { title: "Team", tabs: ["people", "reviews", "install", "crewTraining", "jobber"] },

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, LayoutGrid, LogOut, Search, X } from "lucide-react";
 import { getMe, Me } from "./ui";
+import CrewGps from "./CrewGps";
 import { groupsFor, moreGroups, primaryTabs, ROLE_LABEL, Tab, TABS } from "@/lib/nav";
 
 type Groups = ReturnType<typeof groupsFor>;
@@ -16,7 +17,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const [me, setMe] = useState<Me | null>(null);
   const [sheet, setSheet] = useState(false);
-  const bare = path.startsWith("/login");
+  const bare = path.startsWith("/login") || path.startsWith("/t/"); // /t/ is a customer's tracker link
 
   useEffect(() => {
     if (!bare) getMe().then(setMe).catch(() => {});
@@ -89,6 +90,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="page-in">{children}</main>
+      {me?.role === "lead" && <CrewGps />}
 
       {/* Phone and tablet: tabs along the bottom */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 flex px-1"
