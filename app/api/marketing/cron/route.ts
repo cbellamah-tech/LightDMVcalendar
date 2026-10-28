@@ -6,6 +6,7 @@ import { syncMetaAds } from "@/lib/ads";
 import { refreshWebsite } from "@/lib/website";
 import { refreshInsights } from "@/lib/googleInsights";
 import { refreshGbp } from "@/lib/gbp";
+import { refreshReviewStats } from "@/lib/reviewStats";
 import { refreshLibrary, refreshSocialStats } from "@/lib/social";
 import { later } from "@/lib/background";
 
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
   // The bots run in their own call, so they get their own minute (and the sheet still gets this one).
   later("bots", () => fetch(new URL("/api/bots/cron", req.url), { headers: { authorization: auth ?? "", "user-agent": req.headers.get("user-agent") ?? "" }, signal: AbortSignal.timeout(5000) }).catch(() => null));
   await autoPostNext().catch(() => null);
+  await refreshReviewStats(true).catch(() => null); // Google review count (backup to the website bot, which asks every few hours)
   await refreshWebsite().catch(() => null); // new pages and blog posts on lightdmv.com (the sheet's blog row)
   const google = (await googleStatus()).connected;
   const r = google ? await syncSheet("Daily auto-fill") : { skipped: "Google not connected" };
