@@ -44,6 +44,8 @@ export function classify(text: string) {
 
 const QUOTED = /quote|estimate|proposal|accepted|invoice|job|won|closed|paid/i;
 const SOLD = /accepted|invoice|job|won|paid/i;
+/** A deal that turned into a customer: won, or sitting in a sold stage. */
+export const isSold = (o: GhlOpp) => o.status !== "lost" && (o.status === "won" || SOLD.test(o.stage));
 
 export type Row = { id: SourceId; label: string; kind: Kind; leads: number; quotes: number; sales: number; revenue: number; spend: number };
 export type Attribution = {
@@ -96,9 +98,8 @@ export function attribution(leads: GhlLead[], opps: GhlOpp[], ads: AdDay[], days
       row(s).quotes++;
       items.push({ type: "quote", kind: s.kind, source: s.id, name, day: o.day, value: o.value, stage: o.stage, why });
     }
-    const sold = o.status === "won" || SOLD.test(o.stage);
     const soldDay = o.closedDay ?? o.day;
-    if (sold && o.status !== "lost" && inRange(soldDay)) {
+    if (isSold(o) && inRange(soldDay)) {
       row(s).sales++; row(s).revenue += o.value;
       items.push({ type: "sale", kind: s.kind, source: s.id, name, day: soldDay, value: o.value, stage: o.stage, why });
     }
