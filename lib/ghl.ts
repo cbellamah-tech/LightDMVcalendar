@@ -51,7 +51,7 @@ export type GhlAccount = { id: string; platform: string; name: string; expired?:
 export type GhlPost = { platform: string; day: string; text: string; status: string };
 export type GhlLead = { id: string; name: string; source: string; tags: string[]; day: string; at: number; phone?: string; email?: string; attr?: string };
 /** One deal, slimmed down for attribution: where it came from, how far it got, what it's worth. */
-export type GhlOpp = { id: string; name: string; contactId: string; source: string; status: string; stage: string; pipeline: string; value: number; day: string; closedDay?: string };
+export type GhlOpp = { id: string; name: string; contactId: string; source: string; status: string; stage: string; pipeline: string; value: number; day: string; closedDay?: string; stageAt?: number };
 export type GhlStage = { name: string; count: number; value: number; pipeline?: string };
 export type GhlSnap = { at: number; accounts: GhlAccount[]; posts: GhlPost[]; leads: GhlLead[]; pipeline: GhlStage[]; opps?: GhlOpp[]; errors: string[] };
 
@@ -147,6 +147,8 @@ async function pipeline(opps: GhlOpp[] = []): Promise<GhlStage[]> {
         source: [o.source, ...(o.contact?.tags ?? [])].filter(Boolean).join(" ").slice(0, 200),
         status: String(o.status ?? "open").toLowerCase(), stage: st.name, pipeline: st.pipeline, value: Number(o.monetaryValue) || 0,
         day: etDay(created), closedDay: closed ? etDay(closed) : undefined,
+        // When it landed in the stage it's in now: the weekly cleanup list counts days from here.
+        stageAt: Date.parse(o.lastStageChangeAt ?? o.updatedAt ?? "") || created,
       });
     }
     if (list.length < 100) break;

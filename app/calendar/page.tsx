@@ -45,6 +45,15 @@ const AUTO_TASKS: Task[] = [
   { id: "auto-cold-email-2026", title: "Automated cold emails (50/day)", category: "Auto", assignee: "Both", freq: "range", date: "2026-07-13", endDate: "2026-08-31", notes: "Automated outbound: ~50 cold emails sent per day. Runs Jul 13 – Aug 31, 2026 (50 days). No action needed — monitor replies." },
 ];
 
+/* Weekly tasks added to the saved board once (chris, 2026-10-28). The marker in `done` keeps a deleted one deleted. */
+const ADDED_TASKS: { marker: string; tasks: Task[] } = {
+  marker: "added:ghl-cleanup-2026-10-28",
+  tasks: [
+    { id: "ghl-master-cleanup", title: "Clean up the GoHighLevel master pipeline", category: "Ops", assignee: "Both", freq: "weekly", daysOfWeek: [1], notes: "Deals stuck a week or more: move on, won, lost or out. The list is under Pipeline cleanup in the app." },
+    { id: "ghl-stage-cleanup", title: "Clear Waiting on info and Follow up in every pipeline", category: "Ops", assignee: "Both", freq: "weekly", daysOfWeek: [1], notes: "Every GoHighLevel pipeline, Cold Leads too. The list is under Pipeline cleanup in the app." },
+  ],
+};
+
 const SEED: Task[] = [
   { id: uid(), title: "Film / post a reel or video", category: "Social", assignee: "Chris", freq: "weekly", daysOfWeek: [2,4], notes: "Install clips, roofline reveals, before/after." },
   { id: uid(), title: "Review & optimize Google Ads", category: "Ads", assignee: "Chris", freq: "weekly", daysOfWeek: [1], notes: "Spend, search terms, negatives. Daily in season." },
@@ -155,14 +164,20 @@ export default function OpsCalendar() {
     (async () => {
       try {
         const data = await fetchBoard();
-        if (!data.tasks) { setTasks(SEED); await saveBoard(SEED, {}); }
+        if (!data.tasks) { setTasks(SEED); await saveBoard(SEED, {}); setDone({}); }
         else {
           const loaded: Task[] = data.tasks;
           // One-time cleanup: drop tasks now handled by external automation.
           const cleaned = loaded.filter((t: Task) => !RETIRED_TASK_TITLES.includes(t.title));
           // One-time injection: ensure the gray automated tasks exist on the saved board.
           const missing = AUTO_TASKS.filter(a => !cleaned.some((t: Task) => t.title === a.title));
-          const merged = missing.length ? [...cleaned, ...missing] : cleaned;
+          let merged = missing.length ? [...cleaned, ...missing] : cleaned;
+          const loadedDone = { ...(data.done || {}) };
+          const addNow = !loadedDone[ADDED_TASKS.marker];
+          if (addNow) {
+            merged = [...merged, ...ADDED_TASKS.tasks.filter((a) => !merged.some((t: Task) => t.id === a.id))];
+            loadedDone[ADDED_TASKS.marker] = true;
+          }
           // One-time migration: move QuickBooks + Sales tax to the last Thursday of each month.
           let migratedAny = false;
           const next = merged.map((t: Task) => {
@@ -172,11 +187,11 @@ export default function OpsCalendar() {
             }
             return t;
           });
-          const changed = cleaned.length !== loaded.length || missing.length > 0 || migratedAny;
+          const changed = cleaned.length !== loaded.length || missing.length > 0 || migratedAny || addNow;
           setTasks(next);
-          if (changed) await saveBoard(next, data.done || {});
+          if (changed) await saveBoard(next, loadedDone);
+          setDone(loadedDone);
         }
-        setDone(data.done || {});
       } catch {
         setTasks(SEED);
       }

@@ -1,6 +1,6 @@
 // Who sees which tab, in what order, and how the tabs group. The Shell (top bar, phone bar, More menu) and the
 // home page both read this, so a tab only has to be added here once. The middleware still does the real gating.
-import { CalendarDays, Wallet, Contact, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, Receipt, Settings, ShieldCheck, Star, UserCheck, Users } from "lucide-react";
+import { CalendarDays, Filter, Wallet, Contact, ClipboardCheck, GraduationCap, Hammer, Home, MapPin, Megaphone, Newspaper, Receipt, Settings, ShieldCheck, Star, UserCheck, Users } from "lucide-react";
 import type { Me } from "@/components/ui";
 
 export type Role = Me["role"];
@@ -17,6 +17,7 @@ export const TABS: Record<string, Tab> = {
   signs: { href: "/signs", label: "Yard signs", text: "Sign routes: start one, drive, a photo at each stop.", icon: MapPin, roles: ["owner", "manager", "signs"] },
   customers: { href: "/customers", label: "Customers", text: "Every customer: what they had each year, what they paid, photos, texts and notes.", icon: Contact, roles: OWNER },
   marketing: { href: "/marketing", label: "Marketing", text: "Leads by source, today's post, one-tap listings.", icon: Megaphone, roles: OFFICE },
+  cleanup: { href: "/marketing/cleanup", label: "Pipeline cleanup", short: "Cleanup", text: "Every week: stuck GoHighLevel deals, Waiting on info and Follow up.", icon: Filter, roles: OFFICE },
   briefing: { href: "/briefing", label: "Briefing", text: "The owners' daily read on the business.", icon: Newspaper, roles: OWNER },
   training: { href: "/training", label: "Quote Creation Training", short: "Quotes", text: "Learn to build a quote on real houses.", icon: GraduationCap, roles: OFFICE },
   costs: { href: "/costs", label: "Costs", text: "What the lights cost, what each job made, stock on hand.", icon: Receipt, roles: OWNER },
@@ -41,7 +42,7 @@ const PRIMARY: Record<Role, (keyof typeof TABS)[]> = {
 /** Everything else, grouped by what it's for. A group a role can't see anything in disappears. */
 const GROUPS: { title: string; tabs: (keyof typeof TABS)[] }[] = [
   { title: "Run the day", tabs: ["jobs", "calendar", "signs"] },
-  { title: "Bring in work", tabs: ["customers", "marketing", "briefing", "training"] },
+  { title: "Bring in work", tabs: ["customers", "marketing", "cleanup", "briefing", "training"] },
   { title: "Money and papers", tabs: ["expenses", "costs", "insurance"] },
   { title: "Team", tabs: ["people", "reviews", "install", "crewTraining", "jobber"] },
 ];
