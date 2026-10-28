@@ -12,7 +12,8 @@ type Review = {
   jobId?: string; personId?: string; amount?: number; how?: string; by?: string;
   suggest?: { jobId?: string; personId?: string; why: string }; job?: JobRef; suggestJob?: JobRef;
 };
-type Data = { people: Person[]; reviews: Review[]; jobs: JobRef[]; bonus: number; reviewUrl: string; goesTo: string; scannedAt?: number; error?: string; gmail: boolean };
+type Data = { people: Person[]; reviews: Review[]; jobs: JobRef[]; bonus: number; reviewUrl: string; goesTo: string; scannedAt?: number; error?: string; gmail: boolean;
+  stats: { count: number; rating: number; at: number; source: string; ghlAt?: number; ghlError?: string } | null; base: { count: number; rating: number; at: number; by?: string }; ghlSync: boolean };
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 const card = "bg-white rounded-xl border border-slate-200 p-4";
@@ -53,6 +54,8 @@ export default function ReviewsPage() {
           New reviews are read from Google&apos;s review emails to info@lightdmv.com. Connect Google on the <Link href="/marketing" className="underline font-semibold">Marketing</Link> page to turn this on.
         </div>
       )}
+
+      <CountCard d={d} busy={busy} post={post} />
 
       {open.length > 0 && (
         <section className={card}>
@@ -133,6 +136,47 @@ export default function ReviewsPage() {
         </details>
       )}
     </div>
+  );
+}
+
+const SOURCE: Record<string, string> = {
+  google: "straight from your Google Business Profile",
+  places: "from Google Maps",
+  emails: "counted from Google's review emails to info@",
+};
+
+/** The live count the website and GoHighLevel show. */
+function CountCard({ d, busy, post }: { d: Data; busy: string; post: (j: Record<string, unknown>, tag: string) => void }) {
+  const [fix, setFix] = useState("");
+  const s = d.stats;
+  return (
+    <section className={card}>
+      <h2 className="font-bold mb-1">Google review count</h2>
+      {s ? (
+        <p className="text-sm">
+          <b className="text-lg">{s.count}</b> reviews · <b>{s.rating.toFixed(1)}</b> stars
+          <span className="block text-xs text-slate-400">{SOURCE[s.source] ?? s.source}, checked {ago(s.at)}. LightDMV.com picks it up every 3 hours: every page, the search snippets and the AI answer file.</span>
+        </p>
+      ) : <p className="text-sm text-slate-500">Not counted yet.</p>}
+      {s?.source === "emails" && (
+        <form className="mt-2 flex flex-wrap items-center gap-2 text-sm" onSubmit={(e) => { e.preventDefault(); if (fix) post({ baseCount: Number(fix) }, "base"); setFix(""); }}>
+          <span className="text-slate-500">Google shows a different number?</span>
+          <input value={fix} onChange={(e) => setFix(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder={String(s.count)} className="border rounded px-2 py-1 w-20" />
+          <button disabled={!fix || busy === "base"} className="font-semibold underline" style={{ color: NAVY }}>Use this</button>
+        </form>
+      )}
+      <label className="mt-3 flex items-start gap-2 text-sm">
+        <input type="checkbox" checked={d.ghlSync} disabled={busy === "ghl"} onChange={(e) => post({ ghlSync: e.target.checked }, "ghl")} className="mt-1" />
+        <span>
+          Keep GoHighLevel up to date too
+          <span className="block text-xs text-slate-400">
+            Writes the custom values &quot;Google Review Count&quot; and &quot;Google Rating&quot; in GoHighLevel whenever the count changes, for use as {"{{custom_values.google_review_count}}"} in texts, emails, funnels and widgets.
+            {s?.ghlAt ? ` Last sent ${ago(s.ghlAt)}.` : ""}
+          </span>
+          {s?.ghlError && <span className="block text-xs text-red-600">GoHighLevel said: {s.ghlError}</span>}
+        </span>
+      </label>
+    </section>
   );
 }
 

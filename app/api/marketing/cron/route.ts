@@ -6,6 +6,7 @@ import { syncMetaAds } from "@/lib/ads";
 import { refreshWebsite } from "@/lib/website";
 import { refreshInsights } from "@/lib/googleInsights";
 import { refreshGbp } from "@/lib/gbp";
+import { refreshReviewStats } from "@/lib/reviewStats";
 import { refreshLibrary, refreshSocialStats } from "@/lib/social";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function GET(req: Request) {
   const fromCron = secret ? auth === `Bearer ${secret}` : /vercel-cron/i.test(req.headers.get("user-agent") || "");
   if (!fromCron) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   await autoPostNext().catch(() => null);
+  await refreshReviewStats(true).catch(() => null); // Google review count (backup to the website bot, which asks every few hours)
   await refreshWebsite().catch(() => null); // new pages and blog posts on lightdmv.com (the sheet's blog row)
   const google = (await googleStatus()).connected;
   const r = google ? await syncSheet("Daily auto-fill") : { skipped: "Google not connected" };

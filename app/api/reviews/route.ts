@@ -3,6 +3,7 @@ import { requireRole, OFFICE } from "@/lib/auth";
 import { getJobs } from "@/lib/jobs";
 import { listUsers } from "@/lib/users";
 import { googleStatus } from "@/lib/google";
+import { getBase, getGhlSync, getReviewStats, refreshReviewStats, setBase, setGhlSync } from "@/lib/reviewStats";
 import { BONUS, cardLink, changeReview, getCards, getReviews, getSettings, getTaps, reviewUrl, scanIfStale, scanReviews, setReviewUrl } from "@/lib/reviews";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ export async function GET() {
     people, reviews: list, jobs, bonus: BONUS,
     reviewUrl: settings.reviewUrl ?? "", goesTo: await reviewUrl(), scannedAt: settings.scannedAt, error: settings.error,
     gmail: google.connected,
+    stats: (await getReviewStats()) ?? (await refreshReviewStats().catch(() => null)),
+    base: await getBase(), ghlSync: (await getGhlSync()).on,
   });
 }
 
@@ -45,6 +48,17 @@ export async function POST(req: Request) {
     if (v && !/^https:\/\/[^\s]+$/i.test(v)) return NextResponse.json({ error: "Paste the full link, starting with https://" }, { status: 400 });
     await setReviewUrl(v || null);
     return NextResponse.json({ ok: true });
+  }
+  if ("ghlSync" in b) {
+    await setGhlSync(!!b.ghlSync, s.name);
+    if (b.ghlSync) await refreshReviewStats(true).catch(() => null);
+    return NextResponse.json({ ok: true });
+  }
+  if ("baseCount" in b) {
+    const count = Number(b.baseCount), rating = b.baseRating === undefined || b.baseRating === "" ? 5 : Number(b.baseRating);
+    if (!Number.isInteger(count) || count < 1 || count > 100000) return NextResponse.json({ error: "Type the number of reviews Google shows." }, { status: 400 });
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) return NextResponse.json({ error: "The star average is between 1 and 5." }, { status: 400 });
+    return NextResponse.json(await setBase(count, rating, s.name));
   }
   if (b.scan) {
     try { return NextResponse.json(await scanReviews()); }
