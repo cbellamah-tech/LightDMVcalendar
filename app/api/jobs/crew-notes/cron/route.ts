@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { isConnected, jobberConfigured, syncJobber } from "@/lib/jobber";
 import { buildCrewNotes, etDay, nextDay } from "@/lib/crewNotes";
+import { getJobs } from "@/lib/jobs";
+import { geocodeMissing } from "@/lib/tracker";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,5 +18,8 @@ export async function GET(req: Request) {
   const synced = await syncJobber(0).catch((e) => ({ error: e.message }));
   const day = nextDay(etDay());
   const n = await buildCrewNotes(day, { refresh: true, budgetMs: 30_000 });
-  return NextResponse.json({ synced, day, crews: n.crews.map((c) => ({ crew: c.crew, stops: c.jobs.length })) });
+  // Tomorrow's homes on the Santa tracker map, so the morning never waits on an address lookup.
+  const all = Object.values(await getJobs()).filter((j) => j.crew && etDay(j.start) === day);
+  const located = await geocodeMissing(all.map((j) => j.address), 12_000).catch(() => 0);
+  return NextResponse.json({ synced, day, crews: n.crews.map((c) => ({ crew: c.crew, stops: c.jobs.length })), located });
 }

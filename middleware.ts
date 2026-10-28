@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE, verifySession } from "./lib/session";
 
-// The bot drop box checks its own key; the crons check CRON_SECRET; the callbacks check the session themselves; /r/ is a review card tapped by a customer's phone.
-const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/marketing/linkedin/cron", "/api/jobs/crew-notes/cron", "/api/marketing/runner/", "/api/google/callback", "/api/customers/run", "/manifest.webmanifest", "/icon", "/r/"];
-const OWNER_ONLY = ["/calendar", "/api/board", "/insurance", "/api/insurance", "/people", "/api/people", "/settings", "/api/jobber", "/marketing", "/api/marketing", "/api/google", "/briefing", "/reviews", "/api/reviews"];
+// The bot drop box checks its own key; the crons check CRON_SECRET; the callbacks check the session themselves; /r/ is a review card tapped by a customer's phone; /t/ is a customer's live tracker link.
+const PUBLIC = ["/login", "/api/auth/", "/api/jobber/callback", "/api/jobber/cron", "/api/marketing/bot", "/api/marketing/cron", "/api/marketing/linkedin/cron", "/api/jobs/crew-notes/cron", "/api/marketing/runner/", "/api/google/callback", "/api/customers/run", "/manifest.webmanifest", "/icon", "/r/", "/t/", "/api/t/"];
+const OWNER_ONLY = ["/tracker", "/api/track", "/calendar", "/api/board", "/insurance", "/api/insurance", "/people", "/api/people", "/settings", "/api/jobber", "/marketing", "/api/marketing", "/api/google", "/briefing", "/reviews", "/api/reviews"];
 
 // Crew leads and crew see their home page, their own jobs and the install course, nothing else.
 const CREW_OK = ["/", "/jobs", "/api/jobs", "/install", "/api/install", "/api/me", "/api/upload", "/api/photos", "/api/training/img"];
