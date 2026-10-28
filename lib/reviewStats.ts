@@ -24,7 +24,8 @@ const START: Base = { count: 165, rating: 5, at: Date.parse("2026-10-06T04:21:52
 
 export const getReviewStats = () => kvGet<ReviewStats>(STATS);
 export const getBase = async () => (await kvGet<Base>(BASE)) ?? START;
-export const getGhlSync = async () => (await kvGet<GhlSync>(GHL_SYNC)) ?? { on: false };
+// On unless an owner switches it off on Review cards (chris approved GHL writes on 2026-10-28).
+export const getGhlSync = async () => (await kvGet<GhlSync>(GHL_SYNC)) ?? { on: true };
 export const setGhlSync = (on: boolean, by: string) => kvSet(GHL_SYNC, { on, by, at: Date.now() });
 
 /** An owner types the count Google shows today; email counting carries on from there. */
