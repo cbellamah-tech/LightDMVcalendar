@@ -92,10 +92,14 @@ export default function SignsPage() {
       color: r.visited ? (r.visited >= r.stops ? STATUS_COLOR.placed : "#D97706") : NAVY,
       label: `${r.rank ? `#${r.rank} ` : ""}${r.name} · ${r.visited}/${r.stops} signs`,
     }));
-    const crews = data.live.filter((p) => p.uid !== data.me.uid).map((p) => ({
-      id: `live-${p.uid}`, lat: p.lat, lng: p.lng, color: "#2563EB", big: true,
-      label: `${p.name} (${ago(p.at)})`,
-    }));
+    // A pin is where the phone last shared GPS. Older than 10 minutes means the app is closed or the phone is locked.
+    const crews = data.live.filter((p) => p.uid !== data.me.uid).map((p) => {
+      const fresh = Date.now() - p.at < 10 * 60_000;
+      return {
+        id: `live-${p.uid}`, lat: p.lat, lng: p.lng, color: fresh ? "#2563EB" : "#94A3B8", big: true, radiusM: fresh && p.accuracyM ? p.accuracyM : undefined,
+        label: `${p.name}: ${fresh ? "live" : "last seen"} ${ago(p.at)}${p.accuracyM ? ` (±${Math.round(p.accuracyM)} m)` : ""}`,
+      };
+    });
     const spots = (near?.stops || []).map((st) => ({
       id: `near-${st.id}`, lat: st.lat, lng: st.lng, color: STATUS_COLOR[near!.lastVisit[st.id]?.status || "none"], label: `${st.name} (${st.routeName})`,
     }));
@@ -175,6 +179,20 @@ export default function SignsPage() {
           </>
         )}
       </div>
+
+      {data.office && data.live.length > 0 && (
+        <div className="text-sm text-slate-600 space-y-0.5">
+          {data.live.filter((p) => p.uid !== data.me.uid).map((p) => {
+            const fresh = Date.now() - p.at < 10 * 60_000;
+            return (
+              <div key={p.uid}>
+                <span className="inline-block w-2.5 h-2.5 rounded-full mr-1.5" style={{ background: fresh ? "#2563EB" : "#94A3B8" }} />
+                <b>{p.name}</b> {fresh ? `is live on the map (updated ${ago(p.at)})` : `last shared GPS ${ago(p.at)}. The pin stays where he was until he opens the app again.`}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <SignMap points={points} me={pos} height={380} fitKey={String(data.routes.length)}
         onPick={(id) => { if (data.routes.some((r) => r.id === id)) router.push(`/signs/${id}`); }} />

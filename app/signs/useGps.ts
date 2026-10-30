@@ -5,6 +5,8 @@ import { api } from "@/components/ui";
 
 export type Pos = { lat: number; lng: number; accuracyM: number; at: number };
 const PING_MS = 30_000;
+// Wi-Fi or cell-tower guesses can be off by a mile; the office pin only moves on a real GPS fix.
+const SHARE_MAX_M = 150;
 
 const toPos = (p: GeolocationPosition): Pos => ({ lat: p.coords.latitude, lng: p.coords.longitude, accuracyM: p.coords.accuracy, at: Date.now() });
 
@@ -30,7 +32,7 @@ export function useGps(on: boolean, routeId?: string) {
     const got = (here: Pos, force = false) => {
       setPos(here);
       setErr("");
-      if (force || Date.now() - lastPing.current > PING_MS) {
+      if (here.accuracyM <= SHARE_MAX_M && (force || Date.now() - lastPing.current > PING_MS)) {
         lastPing.current = Date.now();
         api("/api/signs/ping", { method: "POST", json: { ...here, routeId } }).catch(() => {});
       }
