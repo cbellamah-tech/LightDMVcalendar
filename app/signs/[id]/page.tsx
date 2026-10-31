@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Loader2, LocateFixed, MapPin, Navigation, Play, RefreshCw, Route as RouteIcon, Search, Square } from "lucide-react";
+import { ArrowLeft, Camera, Check, Loader2, LocateFixed, MapPin, Navigation, Play, RefreshCw, Route as RouteIcon, Search, Square } from "lucide-react";
 import AddSignButton from "../AddSignButton";
 import MyPay from "../MyPay";
 import VisitSheet from "../VisitSheet";
@@ -212,6 +212,14 @@ export default function RoutePage({ params }: { params: { id: string } }) {
               <button onClick={start} className="w-full rounded-lg py-3 font-bold text-white flex justify-center items-center gap-2" style={{ background: "#1F9D55" }}>
                 <Play size={18} /> Start in this order
               </button>
+              <div className="flex gap-2">
+                <Link href={`/signs/snap?route=${route.id}`} className="flex-1 rounded-lg py-3 font-bold text-white flex justify-center items-center gap-2" style={{ background: NAVY }}>
+                  <Camera size={18} /> Snap signs
+                </Link>
+                <a href={mapsMultiLink(from, preview)} target="_blank" rel="noreferrer" className="flex-1 rounded-lg py-3 font-bold border border-slate-300 flex justify-center items-center gap-2">
+                  <RouteIcon size={18} /> Route in Google Maps
+                </a>
+              </div>
             </>
           )}
         </div>
@@ -247,6 +255,9 @@ export default function RoutePage({ params }: { params: { id: string } }) {
           ) : (
             <div className="font-bold text-green-700 flex items-center gap-2"><Check /> Every spot in {groupLabel.toLowerCase() === "whole route" ? "this route" : groupLabel} is logged. Tap Finish.</div>
           )}
+          <Link href={`/signs/snap?route=${route.id}`} className="w-full rounded-lg py-3 font-bold text-white flex justify-center items-center gap-2" style={{ background: "#1F9D55" }}>
+            <Camera size={18} /> Snap signs (fast camera)
+          </Link>
           {data.me.role === "signs" && <MyPay compact bump={payBump} />}
           <AddSignButton pos={pos} routeId={route.id} onAdded={(m) => { setAdded(m); load(); setPayBump((n) => n + 1); }} />
           {added && <p className="text-sm text-green-700">{added}</p>}
