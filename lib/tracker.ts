@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "crypto";
-import { kvGet, kvGetMany, kvSet, kvUpdate } from "./store";
+import { kvDel, kvGet, kvGetMany, kvSet, kvUpdate } from "./store";
 import { getChecklists, getJobs, type Job } from "./jobs";
 import { distanceM } from "./geo";
+import { planOrder } from "./routeplan";
 import { etDay, etHour } from "./crewNotes";
 import { listUsers, type User } from "./users";
 import { clientFor, pickPhone } from "./onMyWay";
@@ -24,7 +25,7 @@ export type Stop = {
   arrivedAt?: number; completedAt?: number;
   eta?: number; etaFrom?: number; etaTo?: number; ahead: number; // homes still to do before this one
 };
-export type CrewDay = { crew: string; day: string; lead: string; stops: Stop[]; van: Ping | null; vanFresh: boolean; started: boolean; trail: [number, number][] };
+export type CrewDay = { crew: string; day: string; lead: string; stops: Stop[]; order: RouteOrder | null; van: Ping | null; vanFresh: boolean; started: boolean; trail: [number, number][] };
 
 const TZ = "America/New_York";
 const PING = (crew: string) => `ldmv:trk:ping:${crew}`;
@@ -118,9 +119,36 @@ async function osm(address: string): Promise<P | null> {
 
 // ---------- one crew's day, with ETAs ----------
 
-/** The day's stops for a crew in Jobber order (installs, takedowns and fixes). */
-export const crewJobs = (all: Record<string, Job>, crew: string, day: string) =>
-  Object.values(all).filter((j) => j.crew === crew && etDay(j.start) === day).sort((a, b) => a.start.localeCompare(b.start));
+/** The day's stops for a crew (installs, takedowns and fixes): the order the crew set, else Jobber's. */
+export const crewJobs = (all: Record<string, Job>, crew: string, day: string, order?: string[] | null) => {
+  const list = Object.values(all).filter((j) => j.crew === crew && etDay(j.start) === day).sort((a, b) => a.start.localeCompare(b.start));
+  if (!order?.length) return list;
+  // Stops Jobber added after the crew set its order go to the end, in Jobber order.
+  const at = (id: string) => { const i = order.indexOf(id); return i < 0 ? order.length : i; };
+  return list.map((j, i) => ({ j, i })).sort((a, b) => at(a.j.id) - at(b.j.id) || a.i - b.i).map((x) => x.j);
+};
+
+// ---------- the crew's own order for the day ----------
+
+const ORDER = (crew: string, day: string) => `ldmv:trk:order:${crew}:${day}`;
+export type RouteOrder = { ids: string[]; by: string; at: number };
+export const getOrder = (crew: string, day: string) => kvGet<RouteOrder>(ORDER(crew, day));
+export const getOrders = async (crews: string[], day: string) =>
+  Object.fromEntries((await kvGetMany<RouteOrder>(crews.map((c) => ORDER(c, day)))).map((o, i) => [crews[i], o]));
+export const saveOrder = (crew: string, day: string, ids: string[] | null, by: string) =>
+  ids?.length ? kvSet<RouteOrder>(ORDER(crew, day), { ids, by, at: Date.now() }) : kvDel(ORDER(crew, day));
+
+/** Shortest drive through the homes still to do, starting where the van is (or the last home done).
+ *  Homes done or on site keep their place at the top; homes not on the map yet go last. */
+export function bestOrder(cd: CrewDay): string[] {
+  const fixed = cd.stops.filter((s) => s.status === "done" || s.status === "here");
+  const open = cd.stops.filter((s) => s.status !== "done" && s.status !== "here");
+  const placed = open.filter((s) => s.at);
+  const lastDone = [...fixed].reverse().find((s) => s.at)?.at;
+  const from = (cd.vanFresh && cd.van) || fixed.find((s) => s.status === "here")?.at || lastDone || placed[0]?.at;
+  const route = from ? planOrder(from, placed.map((s) => ({ ...s.at!, id: s.jobId }))).map((x) => x.id) : placed.map((s) => s.jobId);
+  return [...fixed.map((s) => s.jobId), ...route, ...open.filter((s) => !s.at).map((s) => s.jobId)];
+}
 
 /** Straight line times a road factor at about 25 mph through neighborhoods, plus parking. */
 export const driveMs = (a: P, b: P) => ((distanceM(a, b) * 1.35) / 11.2) * 1000 + 3 * MIN;
@@ -143,10 +171,10 @@ function onSiteEstimator(jobs: { job: Job; arrivedAt?: number; completedAt?: num
 }
 
 export async function crewDay(crew: string, day = etDay(), ctx?: { all?: Record<string, Job>; users?: User[] }): Promise<CrewDay> {
-  const [all, users, van, trail] = await Promise.all([
-    ctx?.all ?? getJobs(), ctx?.users ?? listUsers(), kvGet<Ping>(PING(crew)), kvGet<[number, number, number][]>(TRAIL(crew, day)),
+  const [all, users, van, trail, saved] = await Promise.all([
+    ctx?.all ?? getJobs(), ctx?.users ?? listUsers(), kvGet<Ping>(PING(crew)), kvGet<[number, number, number][]>(TRAIL(crew, day)), getOrder(crew, day),
   ]);
-  const jobs = crewJobs(all, crew, day);
+  const jobs = crewJobs(all, crew, day, saved?.ids);
   const [lists, pts] = await Promise.all([getChecklists(jobs), geoFor(jobs.map((j) => j.address))]);
   const now = Date.now();
   const vanToday = van && van.day === day ? van : null;
@@ -197,7 +225,7 @@ export async function crewDay(crew: string, day = etDay(), ctx?: { all?: Record<
     }
     if (s.at) from = s.at;
   });
-  return { crew, day, lead, stops, van: vanToday, vanFresh, started, trail: (trail ?? []).map(([a, b]) => [a, b]) };
+  return { crew, day, lead, stops, order: saved ?? null, van: vanToday, vanFresh, started, trail: (trail ?? []).map(([a, b]) => [a, b]) };
 }
 
 const round5 = (t: number) => Math.round(t / (5 * MIN)) * 5 * MIN;

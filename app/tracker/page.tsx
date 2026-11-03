@@ -3,9 +3,10 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Copy, ExternalLink, Loader2, MessageSquare, Truck } from "lucide-react";
+import { Check, Copy, ExternalLink, Loader2, MessageSquare, Route, Truck } from "lucide-react";
 import { ago, api, fmtDay, NAVY } from "@/components/ui";
 import type { MapLine, MapPoint } from "@/components/SignMap";
+import RouteEditor from "@/components/RouteEditor";
 import type { CrewDay, LinkSend, Stop, TrackSettings } from "@/lib/tracker";
 
 const SignMap = dynamic(() => import("@/components/SignMap"), { ssr: false });
@@ -78,6 +79,7 @@ export default function TrackerPage() {
 }
 
 function CrewCard({ c, sample, onSent }: { c: Crew; sample: string; onSent: () => void }) {
+  const [reorder, setReorder] = useState(false);
   const done = c.stops.filter((s) => s.status === "done").length;
   const color = CREW_COLOR[c.crew] ?? NAVY;
   return (
@@ -96,6 +98,12 @@ function CrewCard({ c, sample, onSent }: { c: Crew; sample: string; onSent: () =
           <div className="h-full bg-green-600" style={{ width: `${(done / c.stops.length) * 100}%` }} />
         </div>
       )}
+      {c.stops.length > 1 && (
+        <button onClick={() => { if (reorder) onSent(); setReorder(!reorder); }} className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}>
+          <Route size={15} /> {reorder ? "Done changing the order" : `Change ${c.lead}'s order${c.order ? ` (changed by ${c.order.by})` : ""}`}
+        </button>
+      )}
+      {reorder && <RouteEditor crew={c.crew} onChange={onSent} />}
       <ul className="divide-y divide-slate-100">
         {c.stops.map((s) => <StopRow key={s.jobId} s={s} sample={sample} onSent={onSent} />)}
       </ul>

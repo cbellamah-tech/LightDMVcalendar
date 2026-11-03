@@ -12,6 +12,8 @@ import { getPayOverrides, payFor } from "@/lib/crewPay";
 import { expenseTotal, getAllExpenses } from "@/lib/expenses";
 import { bonusesByJob, bonusTotal, scanIfStale } from "@/lib/reviews";
 import { getBringRates } from "@/lib/bringRates";
+import { etDay } from "@/lib/crewNotes";
+import { crewJobs, getOrders } from "@/lib/tracker";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Jobber can ask us to wait out its rate limit
@@ -48,6 +50,12 @@ export async function GET(req: Request) {
     scanIfStale().catch(() => {}), // new Google reviews: credit the installer whose card was tapped
     getBringRates().catch(() => undefined), // quoting rates for the "What to bring" amounts
   ]);
+  // Today's stop number for each crew, in the order the crew set on its route (else Jobber's).
+  const day = etDay();
+  const crewsToday = [...new Set(rows.filter((j) => j.crew && etDay(j.start) === day).map((j) => j.crew!))];
+  const orders = crewsToday.length ? await getOrders(crewsToday, day) : {};
+  const routeN = new Map<string, number>();
+  for (const c of crewsToday) crewJobs(all, c, day, orders[c]?.ids).forEach((j, i) => routeN.set(j.id, i + 1));
   const withProgress = (j: Job, i: number) => {
     const c = lists[i];
     // Repeat / new and bin from what's already cached; the job page fetches fresh details.
@@ -55,7 +63,7 @@ export async function GET(req: Request) {
     const v = j.source === "jobber" ? withDrive(idx, d, j.client) : null;
     const info = v ? { repeat: v.repeat, bins: v.drive.bins.map((b) => b.bin), known: !!d } : undefined;
     const bring = j.kind === "install" ? jobBring(d, rates)?.items : undefined; // the day's load list adds these up
-    return { ...j, bring, progress: checklistProgress(c), arrivedAt: c.arrivedAt, completedAt: c.completedAt, info, pay: payFor(j, d, overrides), expenses: expenseTotal(expenses[j.id]), reviews: bonusTotal(bonuses[j.id]) };
+    return { ...j, routeN: routeN.get(j.id), bring, progress: checklistProgress(c), arrivedAt: c.arrivedAt, completedAt: c.completedAt, info, pay: payFor(j, d, overrides), expenses: expenseTotal(expenses[j.id]), reviews: bonusTotal(bonuses[j.id]) };
   };
   const out = rows.map(withProgress);
   const fixes = out.slice(jobs.length)

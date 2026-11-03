@@ -1,18 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ChevronRight, ClipboardCheck, Filter, Hammer, Loader2, MapPin, Navigation, PhoneMissed, UserCheck, Wallet, Wrench } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, ChevronRight, ClipboardCheck, Filter, Hammer, Loader2, MapPin, Navigation, PhoneMissed, Route, UserCheck, Wallet, Wrench } from "lucide-react";
 import { api, fmtDay, fmtTime, getMe, Me, NAVY } from "@/components/ui";
 import { groupsFor, ROLE_LABEL } from "@/lib/nav";
 import { CREW_LABEL } from "./signs/types";
 import type { CrewPay, Job, Progress } from "./jobs/types";
 import Bring from "./jobs/Bring";
 import Lights from "@/components/Lights";
+import RouteEditor from "@/components/RouteEditor";
 import type { BringItem } from "@/lib/materials";
 import type { Cleanup } from "@/lib/pipelineCleanup";
 
-type Row = Job & { progress: Progress; arrivedAt?: number; completedAt?: number; pay?: CrewPay; bring?: BringItem[]; info?: { repeat: boolean } };
+type Row = Job & { routeN?: number; progress: Progress; arrivedAt?: number; completedAt?: number; pay?: CrewPay; bring?: BringItem[]; info?: { repeat: boolean } };
 type JobsData = { jobs: Row[]; fixes: Row[] };
 type Course = { loaded: boolean; total?: number; done?: number; next?: { n: number; title: string; started: boolean } | null };
 type Team = { me: string; people: { uid: string; name: string; modules: { title: string; done: number | null; signedOff: unknown }[] }[] };
@@ -30,13 +31,13 @@ export default function Today() {
   const [me, setMe] = useState<Me | null>(null);
   const [data, setData] = useState<JobsData | null>(null);
   const [err, setErr] = useState("");
+  const load = useCallback(() => api<JobsData>("/api/jobs").then(setData).catch((e) => setErr(e.message)), []);
   useEffect(() => {
     getMe().then(setMe).catch(() => {});
-    const load = () => api<JobsData>("/api/jobs").then(setData).catch((e) => setErr(e.message));
     load();
     const t = setInterval(load, 60000);
     return () => clearInterval(t);
-  }, []);
+  }, [load]);
   if (!me) return <div className="p-6 text-slate-500 flex gap-2"><Loader2 className="animate-spin" /> Loading...</div>;
   const crewSide = me.role === "lead" || me.role === "crew";
   return (
@@ -48,19 +49,22 @@ export default function Today() {
           {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} · {ROLE_LABEL[me.role]}{crewSide && me.crew ? ` · ${CREW_LABEL[me.crew] ?? me.crew}` : ""}
         </p>
       </div>
-      {crewSide ? <CrewHome me={me} data={data} err={err} /> : <OfficeHome me={me} data={data} err={err} />}
+      {crewSide ? <CrewHome me={me} data={data} err={err} reload={load} /> : <OfficeHome me={me} data={data} err={err} />}
     </div>
   );
 }
 
 // ---------------- crew and crew leads ----------------
 
-function CrewHome({ me, data, err }: { me: Me; data: JobsData | null; err: string }) {
+function CrewHome({ me, data, err, reload }: { me: Me; data: JobsData | null; err: string; reload: () => void }) {
   const now = new Date();
+  const [reorder, setReorder] = useState(false);
   const { today, nextDay } = useMemo(() => {
     const all = [...(data?.fixes ?? []).filter((f) => !isDone(f) || sameDay(f.start, now)), ...(data?.jobs ?? [])]
       .sort((a, b) => a.start.localeCompare(b.start));
-    const today = all.filter((j) => sameDay(j.start, now) || (j.kind === "fix" && new Date(j.start) < now && !isDone(j)));
+    const today = all.filter((j) => sameDay(j.start, now) || (j.kind === "fix" && new Date(j.start) < now && !isDone(j)))
+      // The order the crew set on the route (Change order), else Jobber's times.
+      .sort((a, b) => (a.routeN ?? 999) - (b.routeN ?? 999));
     const later = all.filter((j) => new Date(j.start) > now && !sameDay(j.start, now));
     const nextDay = later.length ? later.filter((j) => sameDay(j.start, new Date(later[0].start))) : [];
     return { today, nextDay };
@@ -91,7 +95,15 @@ function CrewHome({ me, data, err }: { me: Me; data: JobsData | null; err: strin
           <section id="today-jobs" className="space-y-2 scroll-mt-16">
             {today.length ? (
               <>
-                <h2 className="font-extrabold" style={{ color: NAVY }}>Today, in order</h2>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-extrabold" style={{ color: NAVY }}>Today, in order</h2>
+                  {me.role === "lead" && (
+                    <button onClick={() => setReorder(!reorder)} className="text-sm font-semibold flex items-center gap-1" style={{ color: NAVY }}>
+                      <Route size={15} /> {reorder ? "Done" : "Change order"}
+                    </button>
+                  )}
+                </div>
+                {reorder && <RouteEditor onChange={reload} />}
                 {today.map((j, i) => <CrewJob key={j.id} j={j} next={!isClosed(j) && today.slice(0, i).every(isClosed)} />)}
               </>
             ) : nextDay.length ? (
