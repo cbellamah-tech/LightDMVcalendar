@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Loader2, LocateFixed, Navigation, Upload } from "lucide-react";
+import { Camera, ChevronRight, Loader2, LocateFixed, Navigation, Upload } from "lucide-react";
 import { distanceM, fmtDist, mapsLink } from "@/lib/geo";
 import AddSignButton from "./AddSignButton";
 import MyPay from "./MyPay";
@@ -141,11 +141,16 @@ export default function SignsPage() {
         </div>
       </div>
 
+      {placer && (
+        <Link href="/signs/snap" className="w-full rounded-2xl py-5 text-xl font-extrabold text-white flex justify-center items-center gap-3 shadow" style={{ background: "#1F9D55" }}>
+          <Camera size={28} /> Start snapping signs
+        </Link>
+      )}
       {placer && <MyPay bump={payBump} />}
       {data.me.role === "owner" && <SignPay />}
       {placer && (
         <p className="text-sm text-slate-600">
-          Pick a route below (closest first when GPS is on), tap <b>Open</b>, then <b>Start in this order</b>. Each spot needs a photo; tap <b>Add sign location</b> for a spot that isn't on the list.
+          Tap <b>Start snapping signs</b>: the camera opens, each tap logs one sign with its exact GPS spot and adds $2. It picks your closest route and shows the next spot, with Google Maps one tap away.
         </p>
       )}
 
