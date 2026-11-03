@@ -156,7 +156,7 @@ export type Episode = {
   callbackAt?: number;   // first call out to them after the miss
   tries: number;         // calls out before we reached them
   reachedAt?: number; reachedHow?: "we called" | "they called again";
-  booked?: boolean;
+  booked?: boolean; bookedDay?: string; bookedVia?: SoldMark["via"];
 };
 
 const ET_HOUR = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23", weekday: "short" });
@@ -167,7 +167,7 @@ export function etHour(t: number) {
 /** Open for calls: 8 AM to 6 PM, Monday to Saturday (Eastern). */
 export const afterHours = (t: number) => { const { hour, weekday } = etHour(t); return weekday === "Sun" || hour < 8 || hour >= 18; };
 
-export function episodes(calls: Call[], soldDays: Map<string, string>): Episode[] {
+export function episodes(calls: Call[], sold: Sold): Episode[] {
   const open = new Map<string, Episode>();
   const out: Episode[] = [];
   for (const c of calls) {
@@ -181,7 +181,7 @@ export function episodes(calls: Call[], soldDays: Map<string, string>): Episode[
     if (c.dir === "out") { ep.callbackAt ??= c.at; ep.tries++; }
     if (c.answered) { ep.reachedAt = c.at; ep.reachedHow = c.dir === "out" ? "we called" : "they called again"; open.delete(c.contactId); }
   }
-  for (const e of out) { const sold = soldDays.get(e.contactId); e.booked = !!sold && sold >= e.day; }
+  for (const e of out) { const b = bookedFrom(sold, e.contactId, e.day); e.booked = !!b; e.bookedDay = b?.day; e.bookedVia = b?.via; }
   return out;
 }
 
@@ -191,7 +191,7 @@ export type Range = {
   reached: number; booked: number; bookedCallers: number;
 };
 
-export function rangeStats(calls: Call[], eps: Episode[], from: string, to: string, soldDays: Map<string, string>): Range {
+export function rangeStats(calls: Call[], eps: Episode[], from: string, to: string, sold: Sold): Range {
   const inR = (t: number) => { const d = etDay(t); return d >= from && d <= to; };
   const cs = calls.filter((c) => inR(c.at));
   // A missed caller counts in every range they missed us in, even when the first miss was earlier.
@@ -211,7 +211,7 @@ export function rangeStats(calls: Call[], eps: Episode[], from: string, to: stri
     medianCallbackMin: waits.length ? Math.round(waits[Math.floor(waits.length / 2)]) : null,
     reached: es.filter((e) => e.reachedAt).length,
     booked: es.filter((e) => e.booked).length,
-    bookedCallers: [...callers].filter(([id, day]) => { const s = soldDays.get(id); return !!s && s >= day; }).length,
+    bookedCallers: [...callers].filter(([id, day]) => !!bookedFrom(sold, id, day)).length,
   };
 }
 
@@ -255,14 +255,24 @@ export function insights(calls: Call[], eps: Episode[], today: string, from: str
   return out;
 }
 
-/** The day each contact's deal was won (from the Marketing tab's saved GoHighLevel deals). */
-export async function soldByContact(): Promise<Map<string, string>> {
-  const snap = await getGhlSnap();
-  const m = new Map<string, string>();
-  for (const o of snap?.opps ?? []) {
-    if (!o.contactId || !isSold(o)) continue;
-    const d = o.closedDay ?? o.day;
-    if (!m.has(o.contactId) || d < m.get(o.contactId)!) m.set(o.contactId, d);
-  }
+/** Written by the customer database build (lib/customers.ts): GoHighLevel contact id to the days its household booked in Jobber. */
+export const JOBBER_SOLD = "ldmv:calls:jobberSold";
+export type SoldMark = { day: string; via: "GoHighLevel" | "Jobber" };
+export type Sold = Map<string, SoldMark[]>;
+/** The first time this contact booked on or after `day` (a won deal in GoHighLevel, or a job or approved quote in Jobber). */
+export const bookedFrom = (sold: Sold, id: string, day: string) => sold.get(id)?.find((x) => x.day >= day);
+
+/** Every day each contact booked: won deals from the Marketing tab's saved GoHighLevel deals, plus jobs and approved
+    quotes in Jobber for the same household (matched by phone, email or address in the customer database). */
+export async function soldByContact(): Promise<Sold> {
+  const [snap, jobber] = await Promise.all([getGhlSnap(), kvGet<Record<string, string[]>>(JOBBER_SOLD)]);
+  const m: Sold = new Map();
+  const add = (id: string, day: string, via: SoldMark["via"]) => {
+    const l = m.get(id) ?? m.set(id, []).get(id)!;
+    if (!l.some((x) => x.day === day)) l.push({ day, via });
+  };
+  for (const o of snap?.opps ?? []) if (o.contactId && isSold(o)) add(o.contactId, o.closedDay ?? o.day, "GoHighLevel");
+  for (const [id, days] of Object.entries(jobber ?? {})) for (const d of days) add(id, d, "Jobber");
+  for (const l of m.values()) l.sort((a, b) => a.day.localeCompare(b.day) || (a.via === "GoHighLevel" ? -1 : 1));
   return m;
 }

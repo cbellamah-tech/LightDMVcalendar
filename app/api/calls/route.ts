@@ -3,6 +3,7 @@ import { OFFICE, requireRole } from "@/lib/auth";
 import { laterOnce } from "@/lib/background";
 import { ghlConfigured } from "@/lib/ghl";
 import { ghlContactUrl } from "@/lib/cxGhl";
+import { kickCustomers } from "@/lib/cxSync";
 import { addDays, etDay, weekOf } from "@/lib/marketing";
 import { episodes, getCalls, getWho, insights, rangeStats, seasonStart, soldByContact, syncCalls } from "@/lib/calls";
 
@@ -27,13 +28,20 @@ export async function GET(req: Request) {
   const eps = episodes(calls, sold);
   const who = await getWho();
   const ids = new Set(calls.map((c) => c.contactId));
-  const people = Object.fromEntries([...ids].map((id) => [id, { ...(who[id] ?? { name: "Caller" }), link: ghlContactUrl(id), soldDay: sold.get(id) }]));
+  const people = Object.fromEntries([...ids].map((id) => [id, { ...(who[id] ?? { name: "Caller" }), link: ghlContactUrl(id), soldDay: sold.get(id)?.at(-1)?.day }]));
 
   // The Today page's card: just the people still owed a call back and today's numbers.
   if (new URL(req.url).searchParams.get("summary") === "1") {
     const owed = eps.filter((e) => !e.reachedAt && e.day >= addDays(today, -14));
     return NextResponse.json({ configured: true, owed: owed.length, notTried: owed.filter((e) => !e.tries).length, today: rangeStats(calls, eps, today, today, sold) });
   }
+
+  // Keep Jobber's side of "became a customer" fresh (the customer database build writes it).
+  if (refresh || Date.now() - (saved?.at ?? 0) > 2 * 60_000) await kickCustomers(new URL(req.url).origin, 6 * 3600_000).catch(() => {});
+
+  // Day by day: the same numbers as the tiles for each day of the season, newest first.
+  const days: ({ day: string } & ReturnType<typeof rangeStats>)[] = [];
+  for (let d = today; d >= from; d = addDays(d, -1)) days.push({ day: d, ...rangeStats(calls, eps, d, d, sold) });
 
   const daily: { day: string; answered: number; missed: number; out: number }[] = [];
   const byDay = new Map<string, { answered: number; missed: number; out: number }>();
@@ -60,5 +68,6 @@ export async function GET(req: Request) {
     calls: calls.slice().reverse().map((c) => ({ id: c.id, contactId: c.contactId, at: c.at, dir: c.dir, status: c.status, secs: c.secs, missed: c.missed, answered: c.answered })),
     people,
     daily,
+    days,
   });
 }

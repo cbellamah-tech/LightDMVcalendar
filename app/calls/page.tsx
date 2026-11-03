@@ -8,7 +8,7 @@ import { ago, api, fmtDay, fmtTime, GREEN, NAVY, RED } from "@/components/ui";
    how many we reached and how many booked. Every number opens the calls behind it; the graph folds away. */
 
 type Call = { id: string; contactId: string; at: number; dir: "in" | "out"; status: string; secs: number; missed: boolean; answered: boolean };
-type Episode = { contactId: string; at: number; day: string; lastDay: string; misses: number; callbackAt?: number; tries: number; reachedAt?: number; reachedHow?: string; booked?: boolean };
+type Episode = { contactId: string; at: number; day: string; lastDay: string; misses: number; callbackAt?: number; tries: number; reachedAt?: number; reachedHow?: string; booked?: boolean; bookedDay?: string; bookedVia?: string };
 type Range = {
   callsIn: number; answered: number; missed: number; callsOut: number; callers: number; missedCallers: number; calledBack: number;
   avgCallbackMin: number | null; medianCallbackMin: number | null; reached: number; booked: number; bookedCallers: number;
@@ -18,8 +18,9 @@ type Data = {
   configured: boolean; at: number | null; error?: string; today: string; seasonFrom: string;
   stats: Record<"today" | "week" | "season", Range>; insights: string[]; episodes: Episode[]; calls: Call[];
   people: Record<string, Person>; daily: { day: string; answered: number; missed: number; out: number }[];
+  days?: ({ day: string } & Range)[];
 };
-type RangeId = "today" | "week" | "season";
+type RangeId = "today" | "week" | "season" | "day";
 type Pick =
   | "missed" | "missedCallers" | "calledBack" | "wait" | "reached" | "booked" | "callsIn" | "callsOut" | "bookedCallers";
 
@@ -39,6 +40,8 @@ export default function CallsPage() {
   const [range, setRange] = useState<RangeId>("today");
   const [pick, setPick] = useState<Pick | null>(null);
   const [allOwed, setAllOwed] = useState(false);
+  const [day, setDay] = useState("");
+  const [allDays, setAllDays] = useState(false);
 
   const load = useCallback((refresh = false) =>
     api<Data>(`/api/calls${refresh ? "?refresh=1" : ""}`).then((x) => { setD(x); setErr(""); }).catch((e) => setErr(e.message)), []);
@@ -49,19 +52,27 @@ export default function CallsPage() {
     return () => clearInterval(t);
   }, [load]);
 
-  const from = useMemo(() => !d ? "" : range === "today" ? d.today : range === "week" ? weekStart(d.today) : d.seasonFrom, [d, range]);
+  const from = useMemo(() => !d ? "" : range === "today" ? d.today : range === "week" ? weekStart(d.today) : range === "day" ? day : d.seasonFrom, [d, range, day]);
+  const to = !d ? "" : range === "day" ? day : d.today;
 
   if (!d) return <div className="p-6 text-slate-500 flex gap-2">{err || <><Loader2 className="animate-spin" /> Loading calls...</>}</div>;
   if (!d.configured) return <div className="max-w-3xl mx-auto p-4"><div className={card}>GoHighLevel isn&apos;t connected, so there are no calls to show yet.</div></div>;
 
-  const s = d.stats[range];
+  const dayRow = range === "day" ? d.days?.find((x) => x.day === day) : undefined;
+  const s = dayRow ?? d.stats[range === "day" ? "today" : range];
   const who = (id: string) => d.people[id] ?? { name: "Caller", link: "" };
-  const inRange = (t: number) => { const x = etDay(t); return x >= from && x <= d.today; };
-  const eps = d.episodes.filter((e) => e.day <= d.today && e.lastDay >= from);
+  const inRange = (t: number) => { const x = etDay(t); return x >= from && x <= to; };
+  const eps = d.episodes.filter((e) => e.day <= to && e.lastDay >= from);
   // Waiting on us: missed in the last 2 weeks, nobody has talked to them yet. Not yet tried first, then oldest first.
   const owed = d.episodes.filter((e) => !e.reachedAt && e.day >= addDays(d.today, -14))
     .sort((a, b) => (a.tries ? 1 : 0) - (b.tries ? 1 : 0) || a.at - b.at);
-  const label = range === "today" ? "today" : range === "week" ? "this week" : "this season";
+  const dayName = (x: string) => fmtDay(`${x}T12:00:00`);
+  const label = range === "today" ? "today" : range === "week" ? "this week" : range === "day" ? `on ${dayName(day)}` : "this season";
+  const openDay = (x: string) => {
+    if (x === d.today) setRange("today"); else { setDay(x); setRange("day"); }
+    setPick(null);
+    document.getElementById("call-numbers")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const toggle = (p: Pick) => setPick(pick === p ? null : p);
 
   const tiles: { id: Pick; title: string; value: string; sub: string; tone?: "bad" | "good" }[] = [
@@ -69,9 +80,9 @@ export default function CallsPage() {
     { id: "calledBack", title: "Called back", value: `${s.calledBack} of ${s.missedCallers}`, sub: pct(s.calledBack, s.missedCallers) || "nobody to call back" },
     { id: "wait", title: "Avg time to call back", value: s.avgCallbackMin === null ? "–" : mins(s.avgCallbackMin), sub: s.medianCallbackMin === null ? "no call backs yet" : `half within ${mins(s.medianCallbackMin)}` },
     { id: "reached", title: "Missed callers we spoke to", value: `${s.reached} of ${s.missedCallers}`, sub: pct(s.reached, s.missedCallers) || "–", tone: s.reached ? "good" : undefined },
-    { id: "booked", title: "Missed callers who booked", value: String(s.booked), sub: pct(s.booked, s.missedCallers) ? `${pct(s.booked, s.missedCallers)} of missed callers` : "–", tone: s.booked ? "good" : undefined },
+    { id: "booked", title: "Missed callers who became customers", value: `${s.booked} of ${s.missedCallers}`, sub: pct(s.booked, s.missedCallers) ? `${pct(s.booked, s.missedCallers)} booked in GoHighLevel or Jobber` : "–", tone: s.booked ? "good" : undefined },
     { id: "callsIn", title: "Calls in", value: String(s.callsIn), sub: s.callsIn ? `${pct(s.answered, s.callsIn)} answered` : "–" },
-    { id: "bookedCallers", title: "Callers who booked", value: `${s.bookedCallers} of ${s.callers}`, sub: pct(s.bookedCallers, s.callers) ? `${pct(s.bookedCallers, s.callers)} became customers` : "–", tone: s.bookedCallers ? "good" : undefined },
+    { id: "bookedCallers", title: "All callers who became customers", value: `${s.bookedCallers} of ${s.callers}`, sub: pct(s.bookedCallers, s.callers) ? `${pct(s.bookedCallers, s.callers)} became customers` : "–", tone: s.bookedCallers ? "good" : undefined },
     { id: "callsOut", title: "Calls out", value: String(s.callsOut), sub: "every call we made" },
   ];
 
@@ -119,7 +130,12 @@ export default function CallsPage() {
         )}
       </section>
 
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+      <div id="call-numbers" className="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1 w-fit scroll-mt-4">
+        {range === "day" && (
+          <button className="px-3 py-1.5 rounded-md text-sm font-semibold bg-white shadow-sm flex items-center gap-1" onClick={() => setRange("today")}>
+            {dayName(day)} <X size={14} className="text-slate-400" />
+          </button>
+        )}
         {(["today", "week", "season"] as RangeId[]).map((r) => (
           <button key={r} onClick={() => { setRange(r); setPick(null); }}
             className={`px-3 py-1.5 rounded-md text-sm font-semibold ${range === r ? "bg-white shadow-sm" : "text-slate-500"}`}>
@@ -140,6 +156,51 @@ export default function CallsPage() {
       </div>
 
       {pick && <Detail pick={pick} title={`${tiles.find((t) => t.id === pick)!.title} ${label}`} d={d} eps={eps} calls={d.calls.filter((c) => inRange(c.at))} from={from} onClose={() => setPick(null)} />}
+
+      {d.days && d.days.length > 0 && (
+        <section className={card}>
+          <h2 className="font-bold mb-1">Day by day</h2>
+          <p className="text-xs text-slate-500 mb-2">Tap a day to see its numbers and the calls behind them.</p>
+          <table className="w-full text-xs sm:text-sm tabular-nums [&_td]:whitespace-nowrap [&_td]:pl-2">
+            <thead>
+              <tr className="text-xs text-slate-500 text-right">
+                <th className="text-left font-medium py-1">Day</th>
+                <th className="font-medium">Missed</th>
+                <th className="font-medium">Called back</th>
+                <th className="font-medium">Avg wait</th>
+                <th className="font-medium">Spoke to</th>
+                <th className="font-medium">New customers</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {(allDays ? d.days : d.days.slice(0, 7)).map((x) => (
+                <tr key={x.day} onClick={() => openDay(x.day)}
+                  className={`cursor-pointer text-right hover:bg-slate-50 ${(range === "day" && x.day === day) || (range === "today" && x.day === d.today) ? "bg-slate-100" : ""}`}>
+                  <td className="text-left py-1.5 font-semibold" style={{ color: NAVY }}>{x.day === d.today ? "Today" : dayName(x.day).replace(/,? \d{4}$/, "")}</td>
+                  <td style={{ color: x.missed ? RED : undefined }}>{x.missed}</td>
+                  <td>{x.missedCallers ? `${x.calledBack}/${x.missedCallers}` : "–"}</td>
+                  <td>{x.avgCallbackMin === null ? "–" : mins(x.avgCallbackMin)}</td>
+                  <td>{x.missedCallers ? `${x.reached}/${x.missedCallers}` : "–"}</td>
+                  <td style={{ color: x.bookedCallers ? GREEN : undefined }}>{x.bookedCallers || "–"}</td>
+                </tr>
+              ))}
+              <tr className="text-right font-bold border-t-2 border-slate-200 cursor-pointer" onClick={() => { setRange("season"); setPick(null); document.getElementById("call-numbers")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+                <td className="text-left py-1.5">Season</td>
+                <td>{d.stats.season.missed}</td>
+                <td>{d.stats.season.calledBack}/{d.stats.season.missedCallers}</td>
+                <td>{d.stats.season.avgCallbackMin === null ? "–" : mins(d.stats.season.avgCallbackMin)}</td>
+                <td>{d.stats.season.reached}/{d.stats.season.missedCallers}</td>
+                <td style={{ color: GREEN }}>{d.stats.season.bookedCallers}</td>
+              </tr>
+            </tbody>
+          </table>
+          {d.days.length > 7 && (
+            <button onClick={() => setAllDays(!allDays)} className="text-sm font-semibold mt-1" style={{ color: NAVY }}>
+              {allDays ? "Show the last week" : `Show all ${d.days.length} days`}
+            </button>
+          )}
+        </section>
+      )}
 
       {d.insights.length > 0 && (
         <section className={card}>
@@ -168,7 +229,7 @@ function Detail({ pick, title, d, eps, calls, from, onClose }: { pick: Pick; tit
       `missed ${when(e.at)}${e.misses > 1 ? ` (${e.misses} calls)` : ""}`,
       e.callbackAt ? `called back in ${mins((e.callbackAt - e.at) / 60_000)}` : "no call back",
       e.reachedAt ? `spoke ${e.reachedHow === "they called again" ? "when they called again" : "on our call back"}` : e.tries ? `not reached after ${e.tries} ${e.tries > 1 ? "tries" : "try"}` : "",
-      e.booked ? "booked" : "",
+      e.booked ? `became a customer${e.bookedVia ? ` (${e.bookedVia})` : ""}` : "",
     ].filter(Boolean).join(" · "),
     tone: e.booked ? GREEN : !e.callbackAt ? RED : undefined,
   });
