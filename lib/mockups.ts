@@ -23,13 +23,13 @@ export function parseMockupName(file: string) {
 
 export const loadLibrary = async () => (await kvGet<Library>(KEY)) ?? {};
 
-export async function addMockup(file: string, url: string) {
+export async function addMockup(file: string, url: string, at = Date.now()) {
   const p = parseMockupName(file);
   if (!p) throw new Error(`${file} isn't named like a Light Design Hero download (A_Name_Design1.png).`);
   await kvUpdate<Library>(KEY, {}, (lib) => {
     // A re-download of the same design replaces the older copy.
     const list = (lib[p.who] ?? []).filter((x) => !(x.n === p.n && x.ai === p.ai));
-    list.push({ n: p.n, ai: p.ai, url, file, at: Date.now() });
+    list.push({ n: p.n, ai: p.ai, url, file, at });
     lib[p.who] = list.sort((a, b) => a.n - b.n || Number(a.ai) - Number(b.ai));
   });
 }
