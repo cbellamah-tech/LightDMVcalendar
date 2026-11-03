@@ -17,7 +17,7 @@ export default function RouteEditor({ crew, onChange }: { crew?: string; onChang
   const [v, setV] = useState<V | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const q = crew ? `?crew=${crew}` : "";
+  const q = crew ? `?crew=${encodeURIComponent(crew)}` : "";
   useEffect(() => { api<V>(`/api/jobs/route-order${q}`).then(setV).catch((e) => setErr(e.message)); }, [q]);
 
   const save = useCallback(async (body: Record<string, unknown>) => {

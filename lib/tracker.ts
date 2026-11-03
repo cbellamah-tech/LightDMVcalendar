@@ -4,7 +4,7 @@ import { getChecklists, getJobs, type Job } from "./jobs";
 import { distanceM } from "./geo";
 import { planOrder } from "./routeplan";
 import { etDay, etHour } from "./crewNotes";
-import { listUsers, type User } from "./users";
+import { CREWS, listUsers, type User } from "./users";
 import { clientFor, pickPhone } from "./onMyWay";
 import { rows } from "./jobberSchema";
 import { ghlSendSms } from "./ghl";
@@ -119,9 +119,35 @@ async function osm(address: string): Promise<P | null> {
 
 // ---------- one crew's day, with ETAs ----------
 
+/* Every crew Jobber sends out shows, not only the crews set up on the People page: visits whose Jobber people aren't
+   on a crew in the app are grouped by who Jobber assigned ("jb:<names>"), and visits with nobody assigned by "none". */
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+export const crewKey = (j: Job) => j.crew || (j.assignedNames.length ? `jb:${j.assignedNames.map(slug).sort().join("+")}` : "none");
+export const validCrewKey = (k: string) => /^(crew\d{1,2}|none|jb:[a-z0-9+-]{1,120})$/.test(k);
+
+/** Crews with visits that day: People-page crews first, then Jobber-only groups, unassigned last. */
+export function crewsOn(all: Record<string, Job>, day: string) {
+  const keys = new Set(Object.values(all).filter((j) => etDay(j.start) === day).map(crewKey));
+  const rank = (k: string) => (k.startsWith("crew") ? 0 : k === "none" ? 2 : 1);
+  return [...keys].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, undefined, { numeric: true }));
+}
+
+/** "Crew 3 (Jose)", or for a Jobber-only group the names Jobber has on it. */
+export function crewLabel(crew: string, users: User[], jobs: Job[]) {
+  if (crew === "none") return "Nobody assigned in Jobber";
+  if (crew.startsWith("jb:")) return `${jobs[0]?.assignedNames.join(" & ") || "Jobber crew"} (not on a crew in People)`;
+  const lead = users.find((u) => u.active && u.role === "lead" && u.crew === crew)?.name;
+  const base = (CREWS[crew] || crew).replace(/\s*\(.*\)$/, "");
+  return lead ? `${base} (${lead})` : CREWS[crew] || crew;
+}
+
+/** The name customers see: the crew's lead in People, else the first person Jobber put on the visit. */
+export const leadOf = (crew: string, users: User[], jobs: Job[]) =>
+  users.find((u) => u.active && u.role === "lead" && u.crew === crew)?.name || jobs[0]?.assignedNames[0]?.split(/\s+/)[0] || "Your crew";
+
 /** The day's stops for a crew (installs, takedowns and fixes): the order the crew set, else Jobber's. */
 export const crewJobs = (all: Record<string, Job>, crew: string, day: string, order?: string[] | null) => {
-  const list = Object.values(all).filter((j) => j.crew === crew && etDay(j.start) === day).sort((a, b) => a.start.localeCompare(b.start));
+  const list = Object.values(all).filter((j) => crewKey(j) === crew && etDay(j.start) === day).sort((a, b) => a.start.localeCompare(b.start));
   if (!order?.length) return list;
   // Stops Jobber added after the crew set its order go to the end, in Jobber order.
   const at = (id: string) => { const i = order.indexOf(id); return i < 0 ? order.length : i; };
@@ -179,7 +205,7 @@ export async function crewDay(crew: string, day = etDay(), ctx?: { all?: Record<
   const now = Date.now();
   const vanToday = van && van.day === day ? van : null;
   const vanFresh = !!vanToday && now - vanToday.at < FRESH_MS;
-  const lead = users.find((u) => u.active && u.role === "lead" && u.crew === crew)?.name || crew;
+  const lead = leadOf(crew, users, jobs);
 
   const rowsIn = jobs.map((job, i) => ({ job, at: pts[i] ?? undefined, arrivedAt: lists[i].arrivedAt, completedAt: lists[i].completedAt, done: !!(lists[i].completedAt || job.doneInJobber) }));
   const est = onSiteEstimator(rowsIn);
@@ -273,14 +299,15 @@ export async function publicView(token: string): Promise<PublicView> {
   if (!rec) return { state: "gone" };
   const [all, users] = await Promise.all([getJobs(), listUsers()]);
   const job = all[rec.jobId];
-  if (!job || !job.crew) return { state: "gone" };
+  if (!job) return { state: "gone" };
+  const crew = crewKey(job);
   const today = etDay();
   const day = etDay(job.start);
-  const lead = users.find((u) => u.active && u.role === "lead" && u.crew === job.crew)?.name || "Your crew";
+  const lead = leadOf(crew, users, [job]);
   if (day > today) return { state: "future", day, start: job.start, allDay: isMidnight(job.start), kind: job.kind, lead };
   // Two days after the visit the link stops showing anything.
   if (Date.parse(`${day}T12:00:00Z`) < Date.parse(`${today}T12:00:00Z`) - 2 * 86400_000) return { state: "gone" };
-  const cd = await crewDay(job.crew, day, { all, users });
+  const cd = await crewDay(crew, day, { all, users });
   const me = cd.stops.find((s) => s.jobId === job.id);
   if (!me) return { state: "gone" };
   const done = cd.stops.filter((s) => s.status === "done").length;

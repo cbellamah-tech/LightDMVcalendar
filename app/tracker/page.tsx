@@ -15,7 +15,10 @@ type Row = Stop & { link: string; sends: LinkSend[] };
 type Crew = Omit<CrewDay, "stops"> & { label: string; stops: Row[] };
 type Data = { day: string; settings: TrackSettings; sample: string; crews: Crew[]; locating: number };
 
-const CREW_COLOR: Record<string, string> = { crew1: "#112E5B", crew2: "#7C3AED" };
+const CREW_COLOR: Record<string, string> = { crew1: "#112E5B", crew2: "#7C3AED", crew3: "#0E7490", crew4: "#BE185D", crew5: "#B45309", crew6: "#4D7C0F" };
+const PALETTE = ["#0E7490", "#BE185D", "#B45309", "#4D7C0F", "#9333EA", "#0F766E", "#C2410C"];
+/** A steady color per crew, so the same crew keeps its color on every refresh. */
+const colorOf = (crew: string) => CREW_COLOR[crew] ?? (crew === "none" ? "#64748B" : PALETTE[[...crew].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % PALETTE.length]);
 const STATUS_COLOR = { done: "#1F9D55", here: "#F5A524" } as const;
 const TZ = "America/New_York";
 const clock = (t: number | string) => new Date(t).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
@@ -36,7 +39,7 @@ export default function TrackerPage() {
     const points: MapPoint[] = [];
     const lines: MapLine[] = [];
     for (const c of d?.crews ?? []) {
-      const color = CREW_COLOR[c.crew] ?? NAVY;
+      const color = colorOf(c.crew);
       const lead = c.lead;
       for (const s of c.stops) {
         if (!s.at) continue;
@@ -81,14 +84,16 @@ export default function TrackerPage() {
 function CrewCard({ c, sample, onSent }: { c: Crew; sample: string; onSent: () => void }) {
   const [reorder, setReorder] = useState(false);
   const done = c.stops.filter((s) => s.status === "done").length;
-  const color = CREW_COLOR[c.crew] ?? NAVY;
+  const color = colorOf(c.crew);
   return (
     <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className="font-extrabold flex items-center gap-2" style={{ color }}><Truck size={18} /> {c.label}</h2>
           <p className="text-xs text-slate-500">
-            {c.van ? <>Van seen {ago(c.van.at)}{c.vanFresh ? "" : " (phone not sending now: app closed or screen locked)"}</> : c.stops.length ? `${c.lead}'s phone hasn't shared a location today. It starts when ${c.lead} opens the app.` : "No stops today."}
+            {c.van ? <>Van seen {ago(c.van.at)}{c.vanFresh ? "" : " (phone not sending now: app closed or screen locked)"}</> : !c.stops.length ? "No stops today."
+              : c.crew.startsWith("crew") ? `${c.lead}'s phone hasn't shared a location today. It starts when ${c.lead} opens the app.`
+              : "No van location: nobody on this crew is set up as a crew lead in the app. Put them on a crew on the People page."}
           </p>
         </div>
         {c.stops.length > 0 && <span className="text-sm font-bold text-slate-600 shrink-0">{done} of {c.stops.length} done</span>}

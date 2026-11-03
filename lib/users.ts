@@ -14,7 +14,7 @@ export type User = {
 };
 export type PublicUser = Omit<User, "pinHash"> & { hasPin: boolean };
 
-export const CREWS: Record<string, string> = { crew1: "Crew 1 (Gary)", crew2: "Crew 2 (Sayed)" };
+export const CREWS: Record<string, string> = { crew1: "Crew 1 (Gary)", crew2: "Crew 2 (Sayed)", crew3: "Crew 3", crew4: "Crew 4", crew5: "Crew 5", crew6: "Crew 6" };
 
 const KEY = "ldmv:users";
 

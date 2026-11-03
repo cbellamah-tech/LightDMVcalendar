@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { etDay } from "@/lib/crewNotes";
 import type { Session } from "@/lib/session";
-import { CREWS } from "@/lib/users";
-import { bestOrder, crewDay, saveOrder } from "@/lib/tracker";
+import { bestOrder, crewDay, saveOrder, validCrewKey } from "@/lib/tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +12,7 @@ export const dynamic = "force-dynamic";
 const crewOf = (s: Session, asked: string | null) => {
   const office = s.role === "owner" || s.role === "manager";
   const crew = office ? asked || s.crew : s.crew;
-  return crew && CREWS[crew] ? crew : null;
+  return crew && validCrewKey(crew) ? crew : null;
 };
 
 const view = async (crew: string) => {
