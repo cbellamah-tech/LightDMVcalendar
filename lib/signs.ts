@@ -189,6 +189,7 @@ export const getVisits = async () => (await kvGet<Record<string, Visit[]>>(VISIT
 
 export async function addVisit(v: Visit) {
   await kvUpdate<Record<string, Visit[]>>(VISITS, {}, (all) => {
+    if (all[v.stopId]?.some((x) => x.id === v.id)) return; // a retried upload
     all[v.stopId] = [v, ...(all[v.stopId] ?? [])].slice(0, 25);
   });
 }
@@ -256,9 +257,11 @@ export type PayEntry = {
 export const getPay = async () => (await kvGet<Record<string, PayEntry[]>>(PAY)) ?? {};
 
 /** Logs pay for a visit. Saving the same spot again within 12 hours replaces its entry, so a redo never pays twice. */
-export async function addPay(uid: string, e: PayEntry) {
+export async function addPay(uid: string, e: PayEntry, perSnap = false) {
   await kvUpdate<Record<string, PayEntry[]>>(PAY, {}, (all) => {
-    const list = (all[uid] ?? []).filter((x) => !(x.stopId === e.stopId && Math.abs(e.at - x.at) < 12 * 3600_000));
+    if (all[uid]?.some((x) => x.visitId === e.visitId)) return; // a retried upload never pays twice
+    // Snaps pay per photo (four corners = four snaps); a re-saved spot from the old form replaces its entry.
+    const list = perSnap ? (all[uid] ?? []) : (all[uid] ?? []).filter((x) => !(x.stopId === e.stopId && Math.abs(e.at - x.at) < 12 * 3600_000));
     all[uid] = [e, ...list].slice(0, 5000);
   });
 }

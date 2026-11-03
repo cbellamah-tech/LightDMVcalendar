@@ -23,12 +23,12 @@ export default function VisitSheet({ stop, auto, pos, last, routeName, onClose, 
   const needPhoto = stop.photoRequired && status !== "skipped";
   const dist = pos ? distanceM(pos, stop) : null;
 
-  async function save() {
+  async function save(photoUrl = photo) {
     setBusy(true); setErr("");
     try {
       // GPS goes with every check: the live reading, or a quick fresh one if GPS wasn't running.
       const here = pos || (await freshFix(8000));
-      await api("/api/signs/visit", { method: "POST", json: { stopId: stop.id, status, photoUrl: photo || undefined, note, signs, ...(here || {}) } });
+      await api("/api/signs/visit", { method: "POST", json: { stopId: stop.id, status, photoUrl: photoUrl || undefined, note, signs, ...(here || {}) } });
       onSaved();
     } catch (e: any) { setErr(e.message); setBusy(false); }
   }
@@ -64,13 +64,13 @@ export default function VisitSheet({ stop, auto, pos, last, routeName, onClose, 
           </div>
         ) : (
           <PhotoButton folder={`signs/${stop.id}`} multiple={false} label={needPhoto ? "Take sign photo (required)" : "Take sign photo"} className="w-full py-3"
-            onUploaded={(urls) => setPhoto(urls[0])} />
+            onUploaded={(urls) => { setPhoto(urls[0]); if (status !== "skipped") save(urls[0]); }} />
         )}
         <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
           placeholder={status === "skipped" ? "Why couldn't you place it?" : "Note (optional)"}
           className="w-full border border-slate-300 rounded-lg p-2 text-sm" />
         {err && <p className="text-sm text-red-600">{err}</p>}
-        <button disabled={busy || (needPhoto && !photo) || (status === "skipped" && !note.trim())} onClick={save}
+        <button disabled={busy || (needPhoto && !photo) || (status === "skipped" && !note.trim())} onClick={() => save()}
           className="w-full rounded-lg py-3 font-bold text-white disabled:opacity-40 flex justify-center gap-2" style={{ background: "#1F9D55" }}>
           {busy && <Loader2 className="animate-spin" size={20} />} Save stop
         </button>
