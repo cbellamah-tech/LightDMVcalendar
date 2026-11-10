@@ -9,6 +9,7 @@ import { refreshGbp } from "@/lib/gbp";
 import { refreshReviewStats } from "@/lib/reviewStats";
 import { refreshLibrary, refreshSocialStats } from "@/lib/social";
 import { later } from "@/lib/background";
+import { syncAired } from "@/lib/radioAired";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
   await refreshReviewStats(true).catch(() => null); // Google review count (backup to the website bot, which asks every few hours)
   await refreshWebsite().catch(() => null); // new pages and blog posts on lightdmv.com (the sheet's blog row)
   const google = (await googleStatus()).connected;
+  if (google) await syncAired().catch(() => null); // new iHeart spot reports in info@, before the sheet counts radio
   const r = google ? await syncSheet("Daily auto-fill") : { skipped: "Google not connected" };
   await syncMetaAds(true).catch(() => null); // backup, in case the daily video finished while Auto-post was off
   await refreshSocialStats().catch(() => null); // yesterday's likes, views and posts per platform

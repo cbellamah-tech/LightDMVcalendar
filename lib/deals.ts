@@ -60,26 +60,46 @@ export async function getDeals(force = false): Promise<Cached> {
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400_000) + 1;
 export const dealDays = (d: Deal) => daysBetween(d.start, d.end);
 
-/** Radio spots each day of a deal: the paid spots spread evenly over the run, plus the weekly bonus spots. */
-export function radioSpotDays(deals: Deal[]): { day: string; n: number }[] {
+/** What the station's spot reports say aired: spots per day, and the last day the reports cover. */
+export type AiredCounts = { through: string; byDay: Map<string, number> };
+
+/** Radio spots each day of a deal. Days the station's spot reports cover use the spots that really aired;
+ *  later days use the booked rate (paid spots spread evenly over the run, plus the weekly bonus spots). */
+export function radioSpotDays(deals: Deal[], aired?: AiredCounts): { day: string; n: number }[] {
   const out: { day: string; n: number }[] = [];
   for (const d of deals) {
     if (!d.channels.includes("radio")) continue;
     const per = d.spots / dealDays(d) + d.bonusPerWeek / 7;
-    for (let x = d.start; x <= d.end; x = addDays(x, 1)) out.push({ day: x, n: per });
+    for (let x = d.start; x <= d.end; x = addDays(x, 1))
+      out.push({ day: x, n: aired?.through && x <= aired.through ? aired.byDay.get(x) ?? 0 : per });
   }
   return out;
 }
 
-/** Where a deal stands today, for the Marketing tab. Spots and spend so far are pro-rated over the run. */
-export function dealProgress(d: Deal, today = etDay(Date.now())) {
+/** Where a deal stands today, for the Marketing tab. Spend so far is pro-rated over the run; spots so far are
+ *  the aired spots from the station's reports (pro-rated only for days no report covers yet). */
+export function dealProgress(d: Deal, today = etDay(Date.now()), aired?: AiredCounts) {
   const total = dealDays(d);
   const done = today < d.start ? 0 : today > d.end ? total : daysBetween(d.start, today);
   const share = done / total;
   const bonus = Math.round((d.bonusPerWeek * total) / 7);
+  const radio = d.channels.includes("radio");
+  const through = radio && aired?.through && aired.through >= d.start ? (aired.through < d.end ? aired.through : d.end) : "";
+  let spotsAired = 0;
+  const weeks: { week: string; n: number }[] = [];
+  if (through) for (let x = d.start; x <= through; x = addDays(x, 1)) {
+    const n = aired!.byDay.get(x) ?? 0;
+    spotsAired += n;
+    const wk = Math.floor(daysBetween(d.start, x) / 7);
+    (weeks[wk] ??= { week: addDays(d.start, wk * 7), n: 0 }).n += n;
+  }
+  const perDay = (d.spots + bonus) / total;
+  const after = through && today > through ? daysBetween(through, today < d.end ? today : d.end) - 1 : 0;
   return {
     ...d, daysTotal: total, daysDone: done, daysLeft: total - done,
-    spotsTotal: d.spots + bonus, spotsSoFar: Math.round((d.spots + bonus) * share),
+    spotsTotal: d.spots + bonus, spotsSoFar: through ? Math.round(spotsAired + perDay * after) : Math.round((d.spots + bonus) * share),
+    spotsAired, airedThrough: through, bookedByThrough: through ? Math.round(perDay * daysBetween(d.start, through)) : 0,
+    weeks: weeks.filter(Boolean), bookedPerWeek: Math.round(perDay * 7),
     spentSoFar: Math.round(d.cost * share),
   };
 }
