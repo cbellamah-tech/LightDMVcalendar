@@ -6,7 +6,8 @@ import { kvGet, kvSet } from "./store";
 import { BOXES, CHANNELS, ChannelId, CountEvent, channel, addDays, dailyCounts, etDay, getEvents, getFeed, logCount, sheetWeek, weekOf, weekTotals } from "./marketing";
 import { getGhlSnap, ghlConfigured, leadSource, refreshGhl } from "./ghl";
 import { clearCopied2025, coldEmailReports, ColdReport, ensureSheetRows, googleStatus, inboxThreads, InboxThread, SheetCell, sheetUrl, writeRunnerFile, writeSheet } from "./google";
-import { Deal, dealDays, dealProgress, getDeals, radioSpotDays } from "./deals";
+import { AiredCounts, Deal, dealDays, dealProgress, getDeals, radioSpotDays } from "./deals";
+import { airedDays, getAired, syncAired } from "./radioAired";
 import { getMedia, PLATFORMS, runnerKey } from "./media";
 import { stableOrigin } from "./jobber";
 import { laterOnce } from "./background";
@@ -68,6 +69,12 @@ async function readInbox(cur: Inbox | null) {
   }
 }
 
+/** Radio spots that aired, from iHeart's spot reports in info@ (re-checked on Refresh and every morning). */
+async function airedCounts(refresh = false): Promise<AiredCounts> {
+  const st = refresh ? await syncAired() : await getAired();
+  return { through: st.through, byDay: airedDays(st) };
+}
+
 export async function marketingDashboard(opts: { week?: string; refresh?: boolean; days?: number } = {}) {
   const today = etDay(Date.now());
   const thisWeek = weekOf(today);
@@ -88,7 +95,8 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     ghlP, allAdDays(), getEvents(), getFeed(), getAutoPost(), getDrafts(), adsSummary(), latestCold(), getMedia(), kvGet<FillResult>(FILL), googleP,
     googleP.then((gs) => inbox(opts.refresh, gs)), getDeals(opts.refresh),
   ]);
-  const daily = await dailyCounts(ghl?.posts ?? [], adDays, events, radioSpotDays(deals.deals), await newPageDays());
+  const aired = await airedCounts(opts.refresh);
+  const daily = await dailyCounts(ghl?.posts ?? [], adDays, events, radioSpotDays(deals.deals, aired), await newPageDays());
   const totals = weekTotals(daily, week);
   const prev = weekTotals(daily, addDays(week, -7));
 
@@ -128,7 +136,7 @@ export async function marketingDashboard(opts: { week?: string; refresh?: boolea
     autopost: autopost.on,
     drafts: { text: drafts, urls: POST_URL },
     attribution: ghl ? attribution(ghl.leads, ghl.opps ?? [], adDays, opts.days ?? 30, today) : null,
-    deals: { url: deals.url, error: deals.error, list: deals.deals.map((d) => dealProgress(d, today)) },
+    deals: { url: deals.url, error: deals.error, list: deals.deals.map((d) => dealProgress(d, today, aired)) },
     ads,
     cold: { url: SMARTLEAD_URL, latest: cold },
     media: mediaAll.filter((m) => m.status === "ready" && !m.skipped).slice(0, 14),
@@ -156,7 +164,7 @@ export async function fillWeeks(weeks: string[], by: string, dry = false): Promi
   const week = weeks[weeks.length - 1];
   const ghl = ghlConfigured() ? await refreshGhl().catch(() => getGhlSnap()) : null;
   const deals = (await getDeals()).deals;
-  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays(), undefined, radioSpotDays(deals), await newPageDays());
+  const daily = await dailyCounts(ghl?.posts ?? [], await allAdDays(), undefined, radioSpotDays(deals, await airedCounts()), await newPageDays());
   const cellsTouched = new Set<string>(); // "YYYY-MM|week"
   for (const w of weeks)
     for (let i = 0; i < 7; i++) {

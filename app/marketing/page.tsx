@@ -41,6 +41,7 @@ type Data = {
 type DealRow = {
   name: string; vendor: string; channels: string[]; start: string; end: string; cost: number; emails: number; status: string; notes: string;
   daysTotal: number; daysDone: number; daysLeft: number; spotsTotal: number; spotsSoFar: number; spentSoFar: number;
+  spotsAired: number; airedThrough: string; bookedByThrough: number; bookedPerWeek: number; weeks: { week: string; n: number }[];
 };
 
 const addDays = (d: string, k: number) => new Date(Date.parse(d) + k * 86400_000).toISOString().slice(0, 10);
@@ -329,15 +330,23 @@ function Deals({ deals, a, days, sheetUrl }: { deals: Data["deals"]; a: Attribut
             </div>
             {x.status && <div className="text-xs text-amber-700">{x.status}</div>}
             <div className="flex gap-x-4 gap-y-1 flex-wrap text-xs text-slate-700 tabular-nums">
-              {x.spotsTotal > 0 && <span>Radio spots: {x.spotsSoFar} of {x.spotsTotal}{live ? " so far" : ""}</span>}
+              {x.spotsTotal > 0 && (x.airedThrough
+                ? <span>Radio spots aired: {x.spotsAired} through {md(x.airedThrough)} (booked ~{x.bookedByThrough} by then) · {x.spotsTotal} booked in all</span>
+                : <span>Radio spots: {x.spotsSoFar} of {x.spotsTotal}{live ? " so far" : ""}</span>)}
               {x.emails > 0 && <span>Emails: {x.emails.toLocaleString()}</span>}
               {x.cost > 0 && <span>Spent: {money(x.spentSoFar)} of {money(x.cost)}</span>}
               <span>Leads (last {days} days): {leads}{leads && x.spentSoFar ? ` · ${money(Math.round(x.spentSoFar / leads))} a lead` : ""}</span>
             </div>
+            {x.weeks?.length > 0 && (
+              <div className="flex gap-x-3 gap-y-1 flex-wrap text-xs text-slate-600 tabular-nums">
+                <span className="text-slate-500">Aired each week (booked ~{x.bookedPerWeek}):</span>
+                {x.weeks.map((w) => <span key={w.week}>{md(w.week)}: <b className={w.n >= x.bookedPerWeek ? "text-emerald-700" : "text-amber-700"}>{w.n}</b></span>)}
+              </div>
+            )}
           </a>
         );
       })}
-      <p className="text-xs text-slate-500">Spots and spend so far are spread evenly over the run. Leads count when GoHighLevel's source or tags say radio, 97.1, WASH-FM or iHeart.</p>
+      <p className="text-xs text-slate-500">Radio spots come from iHeart's spot reports in info@ (read by themselves each morning); days no report covers yet are spread evenly. Spend so far is spread evenly over the run. Leads count when GoHighLevel's source or tags say radio, 97.1, WASH-FM or iHeart.</p>
     </Card>
   );
 }
