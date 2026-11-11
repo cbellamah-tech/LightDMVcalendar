@@ -4,6 +4,8 @@ import { JC, JJ, JQ, jobberWebUrl, type CxLine, type CxMsg, type CxNote, type JC
 import { GC, GM, GN, ghlContactUrl, type GContact, type GMsgs, type GNotes } from "./cxGhl";
 import { isAdminLine, lineTags } from "./cxItems";
 import { EM, type CxEmails } from "./cxEmail";
+import { etDay } from "./marketing";
+import { JOBBER_SOLD } from "./calls";
 
 /* The owners' customer database: Jobber clients and GoHighLevel contacts merged into households (same phone, email
    or street address = one customer, so a couple with two quotes or a returning customer under a new name is never a
@@ -89,6 +91,8 @@ export async function buildCustomers(): Promise<number> {
   const driveIdx = await loadDriveIndex();
   const rows: CxRow[] = [];
   const members: [string, Members][] = [];
+  const jobberSold: Record<string, string[]> = {};
+  const soldSince = Date.now() - 400 * 86400_000;
   for (const list of groups.values()) {
     const js = list.filter((i) => i < clients.length).map((i) => clients[i]);
     const gs = list.filter((i) => i >= clients.length).map((i) => contacts[i - clients.length]);
@@ -112,9 +116,16 @@ export async function buildCustomers(): Promise<number> {
       bins: [...new Set(js.flatMap((c) => driveFor(driveIdx, c.name).bins.map((b) => b.bin)))],
     });
     members.push([MEMBERS + id, m]);
+    // For the Calls page: the days this household booked in Jobber, under each of its GoHighLevel contacts.
+    if (gs.length) {
+      const days = [...jobs.map((j) => j.createdAt), ...quotes.filter((q) => SOLD.test(q.status ?? "")).map((q) => q.createdAt)]
+        .map((t) => Date.parse(t ?? "") || 0).filter((t) => t >= soldSince).map((t) => etDay(t));
+      if (days.length) { const u = [...new Set(days)].sort(); for (const c of gs) jobberSold[c.id] = u; }
+    }
   }
   rows.sort((a, b) => b.lastAt - a.lastAt);
   await kvSetMany(members);
+  await kvSet(JOBBER_SOLD, jobberSold);
   await kvSet(INDEX, rows);
   g.__cxIndex = { at: Date.now(), rows };
   return rows.length;
